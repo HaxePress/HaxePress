@@ -263,9 +263,6 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             print("Downloading " + library + "…", flush=True)
             urllib.request.urlretrieve(entry["url"], target)
-    subprocess.run(
-        [haxelib, "fixrepo"], cwd=ROOT, env=environment, check=True, stdout=subprocess.DEVNULL
-    )
     if prepare_environment(ROOT):
         print(
             "Created private .env with HxWell's application key. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."
