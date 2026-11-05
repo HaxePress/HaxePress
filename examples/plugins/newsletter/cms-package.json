@@ -1,0 +1,34 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "slug": "newsletter",
+  "name": "Newsletter",
+  "version": "2.16.0",
+  "description": "Newsletter subscriptions and subscriber management.",
+  "author": "HaxePress",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.newsletter.NewsletterPlugin"
+  },
+  "assets": {
+    "module": "newsletter.js",
+    "stylesheet": "newsletter.css"
+  },
+  "hooks": ["ui.navigation", "dashboard.widgets"],
+  "fields": [
+    {
+      "key": "title",
+      "label": "Newsletter heading",
+      "kind": "text",
+      "required": true,
+      "defaultValue": "Newsletter"
+    }
+  ],
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "Add the reading note to content": "Okuma notunu içeriklere ekle",
+  "Minimum content length for site": "Yayımlamak için en az içerik uzunluğu",
+  "Reading Companion": "Okuma Arkadaşı",
+  "Reading Companion requires at least {minimum} content characters before site.": "Okuma Arkadaşı, yayımlamadan önce en az {minimum} karakterlik içerik gerektirir.",
+  "Reading note": "Okuma notu",
+  "Reading progress": "Okuma ilerlemesi",
+  "Reading progress, optional notes and a dashboard widget.": "Okuma ilerlemesi, isteğe bağlı notlar ve bir panel bileşeni.",
+  "Set to 0 to leave site length unchanged.": "Yayın uzunluğunu sınırlamamak için 0 kullanın.",
+  "This note appears below the site footer.": "Bu not site alt bölümünün altında görünür.",
+  "Your reading note is active on the public site.": "Okuma notunuz sitede etkin."
+}

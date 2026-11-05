@@ -1,0 +1,80 @@
+{
+  "apiVersion": 4,
+  "kind": "theme",
+  "slug": "fieldnotes",
+  "name": "Fieldnotes",
+  "version": "2.16.0",
+  "description": "Two-column layout with featured content.",
+  "author": "HaxePress",
+  "layout": "fieldnotes",
+  "assets": {
+    "stylesheet": "theme.css",
+    "renderer": "theme.mjs"
+  },
+  "fields": [
+    {
+      "key": "accent",
+      "label": "Accent color",
+      "kind": "color",
+      "defaultValue": "#28533f",
+      "required": true
+    },
+    {
+      "key": "button_color",
+      "label": "Button background",
+      "kind": "color",
+      "defaultValue": "",
+      "help": "Leave unset to use the accent color."
+    },
+    {
+      "key": "button_text_color",
+      "label": "Button text color",
+      "kind": "color",
+      "defaultValue": "#ffffff"
+    },
+    {
+      "key": "paper",
+      "label": "Page background",
+      "kind": "color",
+      "defaultValue": "#fbfcfa",
+      "required": true
+    },
+    {
+      "key": "ink",
+      "label": "Text color",
+      "kind": "color",
+      "defaultValue": "#282e29",
+      "required": true
+    },
+    {
+      "key": "typeface",
+      "label": "Heading style",
+      "kind": "select",
+      "defaultValue": "editorial",
+      "options": [
+        {
+          "label": "Editorial serif",
+          "value": "editorial"
+        },
+        {
+          "label": "Modern sans serif",
+          "value": "modern"
+        }
+      ]
+    },
+    {
+      "key": "width",
+      "label": "Content width",
+      "kind": "number",
+      "minimum": 960,
+      "maximum": 1440,
+      "defaultValue": "1180",
+      "help": "Maximum desktop width in pixels. Small screens adapt automatically."
+    }
+  ],
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
+  },
+  "cmsVersion": "2.16.0"
+}

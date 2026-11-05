@@ -1,0 +1,28 @@
+--- a/java/db/Jdbc.hx
++++ b/java/db/Jdbc.hx
+@@ -251,9 +251,13 @@
+ 			var ret = {}, names = names, types = types;
+ 			for (i in 0...names.length) {
+ 				var name = names[i], t = types[i], val:Dynamic = null;
+-				if (t == Types.FLOAT) {
+-					val = rs.getDouble(i + 1);
+-				} else if (t == Types.DATE || t == Types.TIME) {
++				if (t == Types.FLOAT || t == Types.DOUBLE || t == Types.REAL
++                    || t == Types.NUMERIC || t == Types.DECIMAL || t == Types.BIGINT) {
++                    val = rs.getDouble(i + 1);
++                    if (rs.wasNull()) {
++                        val = null;
++                    }
++				} else if (t == Types.DATE || t == Types.TIME || t == Types.TIMESTAMP || t == Types.TIMESTAMP_WITH_TIMEZONE) {
+ 					if (dbName == "SQLite") {
+ 						var str = rs.getString(i + 1);
+ 						if (str != null) {
+@@ -261,7 +265,7 @@
+ 							val = d;
+ 						}
+ 					} else {
+-						var d:java.sql.Date = rs.getDate(i + 1);
++						var d = rs.getTimestamp(i + 1);
+ 						if (d != null)
+ 							val = Date.fromTime(cast d.getTime());
+ 					}

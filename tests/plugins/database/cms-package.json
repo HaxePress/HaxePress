@@ -1,0 +1,18 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "slug": "database-test",
+  "name": "Database persistence test",
+  "version": "2.16.0",
+  "description": "Native plugin models, migrations and scoped JSON persistence.",
+  "author": "CMS tests",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.database.DatabasePlugin"
+  },
+  "hooks": ["site.shared"],
+  "fields": []
+}

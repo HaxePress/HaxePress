@@ -1,0 +1,60 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "theme",
+  "slug": "simple",
+  "name": "Simple",
+  "version": "2.16.0",
+  "description": "Single-column layout for content and pages.",
+  "author": "HaxePress",
+  "layout": "simple",
+  "assets": {},
+  "fields": [
+    {
+      "key": "accent",
+      "label": "Link color",
+      "kind": "color",
+      "defaultValue": "#2457a6",
+      "required": true
+    },
+    {
+      "key": "button_color",
+      "label": "Button background",
+      "kind": "color",
+      "defaultValue": "",
+      "help": "Leave unset to use the accent color."
+    },
+    {
+      "key": "button_text_color",
+      "label": "Button text color",
+      "kind": "color",
+      "defaultValue": "#ffffff"
+    },
+    {
+      "key": "paper",
+      "label": "Page background",
+      "kind": "color",
+      "defaultValue": "#ffffff",
+      "required": true
+    },
+    {
+      "key": "ink",
+      "label": "Text color",
+      "kind": "color",
+      "defaultValue": "#202124",
+      "required": true
+    },
+    {
+      "key": "width",
+      "label": "Content width",
+      "kind": "number",
+      "defaultValue": "760",
+      "minimum": 640,
+      "maximum": 960
+    }
+  ],
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "slug": "reading-companion",
+  "name": "Reading Companion",
+  "version": "2.16.0",
+  "description": "Reading progress, optional notes and a dashboard widget.",
+  "author": "HaxePress",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "example.reading.ReadingPlugin"
+  },
+  "hooks": ["site.shared", "site.assets", "dashboard.widgets", "content.render", "content.saving"],
+  "assets": {
+    "module": "reading.js",
+    "stylesheet": "reading.css"
+  },
+  "fields": [
+    {
+      "key": "message",
+      "label": "Reading note",
+      "kind": "textarea",
+      "defaultValue": "",
+      "help": "This note appears below the site footer."
+    },
+    {
+      "key": "content_note",
+      "label": "Add the reading note to content",
+      "kind": "boolean",
+      "defaultValue": "false"
+    },
+    {
+      "key": "minimum_characters",
+      "label": "Minimum content length for site",
+      "kind": "number",
+      "defaultValue": "0",
+      "minimum": 0,
+      "maximum": 100000,
+      "help": "Set to 0 to leave site length unchanged."
+    }
+  ],
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
+  }
+}

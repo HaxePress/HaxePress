@@ -1,0 +1,60 @@
+{
+  "haxe": "4.3.7",
+  "formatter": "1.18.0",
+  "crossbyte": {
+    "version": "1.0.1",
+    "repository": "https://github.com/DimensionscapeOrg/crossbyte",
+    "commit": "acc6de8994e0292ae48706017a2eafa4acbaedbf"
+  },
+  "emitter": {
+    "version": "2.0.0",
+    "repository": "https://github.com/Dimensionscape/Emitter",
+    "commit": "06b396f584271e24a7dc18dcfadfd020c567cc6a"
+  },
+  "haxe-concurrent": "5.1.5",
+  "crypto": "1.3.0",
+  "uuid": "2.4.1",
+  "hxjava": "4.2.0",
+  "hxcpp": "4.3.2",
+  "sqlite-jdbc": {
+    "version": "3.50.3.0",
+    "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar"
+  },
+  "commonmark": {
+    "version": "0.32.0",
+    "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark/0.32.0/commonmark-0.32.0.jar"
+  },
+  "hxwell-inertia": {
+    "version": "0.0.1",
+    "repository": "https://github.com/hxwell/hxwell-inertia",
+    "commit": "243c3b22a13a1c141c5b95fb59fa1031316c782c"
+  },
+  "common-lang": {
+    "version": "3.15.3",
+    "url": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/common/common-lang/3.15.3/common-lang-3.15.3.jar"
+  },
+  "common-io": {
+    "version": "3.15.3",
+    "url": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/common/common-io/3.15.3/common-io-3.15.3.jar"
+  },
+  "common-image": {
+    "version": "3.15.3",
+    "url": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/common/common-image/3.15.3/common-image-3.15.3.jar"
+  },
+  "imageio-core": {
+    "version": "3.15.3",
+    "url": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/imageio/imageio-core/3.15.3/imageio-core-3.15.3.jar"
+  },
+  "imageio-metadata": {
+    "version": "3.15.3",
+    "url": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/imageio/imageio-metadata/3.15.3/imageio-metadata-3.15.3.jar"
+  },
+  "imageio-webp": {
+    "version": "3.15.3",
+    "url": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/imageio/imageio-webp/3.15.3/imageio-webp-3.15.3.jar"
+  },
+  "mysql-connector-j": {
+    "version": "26.10.0",
+    "url": "https://repo.maven.apache.org/maven2/com/mysql/mysql-connector-j/26.10.0/mysql-connector-j-26.10.0.jar"
+  }
+}

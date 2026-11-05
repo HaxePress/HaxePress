@@ -1,0 +1,23 @@
+{
+  "Collects newsletter subscriptions and manages subscribers in the studio.": "Bülten aboneliklerini toplar ve aboneleri stüdyoda yönetir.",
+  "Could not subscribe.": "Abone olunamadı.",
+  "Email address": "E-posta adresi",
+  "Enter a valid email address.": "Geçerli bir e-posta adresi girin.",
+  "Export CSV": "CSV dışa aktar",
+  "Newsletter": "Bülten",
+  "Newsletter heading": "Bülten başlığı",
+  "Newsletter subscriptions and subscriber management.": "Bülten abonelikleri ve abone yönetimi.",
+  "No {items} yet.": "Henüz {items} yok.",
+  "Please try again in a moment.": "Lütfen biraz sonra yeniden deneyin.",
+  "Remove subscriber": "Aboneyi kaldır",
+  "Remove this subscriber?": "Bu abone kaldırılsın mı?",
+  "Subscribe": "Abone ol",
+  "Subscribed at": "Abonelik tarihi",
+  "Subscribers": "Aboneler",
+  "Subscribing…": "Abone olunuyor…",
+  "The people following your site.": "Yayınınızı takip eden kişiler.",
+  "Your email address": "E-posta adresiniz",
+  "Your subscription has been saved.": "Aboneliğiniz kaydedildi.",
+  "subscribers": "abone",
+  "{count} subscribers. [Manage subscribers](/admin/subscribers).": "{count} abone. [Aboneleri yönetin](/admin/subscribers)."
+}

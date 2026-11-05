@@ -1,0 +1,1957 @@
+diff --git a/src/hx/well/database/Connection.hx b/src/hx/well/database/Connection.hx
+--- a/src/hx/well/database/Connection.hx
++++ b/src/hx/well/database/Connection.hx
+@@ -1,16 +1,22 @@
+ package hx.well.database;
++
+ import haxe.ThreadLocal;
+ import hx.well.pool.DatabasePool;
+ import sys.db.Connection as HaxeConnection;
+ import hx.concurrent.collection.SynchronizedMap;
++
+ class Connection {
+-    private static var connectionPool:SynchronizedMap<String, DatabasePool> = SynchronizedMap.newStringMap();
+-    private static var connectionDrivers:SynchronizedMap<String, String> = SynchronizedMap.newStringMap();
+-    private static var threadLocal:ThreadLocal<Map<String, HaxeConnection>> = new ThreadLocal<Map<String, HaxeConnection>>(() -> {
++    private static var connectionPool:SynchronizedMap<String,
++        DatabasePool> = SynchronizedMap.newStringMap();
++    private static var connectionDrivers:SynchronizedMap<String,
++        String> = SynchronizedMap.newStringMap();
++    private static var nativeUpserts:SynchronizedMap<String,
++        Bool> = SynchronizedMap.newStringMap();
++    private static var threadLocal:ThreadLocal<Map<String,
++        HaxeConnection>> = new ThreadLocal<Map<String, HaxeConnection>>(() -> {
+         return new Map<String, HaxeConnection>();
+-    },(connections:Map<String, HaxeConnection>) -> {
+-        for(key in connections.keys())
+-        {
++    }, (connections:Map<String, HaxeConnection>) -> {
++        for (key in connections.keys()) {
+             var connection = connections.get(key);
+             connectionPool.get(key).free(connection);
+         }
+@@ -19,11 +25,12 @@
+         #end
+     });
+ 
+-    public static function create(key:String, config:Dynamic):Void
+-    {
+-        var databasePool:DatabasePool = new DatabasePool(key, config);
++    public static function create(key:String, config:Dynamic,
++            ?connector:Void->HaxeConnection):Void {
++        var databasePool:DatabasePool = new DatabasePool(key, config, connector);
+         connectionPool.set(key, databasePool);
+         connectionDrivers.set(key, config.path != null ? "sqlite" : "mysql");
++        nativeUpserts.remove(key);
+         #if debug
+         trace('${key} => ${databasePool} ${connectionPool.get(key)}');
+         #end
+@@ -33,26 +40,40 @@
+         return connectionPool.get(key).get();
+     }
+ 
+-    public static function get(key:String = "default"):HaxeConnection
+-    {
++    public static function get(key:String = "default"):HaxeConnection {
+         var connections = threadLocal.get();
+ 
+-        if(!connections.exists(key))
++        if (!connections.exists(key))
+             connections.set(key, getConnectionFromPool(key));
+ 
+         return connections.get(key);
+     }
+ 
+     public static function connectionKeys():Array<String> {
+-        return [for(connectionKey in connectionPool.keys()) connectionKey];
++        return [for (connectionKey in connectionPool.keys()) connectionKey];
+     }
+ 
+     public static function driver(key:String = "default"):Null<String> {
+         return connectionDrivers.get(key);
+     }
+ 
+-    public static function free():Void
+-    {
++    public static function supportsNativeUpsert(key:String = "default"):Bool {
++        if (driver(key) != "sqlite") {
++            return true;
++        }
++        if (nativeUpserts.exists(key)) {
++            return nativeUpserts.get(key);
++        }
++        var record = get(key).request("SELECT sqlite_version() AS version").results().first();
++        var parts = Std.string(record.version).split(".");
++        var major = Std.parseInt(parts[0]);
++        var minor = Std.parseInt(parts[1]);
++        var supported = major > 3 || (major == 3 && minor >= 24);
++        nativeUpserts.set(key, supported);
++        return supported;
++    }
++
++    public static function free():Void {
+         threadLocal.remove();
+     }
+ }
+diff --git a/src/hx/well/database/query/InsertQueryBuilder.hx b/src/hx/well/database/query/InsertQueryBuilder.hx
+--- a/src/hx/well/database/query/InsertQueryBuilder.hx
++++ b/src/hx/well/database/query/InsertQueryBuilder.hx
+@@ -1,5 +1,6 @@
+ package hx.well.database.query;
+ import haxe.Exception;
++import hx.well.database.Connection;
+ 
+ class InsertQueryBuilder {
+     /**
+@@ -21,7 +22,7 @@
+ 
+         var stringBuf = new StringBuf();
+         stringBuf.add("INSERT INTO ");
+-        stringBuf.add('`${query.model.getTable()}`');
++        stringBuf.add(QueryIdentifier.quote(query.model.getTable()));
+         stringBuf.add(" (");
+         stringBuf.add(columns);
+         stringBuf.add(") VALUES (");
+@@ -30,4 +31,43 @@
+ 
+         return stringBuf.toString();
+     }
+-}
+\ No newline at end of file
++
++    public static function upsert<T>(query:QueryBuilder<T>, columns:Array<String>,
++            uniqueBy:Array<String>, update:Array<String>):String {
++        if (uniqueBy == null || uniqueBy.length == 0 || update == null || update.length == 0) {
++            throw new Exception("Upsert requires conflict columns and update columns.");
++        }
++        for (column in uniqueBy.concat(update)) {
++            QueryIdentifier.quote(column);
++            if (!columns.contains(column)) {
++                throw new Exception("Every upsert column must have a supplied value.");
++            }
++        }
++        var statement = toString(query, columns.iterator());
++        var assignments = update.map(column -> QueryIdentifier.quote(column) + " = ?");
++        return switch (Connection.driver(query.model.__connection)) {
++            case "sqlite":
++                var conflict = uniqueBy.map(QueryIdentifier.quote).join(", ");
++                statement + " ON CONFLICT (" + conflict + ") DO UPDATE SET " + assignments.join(", ");
++            case "mysql":
++                statement + " ON DUPLICATE KEY UPDATE " + assignments.join(", ");
++            case driver:
++                throw new Exception("Upsert is not supported by database driver: " + driver);
++        };
++    }
++
++    /** SQLite before 3.24 needs an update/conditional-insert inside a savepoint. */
++    public static function legacyUpsert<T>(query:QueryBuilder<T>, columns:Array<String>,
++            uniqueBy:Array<String>, update:Array<String>):Array<String> {
++        var table = QueryIdentifier.quote(query.model.getTable());
++        var predicate = uniqueBy.map(column -> QueryIdentifier.quote(column) + " = ?").join(" AND ");
++        var assignments = update.map(column -> QueryIdentifier.quote(column) + " = ?").join(", ");
++        var projection = columns.map(QueryIdentifier.quote).join(", ");
++        var placeholders = columns.map(_ -> "?").join(", ");
++        return [
++            "UPDATE " + table + " SET " + assignments + " WHERE " + predicate,
++            "INSERT INTO " + table + " (" + projection + ") SELECT " + placeholders
++                + " WHERE NOT EXISTS (SELECT 1 FROM " + table + " WHERE " + predicate + ")"
++        ];
++    }
++}
+diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/query/QueryBuilder.hx
+--- a/src/hx/well/database/query/QueryBuilder.hx
++++ b/src/hx/well/database/query/QueryBuilder.hx
+@@ -1,14 +1,18 @@
+ package hx.well.database.query;
++
+ import hx.well.model.BaseModel;
+ import hx.well.database.query.QueryBuilder;
+ import sys.db.ResultSet;
+ import hx.well.http.ResultSetResponse;
+ import hx.well.facades.DB;
+ import haxe.ds.StringMap;
++import haxe.Exception;
++import hx.well.database.Connection;
++import Date;
+ 
+ typedef QueryCondition = {
+-    condition: String,
+-    type: String
++    condition:String,
++    type:String
+ }
+ 
+ @:allow(hx.well.database.query.SelectQueryBuilder)
+@@ -22,6 +26,7 @@
+     private var model:BaseModel<T>;
+     private var columns:Array<String> = ["*"];
+     private var selectValues:Array<Dynamic> = [];
++    private var distinctValue:Bool = false;
+     private var conditions:Array<QueryCondition> = [];
+     private var joins:Array<String> = [];
+     private var values:Array<Dynamic> = [];
+@@ -37,24 +42,48 @@
+     }
+ 
+     public function select(columns:Array<String>):QueryBuilder<T> {
+-        if(columns == null || columns.length == 0)
+-            throw new haxe.Exception("Select requires at least one column");
++        if (columns == null || columns.length == 0)
++            throw new Exception("Select requires at least one column");
+         // Validate and copy, so later changes to the caller's array cannot inject SQL.
+         this.columns = columns.map(QueryIdentifier.projection);
+         this.selectValues = [];
+         return this;
+     }
+ 
++    public function distinct():QueryBuilder<T> {
++        this.distinctValue = true;
++        return this;
++    }
++
++    public function selectCount(column:String = "*", alias:String = "count"):QueryBuilder<T> {
++        var reference = column == "*" ? "*" : QueryIdentifier.reference(column);
++        var identifier = QueryIdentifier.quote(alias);
++        this.columns = ['COUNT($reference) AS $identifier'];
++        this.selectValues = [];
++        return this;
++    }
++
++    public function selectSub<S>(query:QueryBuilder<S>, alias:String):QueryBuilder<T> {
++        var identifier = QueryIdentifier.quote(alias);
++        var statement = query.toSelectSql();
++        this.columns.push('($statement) AS $identifier');
++        for (value in query.selectValues.concat(query.values)) {
++            this.selectValues.push(value);
++        }
++        return this;
++    }
++
+     /** Replaces the projection with trusted SQL. Pass untrusted values as bindings. */
+     public function selectRaw(expression:String, ...bindings):QueryBuilder<T> {
+-        if(expression == null || StringTools.trim(expression) == "")
+-            throw new haxe.Exception("Select expression must not be empty");
++        if (expression == null || StringTools.trim(expression) == "")
++            throw new Exception("Select expression must not be empty");
+         this.columns = [expression];
+-        this.selectValues = [for(value in bindings) value];
+-        return this;
+-    }
+-
+-    public overload extern inline function where(column:String, op:String, value:Dynamic):QueryBuilder<T> {
++        this.selectValues = [for (value in bindings) value];
++        return this;
++    }
++
++    public overload extern inline function where(column:String, op:String,
++            value:Dynamic):QueryBuilder<T> {
+         return _where(column, op, value);
+     }
+ 
+@@ -63,10 +92,14 @@
+     }
+ 
+     public overload extern inline function where(data:StringMap<Dynamic>):QueryBuilder<T> {
+-        for(keyValueIterator in data.keyValueIterator()) {
++        for (keyValueIterator in data.keyValueIterator()) {
+             _where(keyValueIterator.key, "=", keyValueIterator.value);
+         }
+         return this;
++    }
++
++    public overload extern inline function where(callback:QueryBuilder<T>->Void):QueryBuilder<T> {
++        return addGroup(callback, "AND");
+     }
+ 
+     private function _where(column:String, op:String, value:Dynamic):QueryBuilder<T> {
+@@ -77,7 +110,15 @@
+         return this;
+     }
+ 
+-    public overload extern inline function orWhere(column:String, op:String, value:Dynamic):QueryBuilder<T> {
++    public function whereColumn(first:String, second:String):QueryBuilder<T> {
++        first = QueryIdentifier.reference(first);
++        second = QueryIdentifier.reference(second);
++        conditions.push({condition: '$first = $second', type: "AND"});
++        return this;
++    }
++
++    public overload extern inline function orWhere(column:String, op:String,
++            value:Dynamic):QueryBuilder<T> {
+         return _orWhere(column, op, value);
+     }
+ 
+@@ -86,9 +127,60 @@
+     }
+ 
+     public overload extern inline function orWhere(data:StringMap<Dynamic>):QueryBuilder<T> {
+-        for(keyValueIterator in data.keyValueIterator()) {
++        for (keyValueIterator in data.keyValueIterator()) {
+             _orWhere(keyValueIterator.key, "=", keyValueIterator.value);
+         }
++        return this;
++    }
++
++    public overload extern inline function orWhere(callback:QueryBuilder<T>->Void):QueryBuilder<T> {
++        return addGroup(callback, "OR");
++    }
++
++    private function addGroup(callback:QueryBuilder<T>->Void, type:String):QueryBuilder<T> {
++        var group = new QueryBuilder<T>(model);
++        callback(group);
++        if (group.conditions.length == 0) {
++            throw new Exception("A condition group must contain at least one condition");
++        }
++
++        var expression = new StringBuf();
++        expression.add("(");
++        for (index in 0...group.conditions.length) {
++            var condition = group.conditions[index];
++            if (index > 0) {
++                expression.add(" ");
++                expression.add(condition.type);
++                expression.add(" ");
++            }
++            expression.add(condition.condition);
++        }
++        expression.add(")");
++        conditions.push({condition: expression.toString(), type: type});
++        for (value in group.values) {
++            values.push(value);
++        }
++        return this;
++    }
++
++    public function whereLike(column:String, pattern:String, escape:String = "!"):QueryBuilder<T> {
++        return addLike(column, pattern, escape, "AND");
++    }
++
++    public function orWhereLike(column:String, pattern:String,
++            escape:String = "!"):QueryBuilder<T> {
++        return addLike(column, pattern, escape, "OR");
++    }
++
++    private function addLike(column:String, pattern:String, escape:String,
++            type:String):QueryBuilder<T> {
++        column = QueryIdentifier.reference(column);
++        if (escape == null || escape.length != 1) {
++            throw new Exception("LIKE requires a single escape character");
++        }
++        conditions.push({condition: '$column LIKE ? ESCAPE ?', type: type});
++        values.push(pattern);
++        values.push(escape);
+         return this;
+     }
+ 
+@@ -102,8 +194,36 @@
+ 
+     public function whereRaw(query:String, ...queryValues):QueryBuilder<T> {
+         conditions.push({condition: query, type: "RAW"});
+-        for(value in queryValues)
++        for (value in queryValues)
+             values.push(value);
++        return this;
++    }
++
++    /** Keep membership filters inside the database instead of loading IDs into memory. */
++    public function whereInQuery<S>(column:String, query:QueryBuilder<S>):QueryBuilder<T> {
++        return membershipQuery(column, query, false);
++    }
++
++    public function whereNotInQuery<S>(column:String, query:QueryBuilder<S>):QueryBuilder<T> {
++        return membershipQuery(column, query, true);
++    }
++
++    private function membershipQuery<S>(column:String, query:QueryBuilder<S>,
++            negated:Bool):QueryBuilder<T> {
++        column = QueryIdentifier.reference(column);
++        if (query.model.__connection != model.__connection) {
++            throw new Exception("A membership subquery must use the parent connection");
++        }
++        if (query.columns.length != 1 || query.columns[0] == "*"
++            || StringTools.endsWith(query.columns[0], ".*")) {
++            throw new Exception("A membership subquery must select exactly one column");
++        }
++        var statement = query.toSelectSql();
++        var membership = negated ? "NOT IN" : "IN";
++        conditions.push({condition: '$column $membership ($statement)', type: "AND"});
++        for (value in query.selectValues.concat(query.values)) {
++            values.push(value);
++        }
+         return this;
+     }
+ 
+@@ -165,22 +285,35 @@
+         return this;
+     }
+ 
+-    public function innerJoin(table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public function innerJoin(table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         return join("INNER", table, column1, op, column2);
+     }
+ 
+-    public function leftJoin(table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public function leftJoin(table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         return join("LEFT", table, column1, op, column2);
+     }
+ 
+-    public function rightJoin(table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public function rightJoin(table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         return join("RIGHT", table, column1, op, column2);
+     }
+ 
+-    public function join(type:String, table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public function join(type:String, table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         type = QueryIdentifier.keyword(type);
+-        if(!["INNER", "LEFT", "RIGHT", "LEFT OUTER", "RIGHT OUTER", "FULL", "FULL OUTER", "CROSS"].contains(type))
+-            throw new haxe.Exception('Invalid join type: ${type}');
++        if (![
++            "INNER",
++            "LEFT",
++            "RIGHT",
++            "LEFT OUTER",
++            "RIGHT OUTER",
++            "FULL",
++            "FULL OUTER",
++            "CROSS"
++        ].contains(type))
++            throw new Exception('Invalid join type: ${type}');
+         table = QueryIdentifier.reference(table);
+         column1 = QueryIdentifier.reference(column1);
+         column2 = QueryIdentifier.reference(column2);
+@@ -192,9 +325,14 @@
+     public function orderBy(column:String, direction:String = "ASC"):QueryBuilder<T> {
+         column = QueryIdentifier.reference(column);
+         direction = QueryIdentifier.keyword(direction);
+-        if(direction != "ASC" && direction != "DESC")
+-            throw new haxe.Exception('Invalid sort direction: ${direction}');
+-        this.orderByClause = 'ORDER BY $column $direction';
++        if (direction != "ASC" && direction != "DESC")
++            throw new Exception('Invalid sort direction: ${direction}');
++        var ordering = '$column $direction';
++        if (this.orderByClause == "") {
++            this.orderByClause = "ORDER BY " + ordering;
++        } else {
++            this.orderByClause += ", " + ordering;
++        }
+         return this;
+     }
+ 
+@@ -216,7 +354,17 @@
+     }
+ 
+     public function first():Null<T> {
+-        return convertResult(db.select(toSelectSql(), ...selectValues.concat(values))[0]);
++        var previous = limitValue;
++        limitValue = 1;
++        var records:Array<T>;
++        try {
++            records = get();
++            limitValue = previous;
++        } catch (error:Dynamic) {
++            limitValue = previous;
++            throw error;
++        }
++        return records.length == 0 ? null : records[0];
+     }
+ 
+     public function exists():Bool {
+@@ -237,29 +385,73 @@
+     public function count():Int {
+         var tempColumns = this.columns.copy();
+         var tempLimit = this.limitValue;
+-
+-        // COUNT(*) için kolonları değiştir
+-        this.columns = ["COUNT(*) AS cnt"];
+-        this.limitValue = -1; // limit yok
+-
+-        var sql:String = toSelectSql();
++        var tempOrdering = this.orderByClause;
++        var bindings = this.values.copy();
++        this.limitValue = -1;
++        this.orderByClause = "";
++
++        var sql:String;
++        if (this.distinctValue) {
++            var distinctRows = toSelectSql();
++            sql = 'SELECT COUNT(*) AS cnt FROM ($distinctRows) AS aggregate_rows';
++            bindings = this.selectValues.concat(this.values);
++        } else {
++            this.columns = ["COUNT(*) AS cnt"];
++            sql = toSelectSql();
++        }
+ 
+         this.columns = tempColumns;
+         this.limitValue = tempLimit;
+-
+-        var result:Array<{cnt:Int}> = cast db.select(sql, ...values);
+-
+-        // COUNT(*) her zaman 1 satır döndürür
++        this.orderByClause = tempOrdering;
++
++        var result:Array<{cnt:Int}> = cast db.select(sql, ...bindings);
+         return result[0].cnt;
+     }
+ 
++    /** Aggregate one validated column without materializing matching models. */
++    public function sum(column:String):Float {
++        var reference = QueryIdentifier.reference(column);
++        var previousColumns = columns;
++        var previousSelectValues = selectValues;
++        var previousLimit = limitValue;
++        var previousOrdering = orderByClause;
++        var previousDistinct = distinctValue;
++        var distinctColumn = previousDistinct ? "DISTINCT " + reference : reference;
++        columns = ['COALESCE(SUM($distinctColumn), 0) AS aggregate_value'];
++        selectValues = [];
++        limitValue = -1;
++        orderByClause = "";
++        distinctValue = false;
++        var statement = toSelectSql();
++        var bindings = values.copy();
++        columns = previousColumns;
++        selectValues = previousSelectValues;
++        limitValue = previousLimit;
++        orderByClause = previousOrdering;
++        distinctValue = previousDistinct;
++        var result:Array<{aggregate_value:Dynamic}> = cast db.select(statement, ...bindings);
++        return result.length == 0 ? 0 : Std.parseFloat(Std.string(result[0].aggregate_value));
++    }
++
+     public function get():Array<T> {
+-        return db.select(toSelectSql(), ...selectValues.concat(values)).map(element -> convertResult(element));
++        var result = getResultSet();
++        #if jvm
++        // JDBC exposes column names and converts date columns to Date objects.
++        var fields = result.getFieldsNames() ?? [];
++        #else
++        // Native SQLite returns plain values and does not implement getFieldsNames.
++        var fields:Array<String> = [];
++        #end
++        var records:Array<T> = [];
++        while (result.hasNext()) {
++            records.push(hydrateNext(result, fields));
++        }
++        return records;
+     }
+ 
+     public function update(data:StringMap<Dynamic>):Void {
+-        var keys = [for(k in data.keys()) k];
+-        var dataValues = [for(k in keys) data.get(k)];
++        var keys = [for (k in data.keys()) k];
++        var dataValues = [for (k in keys) data.get(k)];
+         var values:Array<Dynamic> = dataValues.concat(this.values);
+         db.update(toUpdateSql(keys.iterator()), ...values);
+     }
+@@ -273,9 +465,37 @@
+     }
+ 
+     public function insert(data:StringMap<Dynamic>):Int {
+-        var keys = [for(k in data.keys()) k];
+-        var values = [for(k in keys) data.get(k)];
++        var keys = [for (k in data.keys()) k];
++        var values = [for (k in keys) data.get(k)];
+         return db.insert(InsertQueryBuilder.toString(this, keys.iterator()), ...values);
++    }
++
++    public function upsert(data:StringMap<Dynamic>, uniqueBy:Array<String>,
++            update:Array<String>):Void {
++        var columns = [for (column in data.keys()) column];
++        var statement = InsertQueryBuilder.upsert(this, columns, uniqueBy, update);
++        if (!Connection.supportsNativeUpsert(model.__connection)) {
++            var statements = InsertQueryBuilder.legacyUpsert(this, columns, uniqueBy, update);
++            var conflictValues = [for (column in uniqueBy) data.get(column)];
++            var updateValues = [for (column in update) data.get(column)];
++            var insertValues = [for (column in columns) data.get(column)];
++            db.query("SAVEPOINT hxwell_upsert");
++            try {
++                db.query(statements[0], ...updateValues.concat(conflictValues));
++                db.query(statements[1], ...insertValues.concat(conflictValues));
++                db.query("RELEASE SAVEPOINT hxwell_upsert");
++            } catch (error:Dynamic) {
++                db.query("ROLLBACK TO SAVEPOINT hxwell_upsert");
++                db.query("RELEASE SAVEPOINT hxwell_upsert");
++                throw error;
++            }
++            return;
++        }
++        var bindings = [for (column in columns) data.get(column)];
++        for (column in update) {
++            bindings.push(data.get(column));
++        }
++        db.query(statement, ...bindings);
+     }
+ 
+     public function unsafe(value:Bool):QueryBuilder<T> {
+@@ -283,21 +503,38 @@
+         return this;
+     }
+ 
+-    public function getResultSetResponse(?resultSetReplacer:Dynamic->Void, statusCode:Null<Int> = null):ResultSetResponse {
+-        return new ResultSetResponse(getResultSet(), model.getVisibleDatabaseFields(), resultSetReplacer, statusCode);
+-    }
+-
+-    private function convertResult(data:Dynamic):T {
+-        if(data == null)
++    public function getResultSetResponse(?resultSetReplacer:Dynamic->Void,
++            statusCode:Null<Int> = null):ResultSetResponse {
++        return new ResultSetResponse(getResultSet(), model.getVisibleDatabaseFields(),
++            resultSetReplacer, statusCode);
++    }
++
++    private function hydrateNext(result:ResultSet, fields:Array<String>):T {
++        var data:Dynamic = result.next();
++        var serialized:Dynamic = Reflect.copy(data);
++        for (index in 0...fields.length) {
++            var field = fields[index];
++            if (Std.isOfType(Reflect.field(data, field), Date)) {
++                Reflect.setField(serialized, field, result.getResult(index + 1));
++            }
++        }
++        return convertResult(data, serialized);
++    }
++
++    private function convertResult(data:Dynamic, serialized:Dynamic = null):T {
++        if (data == null)
+             return null;
+ 
+-        var model = Type.createInstance(Type.getClass(model), []);
+-        var fields = model.getDatabaseFields();
+-        for(field in fields)
+-        {
+-            if(Reflect.hasField(data, field))
+-                Reflect.setField(model, field, Reflect.field(data, field));
+-        }
+-        return cast model;
++        var instance = Type.createInstance(Type.getClass(model), []);
++        instance.setConnection(model.__connection);
++        instance.setTable(model.getTable());
++        instance.setPrimary(model.getPrimary());
++        var fields = instance.getDatabaseFields();
++        for (field in fields) {
++            if (Reflect.hasField(data, field))
++                Reflect.setField(instance, field, Reflect.field(data, field));
++        }
++        instance.setLoadedValues(data, serialized ?? Reflect.copy(data));
++        return cast instance;
+     }
+ }
+diff --git a/src/hx/well/database/query/QueryIdentifier.hx b/src/hx/well/database/query/QueryIdentifier.hx
+--- a/src/hx/well/database/query/QueryIdentifier.hx
++++ b/src/hx/well/database/query/QueryIdentifier.hx
+@@ -5,42 +5,58 @@
+ class QueryIdentifier {
+     /** SELECT accepts identifiers, qualified wildcards and explicit AS aliases. */
+     public static function projection(value:String):String {
+-        if(value == null)
++        if (value == null)
+             throw new Exception("Select column must not be null");
+         var alias = ~/^([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*) +[aA][sS] +([A-Za-z_][A-Za-z0-9_]*)$/;
+-        if(alias.match(value))
+-            return reference(alias.matched(1)) + " AS " + alias.matched(2);
+-        if(value == "*")
++        if (alias.match(value))
++            return reference(alias.matched(1)) + " AS " + quote(alias.matched(2));
++        if (value == "*")
+             return value;
+-        if(StringTools.endsWith(value, ".*"))
++        if (StringTools.endsWith(value, ".*"))
+             return reference(value.substr(0, value.length - 2)) + ".*";
+         return reference(value);
+     }
+ 
+     public static function reference(identifier:String):String {
+-        if(identifier == null)
++        if (identifier == null)
+             throw new Exception("Column identifier must not be null");
+-        for(part in identifier.split(".")) {
+-            if(!isValid(part))
++        for (part in identifier.split(".")) {
++            if (!isValid(part))
+                 throw new Exception('Invalid column identifier: ${identifier}');
+         }
+-        return identifier;
++        return identifier.split(".").map(quote).join(".");
+     }
+ 
+     public static function comparisonOperator(value:String):String {
+         var normalized = keyword(value);
+-        if(!["=", "!=", "<>", "<", "<=", ">", ">=", "<=>", "LIKE", "NOT LIKE", "IS", "IS NOT", "REGEXP", "NOT REGEXP", "RLIKE"].contains(normalized))
++        if (![
++            "=",
++            "!=",
++            "<>",
++            "<",
++            "<=",
++            ">",
++            ">=",
++            "<=>",
++            "LIKE",
++            "NOT LIKE",
++            "IS",
++            "IS NOT",
++            "REGEXP",
++            "NOT REGEXP",
++            "RLIKE"
++        ].contains(normalized))
+             throw new Exception('Invalid comparison operator: ${value}');
+         return normalized;
+     }
+ 
+     public static function keyword(value:String):String {
+         // SQL keywords are ASCII; JVM case conversion depends on the host locale.
+-        if(value == null)
++        if (value == null)
+             return "";
+         var result = new StringBuf();
+         var trimmed = StringTools.trim(value);
+-        for(i in 0...trimmed.length) {
++        for (i in 0...trimmed.length) {
+             var code = trimmed.charCodeAt(i);
+             result.addChar(code >= 'a'.code && code <= 'z'.code ? code - 32 : code);
+         }
+@@ -48,23 +64,24 @@
+     }
+ 
+     public static function quote(identifier:String):String {
+-        if(!isValid(identifier))
++        if (!isValid(identifier))
+             throw new Exception('Invalid column identifier: ${identifier}');
+ 
+         return '`${identifier}`';
+     }
+ 
+     public static function isValid(identifier:String):Bool {
+-        if(identifier == null || identifier.length == 0)
++        if (identifier == null || identifier.length == 0)
+             return false;
+ 
+-        for(i in 0...identifier.length) {
++        for (i in 0...identifier.length) {
+             var code = identifier.charCodeAt(i);
+ 
+-            if((code >= 'a'.code && code <= 'z'.code) || (code >= 'A'.code && code <= 'Z'.code) || code == '_'.code)
++            if ((code >= 'a'.code && code <= 'z'.code)
++                || (code >= 'A'.code && code <= 'Z'.code) || code == '_'.code)
+                 continue;
+ 
+-            if(i > 0 && code >= '0'.code && code <= '9'.code)
++            if (i > 0 && code >= '0'.code && code <= '9'.code)
+                 continue;
+ 
+             return false;
+diff --git a/src/hx/well/database/query/SelectQueryBuilder.hx b/src/hx/well/database/query/SelectQueryBuilder.hx
+--- a/src/hx/well/database/query/SelectQueryBuilder.hx
++++ b/src/hx/well/database/query/SelectQueryBuilder.hx
+@@ -1,5 +1,7 @@
+ package hx.well.database.query;
++
+ import hx.well.database.query.QueryBuilder.QueryCondition;
++
+ class SelectQueryBuilder {
+     /**
+      * Generates an SQL SELECT statement string.
+@@ -9,6 +11,9 @@
+     public static function toString<T>(query:QueryBuilder<T>):String {
+         var stringBuf = new StringBuf();
+         stringBuf.add("SELECT ");
++        if (query.distinctValue) {
++            stringBuf.add("DISTINCT ");
++        }
+         stringBuf.add(query.columns.join(", "));
+         stringBuf.add(" FROM ");
+         stringBuf.add('`${query.model.getTable()}`');
+@@ -17,7 +22,8 @@
+             stringBuf.add(" ");
+             stringBuf.add(query.joins.join(" "));
+         }
+-        if (query.conditions.length > 0) addWhereClause(query.conditions, stringBuf);
++        if (query.conditions.length > 0)
++            addWhereClause(query.conditions, stringBuf);
+         if (query.orderByClause != "") {
+             stringBuf.add(" ");
+             stringBuf.add(query.orderByClause);
+@@ -29,7 +35,8 @@
+         return stringBuf.toString();
+     }
+ 
+-    private static function addWhereClause(conditions:Array<QueryCondition>, stringBuf:StringBuf):Void {
++    private static function addWhereClause(conditions:Array<QueryCondition>,
++            stringBuf:StringBuf):Void {
+         stringBuf.add(" WHERE ");
+         stringBuf.add(conditions[0].condition);
+         for (i in 1...conditions.length) {
+@@ -39,4 +46,4 @@
+             stringBuf.add(conditions[i].condition);
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/src/hx/well/database/schema/ForeignKeyInfo.hx b/src/hx/well/database/schema/ForeignKeyInfo.hx
+new file mode 100644
+--- /dev/null
++++ b/src/hx/well/database/schema/ForeignKeyInfo.hx
+@@ -0,0 +1,8 @@
++package hx.well.database.schema;
++
++typedef ForeignKeyInfo = {
++    var name:String;
++    var columns:Array<String>;
++    var foreignTable:String;
++    var foreignColumns:Array<String>;
++}
+diff --git a/src/hx/well/database/schema/MysqlSchemaGrammar.hx b/src/hx/well/database/schema/MysqlSchemaGrammar.hx
+--- a/src/hx/well/database/schema/MysqlSchemaGrammar.hx
++++ b/src/hx/well/database/schema/MysqlSchemaGrammar.hx
+@@ -57,6 +57,17 @@
+         return "";
+     }
+ 
++    private override function defaultModifier(column:ColumnDefinition):String {
++        if (column.hasDefault && !column.usesCurrent) {
++            switch (column.type) {
++                case TText, TMediumText, TLongText, TJson, TBinary, TGeometry:
++                    return ' DEFAULT (${formatDefault(column.defaultVal)})';
++                default:
++            }
++        }
++        return super.defaultModifier(column);
++    }
++
+     private override function nullableModifier(column:ColumnDefinition):String {
+         if (column.virtualAsExpr != null || column.storedAsExpr != null)
+             return column.isNullable ? "" : " NOT NULL";
+@@ -69,7 +80,8 @@
+         return "";
+     }
+ 
+-    private override function incrementModifier(column:ColumnDefinition, blueprint:Null<Blueprint>):String {
++    private override function incrementModifier(column:ColumnDefinition,
++            blueprint:Null<Blueprint>):String {
+         if (!isIncrementsColumn(column))
+             return "";
+         if (hasPrimaryCommand(blueprint) || (column.isChange && !column.isPrimary))
+@@ -108,27 +120,33 @@
+         return 'ALTER TABLE ${quote(table)} MODIFY ${compileColumnDefinition(column)}';
+     }
+ 
+-    private override function compileUnique(table:String, columns:Array<String>, name:String):String {
++    private override function compileUnique(table:String, columns:Array<String>,
++            name:String):String {
+         return 'ALTER TABLE ${quote(table)} ADD UNIQUE ${quote(name)} (${quoteList(columns)})';
+     }
+ 
+-    private override function compileIndex(table:String, columns:Array<String>, name:String):String {
++    private override function compileIndex(table:String, columns:Array<String>,
++            name:String):String {
+         return 'ALTER TABLE ${quote(table)} ADD INDEX ${quote(name)} (${quoteList(columns)})';
+     }
+ 
+-    private override function compileFullText(table:String, columns:Array<String>, name:String):String {
++    private override function compileFullText(table:String, columns:Array<String>,
++            name:String):String {
+         return 'ALTER TABLE ${quote(table)} ADD FULLTEXT ${quote(name)} (${quoteList(columns)})';
+     }
+ 
+-    private override function compileSpatialIndex(table:String, columns:Array<String>, name:String):String {
+-        return 'ALTER TABLE ${quote(table)} ADD SPATIAL INDEX ${quote(name)} (${quoteList(columns)})';
++    private override function compileSpatialIndex(table:String, columns:Array<String>,
++            name:String):String {
++        return
++            'ALTER TABLE ${quote(table)} ADD SPATIAL INDEX ${quote(name)} (${quoteList(columns)})';
+     }
+ 
+     private override function compileRenameIndex(table:String, from:String, to:String):String {
+         return 'ALTER TABLE ${quote(table)} RENAME INDEX ${quote(from)} TO ${quote(to)}';
+     }
+ 
+-    private override function compileAddPrimary(table:String, columns:Array<String>, name:Null<String>):String {
++    private override function compileAddPrimary(table:String, columns:Array<String>,
++            name:Null<String>):String {
+         return 'ALTER TABLE ${quote(table)} ADD PRIMARY KEY (${quoteList(columns)})';
+     }
+ 
+@@ -153,19 +171,32 @@
+     }
+ 
+     public override function compileTableExists(table:String):String {
+-        return 'SELECT TABLE_NAME AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
++        return
++            'SELECT TABLE_NAME AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
+     }
+ 
+     public override function compileColumnListing(table:String):String {
+-        return 'SELECT COLUMN_NAME AS name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
++        return
++            'SELECT COLUMN_NAME AS name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
+     }
+ 
+     public override function compileTableListing():String {
+-        return 'SELECT TABLE_NAME AS name FROM information_schema.tables WHERE table_schema = DATABASE()';
++        return
++            'SELECT TABLE_NAME AS name FROM information_schema.tables WHERE table_schema = DATABASE()';
+     }
+ 
+     public override function compileIndexListing(table:String):String {
+-        return 'SELECT DISTINCT INDEX_NAME AS name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
++        return
++            'SELECT DISTINCT INDEX_NAME AS name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
++    }
++
++    public override function compileForeignKeyListing(table:String):String {
++        quote(table);
++        return
++            "SELECT CONSTRAINT_NAME AS name, COLUMN_NAME AS column_name, REFERENCED_TABLE_NAME AS foreign_table, REFERENCED_COLUMN_NAME AS foreign_column, ORDINAL_POSITION AS position FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '"
++            + escapeString(table)
++            +
++            "' AND REFERENCED_TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION";
+     }
+ 
+     public override function compileEnableForeignKeyConstraints():String {
+diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database/schema/SchemaBuilder.hx
+--- a/src/hx/well/database/schema/SchemaBuilder.hx
++++ b/src/hx/well/database/schema/SchemaBuilder.hx
+@@ -2,8 +2,11 @@
+ 
+ import haxe.Exception;
+ import hx.well.database.Connection;
++import hx.well.database.query.QueryIdentifier;
++import sys.db.ResultSet;
+ import sys.FileSystem;
+ import sys.io.File;
++
+ using StringTools;
+ 
+ class SchemaBuilder {
+@@ -27,7 +30,7 @@
+         return Connection.driver(connectionKey) == "sqlite";
+     }
+ 
+-    private function request(statement:String):sys.db.ResultSet {
++    private function request(statement:String):ResultSet {
+         return Connection.get(connectionKey).request(statement);
+     }
+ 
+@@ -100,11 +103,12 @@
+     }
+ 
+     public function hasTable(table:String):Bool {
+-        return request(grammar().compileTableExists(table)).hasNext();
++        return request(grammar().compileTableExists(table)).results().length > 0;
+     }
+ 
+     public function hasColumn(table:String, column:String):Bool {
+-        return getColumnListing(table).map(SchemaGrammar.asciiLower).contains(SchemaGrammar.asciiLower(column));
++        return getColumnListing(table).map(SchemaGrammar.asciiLower)
++            .contains(SchemaGrammar.asciiLower(column));
+     }
+ 
+     public function hasColumns(table:String, columns:Array<String>):Bool {
+@@ -117,11 +121,21 @@
+     }
+ 
+     public function hasIndex(table:String, index:String):Bool {
+-        return getIndexListing(table).map(SchemaGrammar.asciiLower).contains(SchemaGrammar.asciiLower(index));
++        return getIndexListing(table).map(SchemaGrammar.asciiLower)
++            .contains(SchemaGrammar.asciiLower(index));
+     }
+ 
+     public function getColumnListing(table:String):Array<String> {
+-        return readNames(grammar().compileColumnListing(table));
++        return [for (row in columnRows(table)) Std.string(Reflect.field(row, "name"))];
++    }
++
++    private function columnRows(table:String):Array<Dynamic> {
++        var rows = request(grammar().compileColumnListing(table)).results();
++        if (isSqlite() && rows.length == 0) {
++            // Older SQLite builds ignore table_xinfo; retain its richer metadata when supported.
++            rows = request('PRAGMA table_info(${quote(table)})').results();
++        }
++        return [for (row in rows) row];
+     }
+ 
+     public function getIndexListing(table:String):Array<String> {
+@@ -130,6 +144,35 @@
+ 
+     public function getTableListing():Array<String> {
+         return readNames(grammar().compileTableListing());
++    }
++
++    public function getForeignKeys(table:String):Array<ForeignKeyInfo> {
++        var grouped:Map<String, ForeignKeyInfo> = [];
++        var rows = request(grammar().compileForeignKeyListing(table)).results();
++        for (row in rows) {
++            var name = Std.string(Reflect.field(row, isSqlite() ? "id" : "name"));
++            var current = grouped.get(name);
++            if (current == null) {
++                current = {
++                    name: name,
++                    columns: [],
++                    foreignTable: Std.string(Reflect.field(row,
++                        isSqlite() ? "table" : "foreign_table")),
++                    foreignColumns: []
++                };
++                grouped.set(name, current);
++            }
++            var position = intValue(Reflect.field(row, isSqlite() ? "seq" : "position"))
++                - (isSqlite() ? 0 : 1);
++            var column:Dynamic = Reflect.field(row, isSqlite() ? "from" : "column_name");
++            var foreignColumn:Dynamic = Reflect.field(row, isSqlite() ? "to" : "foreign_column");
++            if (position < 0 || column == null) {
++                throw new Exception("The driver returned incomplete foreign key metadata.");
++            }
++            current.columns[position] = Std.string(column);
++            current.foreignColumns[position] = foreignColumn == null ? "" : Std.string(foreignColumn);
++        }
++        return [for (entry in grouped) entry];
+     }
+ 
+     public function whenTableHasColumn(table:String, column:String, callback:Blueprint->Void):Void {
+@@ -137,7 +180,8 @@
+             this.table(table, callback);
+     }
+ 
+-    public function whenTableDoesntHaveColumn(table:String, column:String, callback:Blueprint->Void):Void {
++    public function whenTableDoesntHaveColumn(table:String, column:String,
++            callback:Blueprint->Void):Void {
+         if (!hasColumn(table, column))
+             this.table(table, callback);
+     }
+@@ -170,7 +214,7 @@
+         execute([grammar().compileDisableForeignKeyConstraints()]);
+     }
+ 
+-    public function withoutForeignKeyConstraints(callback:()->Void):Void {
++    public function withoutForeignKeyConstraints(callback:() -> Void):Void {
+         disableForeignKeyConstraints();
+         try {
+             callback();
+@@ -191,7 +235,7 @@
+     }
+ 
+     private function quote(identifier:String):String {
+-        return hx.well.database.query.QueryIdentifier.quote(identifier);
++        return QueryIdentifier.quote(identifier);
+     }
+ 
+     private function sqliteRenameIndex(table:String, from:String, to:String):Void {
+@@ -205,7 +249,8 @@
+             throw new Exception('Index ${from} does not exist on table ${table}.');
+ 
+         var createSql:Null<String> = null;
+-        for (row in request('SELECT sql FROM sqlite_master WHERE type = \'index\' AND name = \'${from.replace("'", "''")}\'').results()) {
++        for (row in request('SELECT sql FROM sqlite_master WHERE type = \'index\' AND name = \'${from.replace("'", "''")}\'')
++            .results()) {
+             if (Reflect.field(row, "sql") != null)
+                 createSql = Std.string(Reflect.field(row, "sql"));
+         }
+@@ -219,14 +264,20 @@
+         });
+     }
+ 
+-    private function sqliteChangeColumns(table:String, changedColumns:Array<ColumnDefinition>):Void {
++    private function sqliteChangeColumns(table:String,
++            changedColumns:Array<ColumnDefinition>):Void {
+         var schemaGrammar = grammar();
+         var definition = SqliteTableDefinition.parse(sqliteTableSql(table));
+-        var changedByName:Map<String, ColumnDefinition> = [for (column in changedColumns) SchemaGrammar.asciiLower(column.name) => column];
+-
+-        var columnRows = [for (row in request('PRAGMA table_xinfo(${quote(table)})').results()) row];
+-        columnRows.sort((a, b) -> intValue(Reflect.field(a, "cid")) - intValue(Reflect.field(b, "cid")));
+-        var existingColumns = [for (row in columnRows) SchemaGrammar.asciiLower(Std.string(Reflect.field(row, "name")))];
++        var changedByName:Map<String,
++            ColumnDefinition> = [for (column in changedColumns) SchemaGrammar.asciiLower(column.name) => column];
++
++        var columnRows = this.columnRows(table);
++        columnRows.sort((a, b) -> intValue(Reflect.field(a, "cid"))
++            - intValue(Reflect.field(b, "cid")));
++        var existingColumns = [
++            for (row in columnRows)
++                SchemaGrammar.asciiLower(Std.string(Reflect.field(row, "name")))
++        ];
+         for (column in changedColumns) {
+             if (!existingColumns.contains(SchemaGrammar.asciiLower(column.name)))
+                 throw new Exception('Column ${column.name} does not exist on table ${table}.');
+@@ -258,20 +309,24 @@
+             }
+             if (!isGeneratedColumn(changed))
+                 copyColumns.push(name);
+-            if (!hasPrimaryConstraint && !schemaGrammar.isIncrementsColumn(changed) && (changed.isPrimary || intValue(Reflect.field(row, "pk")) > 0))
++            if (!hasPrimaryConstraint
++                && !schemaGrammar.isIncrementsColumn(changed)
++                && (changed.isPrimary || intValue(Reflect.field(row, "pk")) > 0))
+                 primaryColumns.push(name);
+         }
+         if (primaryColumns.length > 0)
+             definitions.push('PRIMARY KEY (${primaryColumns.map(quote).join(", ")})');
+ 
+         var dependentSql:Array<String> = [
+-            for (row in request('SELECT sql FROM sqlite_master WHERE type IN (\'index\', \'trigger\') AND tbl_name = \'${table.replace("'", "''")}\' AND sql IS NOT NULL').results())
++            for (row in request('SELECT sql FROM sqlite_master WHERE type IN (\'index\', \'trigger\') AND tbl_name = \'${table.replace("'", "''")}\' AND sql IS NOT NULL')
++                .results())
+                 Std.string(Reflect.field(row, "sql"))
+         ];
+ 
+         var indexStatements:Array<String> = [];
+         for (column in changedColumns)
+-            indexStatements = indexStatements.concat(schemaGrammar.compileColumnIndexes(table, column));
++            indexStatements = indexStatements.concat(schemaGrammar.compileColumnIndexes(table,
++                column));
+ 
+         var temporaryTable = '__tmp_${table}';
+         var quotedColumns = copyColumns.map(quote).join(", ");
+@@ -282,7 +337,9 @@
+             if (copyColumns.length > 0)
+                 request('INSERT INTO ${quote(temporaryTable)} (${quotedColumns}) SELECT ${quotedColumns} FROM ${quote(table)}');
+             // Keep AUTOINCREMENT's high-water mark even when the highest rows were deleted.
+-            if (request("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'").hasNext())
++            if (request("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'")
++                .results()
++                .length > 0)
+                 request('UPDATE sqlite_sequence SET seq = MAX(seq, COALESCE((SELECT seq FROM sqlite_sequence WHERE name = \'${table.replace("'", "''")}\'), 0)) WHERE name = \'${temporaryTable.replace("'", "''")}\'');
+             request('DROP TABLE ${quote(table)}');
+             request('ALTER TABLE ${quote(temporaryTable)} RENAME TO ${quote(table)}');
+@@ -298,12 +355,13 @@
+     }
+ 
+     private function sqliteTableSql(table:String):String {
+-        for (row in request('SELECT sql FROM sqlite_master WHERE type = \'table\' AND name = \'${table.replace("'", "''")}\'').results())
++        for (row in request('SELECT sql FROM sqlite_master WHERE type = \'table\' AND name = \'${table.replace("'", "''")}\'')
++            .results())
+             return Std.string(Reflect.field(row, "sql"));
+         throw new Exception('Table ${table} does not exist.');
+     }
+ 
+-    private function sqliteTransaction(callback:()->Void):Void {
++    private function sqliteTransaction(callback:() -> Void):Void {
+         request("SAVEPOINT hxwell_schema");
+         try {
+             callback();
+@@ -315,7 +373,7 @@
+         request("RELEASE SAVEPOINT hxwell_schema");
+     }
+ 
+-    private function sqliteWithoutForeignKeys(callback:()->Void):Void {
++    private function sqliteWithoutForeignKeys(callback:() -> Void):Void {
+         var enabled = false;
+         for (row in request("PRAGMA foreign_keys").results())
+             enabled = intValue(Reflect.field(row, "foreign_keys")) == 1;
+diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database/schema/SchemaGrammar.hx
+--- a/src/hx/well/database/schema/SchemaGrammar.hx
++++ b/src/hx/well/database/schema/SchemaGrammar.hx
+@@ -2,13 +2,17 @@
+ 
+ import haxe.Exception;
+ import hx.well.database.query.QueryIdentifier;
++
+ using StringTools;
+ 
+ class SchemaGrammar {
+     public function new() {}
+ 
+     public function compileCreate(blueprint:Blueprint):Array<String> {
+-        var definitions:Array<String> = [for (column in blueprint.columns) columnSql(column, blueprint)];
++        var definitions:Array<String> = [
++            for (column in blueprint.columns)
++                columnSql(column, blueprint)
++        ];
+ 
+         var primaryColumns:Array<String> = [
+             for (column in blueprint.columns)
+@@ -33,16 +37,17 @@
+         }
+ 
+         var create = blueprint.isTemporary ? "CREATE TEMPORARY TABLE" : "CREATE TABLE";
+-        var statements = ['${create} ${quote(blueprint.table)} (${definitions.join(", ")})${tableOptionsSql(blueprint)}'];
++        var statements = [
++            '${create} ${quote(blueprint.table)} (${definitions.join(", ")})${tableOptionsSql(blueprint)}'
++        ];
+         return statements.concat(indexStatements(blueprint));
+     }
+ 
+     public function compileAlter(blueprint:Blueprint):Array<String> {
+         var statements:Array<String> = [
+             for (column in blueprint.columns)
+-                if (column.isChange)
+-                    compileChangeColumn(blueprint.table, column)
+-                else
++                if (column.isChange) compileChangeColumn(blueprint.table,
++                    column) else
+                     'ALTER TABLE ${quote(blueprint.table)} ADD COLUMN ${columnSql(column, blueprint)}'
+         ];
+ 
+@@ -61,7 +66,8 @@
+                     statements.push('ALTER TABLE ${quote(blueprint.table)} RENAME COLUMN ${quote(from)} TO ${quote(to)}');
+                 case RenameIndex(from, to):
+                     statements.push(compileRenameIndex(blueprint.table, from, to));
+-                case DropIndex(name) | DropUnique(name) | DropFullText(name) | DropSpatialIndex(name):
++                case DropIndex(name) | DropUnique(name) | DropFullText(name) |
++                    DropSpatialIndex(name):
+                     statements.push(compileDropIndex(blueprint.table, name));
+                 case DropPrimary:
+                     statements.push(compileDropPrimary(blueprint.table));
+@@ -102,6 +108,10 @@
+         throw new Exception("Not implemented");
+     }
+ 
++    public function compileForeignKeyListing(table:String):String {
++        throw new Exception("Foreign key introspection is not implemented by this driver.");
++    }
++
+     public function compileCreateDatabase(name:String):String {
+         throw new Exception("Not implemented");
+     }
+@@ -125,13 +135,17 @@
+     public function compileColumnIndexes(table:String, column:ColumnDefinition):Array<String> {
+         var statements:Array<String> = [];
+         if (column.isUnique)
+-            statements.push(compileUnique(table, [column.name], column.uniqueName ?? indexName(table, [column.name], "unique")));
++            statements.push(compileUnique(table, [column.name],
++                column.uniqueName ?? indexName(table, [column.name], "unique")));
+         if (column.hasIndex)
+-            statements.push(compileIndex(table, [column.name], column.indexName ?? indexName(table, [column.name], "index")));
++            statements.push(compileIndex(table, [column.name],
++                column.indexName ?? indexName(table, [column.name], "index")));
+         if (column.isFullText)
+-            statements.push(compileFullText(table, [column.name], column.fullTextName ?? indexName(table, [column.name], "fulltext")));
++            statements.push(compileFullText(table, [column.name],
++                column.fullTextName ?? indexName(table, [column.name], "fulltext")));
+         if (column.isSpatialIndex)
+-            statements.push(compileSpatialIndex(table, [column.name], column.spatialIndexName ?? indexName(table, [column.name], "spatialindex")));
++            statements.push(compileSpatialIndex(table, [column.name],
++                column.spatialIndexName ?? indexName(table, [column.name], "spatialindex")));
+         return statements;
+     }
+ 
+@@ -144,13 +158,17 @@
+         for (command in blueprint.commands) {
+             switch (command) {
+                 case AddUnique(columns, name):
+-                    statements.push(compileUnique(blueprint.table, columns, name ?? indexName(blueprint.table, columns, "unique")));
++                    statements.push(compileUnique(blueprint.table, columns,
++                        name ?? indexName(blueprint.table, columns, "unique")));
+                 case AddIndex(columns, name):
+-                    statements.push(compileIndex(blueprint.table, columns, name ?? indexName(blueprint.table, columns, "index")));
++                    statements.push(compileIndex(blueprint.table, columns,
++                        name ?? indexName(blueprint.table, columns, "index")));
+                 case AddFullText(columns, name):
+-                    statements.push(compileFullText(blueprint.table, columns, name ?? indexName(blueprint.table, columns, "fulltext")));
++                    statements.push(compileFullText(blueprint.table, columns,
++                        name ?? indexName(blueprint.table, columns, "fulltext")));
+                 case AddSpatialIndex(columns, name):
+-                    statements.push(compileSpatialIndex(blueprint.table, columns, name ?? indexName(blueprint.table, columns, "spatialindex")));
++                    statements.push(compileSpatialIndex(blueprint.table, columns,
++                        name ?? indexName(blueprint.table, columns, "spatialindex")));
+                 default:
+             }
+         }
+@@ -172,10 +190,7 @@
+         sql += collateModifier(column);
+         sql += generatedModifier(column);
+         sql += nullableModifier(column);
+-        if (column.usesCurrent)
+-            sql += " DEFAULT CURRENT_TIMESTAMP";
+-        else if (column.hasDefault)
+-            sql += ' DEFAULT ${formatDefault(column.defaultVal)}';
++        sql += defaultModifier(column);
+         sql += onUpdateModifier(column);
+         sql += incrementModifier(column, blueprint);
+         sql += commentModifier(column);
+@@ -183,6 +198,14 @@
+         return sql;
+     }
+ 
++    private function defaultModifier(column:ColumnDefinition):String {
++        if (column.usesCurrent)
++            return " DEFAULT CURRENT_TIMESTAMP";
++        if (column.hasDefault)
++            return ' DEFAULT ${formatDefault(column.defaultVal)}';
++        return "";
++    }
++
+     private function charsetModifier(column:ColumnDefinition):String {
+         return "";
+     }
+@@ -249,7 +272,8 @@
+         throw new Exception("Not implemented");
+     }
+ 
+-    private function compileAddPrimary(table:String, columns:Array<String>, name:Null<String>):String {
++    private function compileAddPrimary(table:String, columns:Array<String>,
++            name:Null<String>):String {
+         throw new Exception("Not implemented");
+     }
+ 
+@@ -283,7 +307,8 @@
+     }
+ 
+     public function isIncrementsColumn(column:ColumnDefinition):Bool {
+-        return column.type == TIncrements || column.type == TBigIncrements || column.isAutoIncrement;
++        return column.type == TIncrements || column.type == TBigIncrements
++            || column.isAutoIncrement;
+     }
+ 
+     private function hasPrimaryCommand(blueprint:Null<Blueprint>):Bool {
+@@ -291,7 +316,8 @@
+             return false;
+         for (command in blueprint.commands) {
+             switch (command) {
+-                case AddPrimary(_, _): return true;
++                case AddPrimary(_, _):
++                    return true;
+                 default:
+             }
+         }
+diff --git a/src/hx/well/database/schema/SqliteSchemaGrammar.hx b/src/hx/well/database/schema/SqliteSchemaGrammar.hx
+--- a/src/hx/well/database/schema/SqliteSchemaGrammar.hx
++++ b/src/hx/well/database/schema/SqliteSchemaGrammar.hx
+@@ -34,19 +34,23 @@
+         throw new Exception("SQLite column changes are applied through SchemaBuilder table recreation.");
+     }
+ 
+-    private override function compileUnique(table:String, columns:Array<String>, name:String):String {
++    private override function compileUnique(table:String, columns:Array<String>,
++            name:String):String {
+         return 'CREATE UNIQUE INDEX ${quote(name)} ON ${quote(table)} (${quoteList(columns)})';
+     }
+ 
+-    private override function compileIndex(table:String, columns:Array<String>, name:String):String {
++    private override function compileIndex(table:String, columns:Array<String>,
++            name:String):String {
+         return 'CREATE INDEX ${quote(name)} ON ${quote(table)} (${quoteList(columns)})';
+     }
+ 
+-    private override function compileFullText(table:String, columns:Array<String>, name:String):String {
++    private override function compileFullText(table:String, columns:Array<String>,
++            name:String):String {
+         throw new Exception("SQLite does not support fulltext indexes.");
+     }
+ 
+-    private override function compileSpatialIndex(table:String, columns:Array<String>, name:String):String {
++    private override function compileSpatialIndex(table:String, columns:Array<String>,
++            name:String):String {
+         throw new Exception("SQLite does not support spatial indexes.");
+     }
+ 
+@@ -54,7 +58,8 @@
+         throw new Exception("SQLite index renames are applied through SchemaBuilder recreation.");
+     }
+ 
+-    private override function compileAddPrimary(table:String, columns:Array<String>, name:Null<String>):String {
++    private override function compileAddPrimary(table:String, columns:Array<String>,
++            name:Null<String>):String {
+         throw new Exception("SQLite does not support adding primary keys to existing tables.");
+     }
+ 
+@@ -79,7 +84,8 @@
+     }
+ 
+     public override function compileTableExists(table:String):String {
+-        return 'SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'${escapeString(table)}\'';
++        return
++            'SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'${escapeString(table)}\'';
+     }
+ 
+     public override function compileColumnListing(table:String):String {
+@@ -94,6 +100,10 @@
+         return 'PRAGMA index_list(${quote(table)})';
+     }
+ 
++    public override function compileForeignKeyListing(table:String):String {
++        return 'PRAGMA foreign_key_list(${quote(table)})';
++    }
++
+     public override function compileEnableForeignKeyConstraints():String {
+         return "PRAGMA foreign_keys = ON";
+     }
+diff --git a/src/hx/well/database/schema/SqliteTableDefinition.hx b/src/hx/well/database/schema/SqliteTableDefinition.hx
+--- a/src/hx/well/database/schema/SqliteTableDefinition.hx
++++ b/src/hx/well/database/schema/SqliteTableDefinition.hx
+@@ -1,6 +1,8 @@
+ package hx.well.database.schema;
+ 
+ import haxe.Exception;
++import hx.well.database.query.QueryIdentifier;
++
+ using StringTools;
+ 
+ class SqliteTableDefinition {
+@@ -55,14 +57,16 @@
+             throw new Exception('Unable to parse table definition: ${sql}');
+ 
+         items.push(sql.substring(itemStart, close));
+-        return new SqliteTableDefinition([for (item in items) item.trim()], sql.substring(close + 1).trim());
++        return new SqliteTableDefinition([for (item in items) item.trim()],
++            sql.substring(close + 1).trim());
+     }
+ 
+     public static function columnName(item:String):Null<String> {
+         var identifier = readIdentifier(item, 0);
+         if (identifier == null)
+             return null;
+-        if (!identifier.quoted && constraintKeywords.contains(SchemaGrammar.asciiUpper(identifier.name)))
++        if (!identifier.quoted
++            && constraintKeywords.contains(SchemaGrammar.asciiUpper(identifier.name)))
+             return null;
+         return identifier.name;
+     }
+@@ -104,10 +108,17 @@
+         }
+         if (token == null)
+             throw new Exception("Unable to parse index definition.");
+-        return sql.substring(0, token.start) + hx.well.database.query.QueryIdentifier.quote(name) + sql.substring(token.end);
++        return sql.substring(0, token.start)
++            + QueryIdentifier.quote(name)
++            + sql.substring(token.end);
+     }
+ 
+-    private static function readIdentifier(text:String, position:Int):Null<{name:String, quoted:Bool, start:Int, end:Int}> {
++    private static function readIdentifier(text:String, position:Int):Null<{
++        name:String,
++        quoted:Bool,
++        start:Int,
++        end:Int
++    }> {
+         var i = position;
+         while (i < text.length) {
+             if (text.isSpace(i))
+@@ -126,22 +137,36 @@
+         if (code == "'".code || code == '"'.code || code == "`".code) {
+             var quote = text.charAt(i);
+             var end = skipQuoted(text, i, code);
+-            return {name: text.substring(i + 1, end - 1).replace(quote + quote, quote), quoted: true, start: i, end: end};
++            return {
++                name: text.substring(i + 1, end - 1).replace(quote + quote, quote),
++                quoted: true,
++                start: i,
++                end: end
++            };
+         }
+         if (code == "[".code) {
+             var end = skipPast(text, i + 1, "]");
+-            return {name: text.substring(i + 1, end - 1), quoted: true, start: i, end: end};
++            return {
++                name: text.substring(i + 1, end - 1),
++                quoted: true,
++                start: i,
++                end: end
++            };
+         }
+ 
+         var start = i;
+         while (i < text.length && isBareIdentifierChar(text.charCodeAt(i)))
+             i++;
+-        return i == start ? null : {name: text.substring(start, i), quoted: false, start: start, end: i};
++        return i == start ? null : {
++            name: text.substring(start, i),
++            quoted: false,
++            start: start,
++            end: i
++        };
+     }
+ 
+     private static function isBareIdentifierChar(code:Int):Bool {
+-        return code > " ".code
+-            && code != "(".code && code != ")".code && code != ",".code
++        return code > " ".code && code != "(".code && code != ")".code && code != ",".code
+             && code != "'".code && code != '"'.code && code != "`".code && code != "[".code;
+     }
+ 
+diff --git a/src/hx/well/facades/Schema.hx b/src/hx/well/facades/Schema.hx
+--- a/src/hx/well/facades/Schema.hx
++++ b/src/hx/well/facades/Schema.hx
+@@ -2,6 +2,7 @@
+ 
+ import hx.well.database.schema.Blueprint;
+ import hx.well.database.schema.SchemaBuilder;
++import hx.well.database.schema.ForeignKeyInfo;
+ 
+ class Schema {
+     public static function connection(key:String):SchemaBuilder {
+@@ -68,11 +69,17 @@
+         return new SchemaBuilder().getTableListing();
+     }
+ 
+-    public static function whenTableHasColumn(table:String, column:String, callback:Blueprint->Void):Void {
++    public static function getForeignKeys(table:String):Array<ForeignKeyInfo> {
++        return new SchemaBuilder().getForeignKeys(table);
++    }
++
++    public static function whenTableHasColumn(table:String, column:String,
++            callback:Blueprint->Void):Void {
+         new SchemaBuilder().whenTableHasColumn(table, column, callback);
+     }
+ 
+-    public static function whenTableDoesntHaveColumn(table:String, column:String, callback:Blueprint->Void):Void {
++    public static function whenTableDoesntHaveColumn(table:String, column:String,
++            callback:Blueprint->Void):Void {
+         new SchemaBuilder().whenTableDoesntHaveColumn(table, column, callback);
+     }
+ 
+@@ -92,7 +99,7 @@
+         new SchemaBuilder().disableForeignKeyConstraints();
+     }
+ 
+-    public static function withoutForeignKeyConstraints(callback:()->Void):Void {
++    public static function withoutForeignKeyConstraints(callback:() -> Void):Void {
+         new SchemaBuilder().withoutForeignKeyConstraints(callback);
+     }
+ }
+diff --git a/src/hx/well/model/BaseModel.hx b/src/hx/well/model/BaseModel.hx
+--- a/src/hx/well/model/BaseModel.hx
++++ b/src/hx/well/model/BaseModel.hx
+@@ -10,125 +10,154 @@
+ // TODO: Add support for saving (save())
+ @:autoBuild(hx.well.macro.ModelMacro.build())
+ class BaseModel<T> implements IResponseInstance implements ISerializable {
+-	public var __connection:String = "default";
+-	public var __table:String;
+-	public var __primary:String;
+-	private var __visibleFields:Array<String> = [];
++    public var __connection:String = "default";
++    public var __table:String;
++    public var __primary:String;
+ 
+-	public function new() {}
++    private var __visibleFields:Array<String> = [];
++    private var __loadedValues:Dynamic = null;
++    private var __serializedValues:Dynamic = null;
+ 
+-	public function primaryKeyFactory():Dynamic {
+-		return null;
+-	}
++    public function new() {}
+ 
+-	public function delete():Void {
+-		primaryQuery().delete();
+-	}
++    public function primaryKeyFactory():Dynamic {
++        return null;
++    }
+ 
+-	public function update(data:Map<String, Dynamic>):Void {
+-		primaryQuery().update(data);
+-		for(key in data.keys()) {
+-			var value:Dynamic = data.get(key);
+-			Reflect.setField(this, key, value);
+-		}
+-	}
++    public function delete():Void {
++        primaryQuery().delete();
++    }
+ 
+-	public inline function getTable():String {
+-		return __table;
+-	}
++    public function update(data:Map<String, Dynamic>):Void {
++        primaryQuery().update(data);
++        for (key in data.keys()) {
++            var value:Dynamic = data.get(key);
++            Reflect.setField(this, key, value);
++            if (__loadedValues != null) {
++                Reflect.setField(__loadedValues, key, value);
++                Reflect.setField(__serializedValues, key, value);
++            }
++        }
++    }
+ 
+-	public function setTable(value:String):Void {
+-		__table = value;
+-	}
++    public inline function getTable():String {
++        return __table;
++    }
+ 
+-	public function setConnection(value:String):Void {
+-		__connection = value;
+-	}
++    public function setTable(value:String):Void {
++        __table = value;
++    }
+ 
+-	public function getPrimary():String {
+-		return __primary;
+-	}
++    public function setConnection(value:String):Void {
++        __connection = value;
++    }
+ 
+-	public function setPrimary(value:String):Void {
+-		__primary = value;
+-	}
++    public function getPrimary():String {
++        return __primary;
++    }
+ 
+-	public function getDatabaseFields():Array<String> {
+-		return [];
+-	}
++    public function setPrimary(value:String):Void {
++        __primary = value;
++    }
+ 
+-	public function getVisibleDatabaseFields():Array<String> {
+-		return __visibleFields;
+-	}
++    public function getDatabaseFields():Array<String> {
++        return [];
++    }
+ 
+-	public overload extern inline function makeVisible(attribute:String):Void {
+-		makeVisibleInternal(attribute);
+-	}
++    public function getVisibleDatabaseFields():Array<String> {
++        return __visibleFields;
++    }
+ 
+-	public overload extern inline function makeVisible(attributes:Array<String>):Void {
+-		for(attribute in attributes)
+-			makeVisible(attribute);
+-	}
++    /** Track selected attributes, including explicit aggregate aliases, without exposing defaults. */
++    public function setLoadedValues(values:Dynamic, serialized:Dynamic):Void {
++        __loadedValues = values;
++        __serializedValues = serialized;
++        var declared = getDatabaseFields();
++        for (field in Reflect.fields(values)) {
++            if (!declared.contains(field)) {
++                makeVisible(field);
++            }
++        }
++    }
+ 
+-	public overload extern inline function makeVisible(attributes:...String):Void {
+-		for(attribute in attributes)
+-			makeVisible(attribute);
+-	}
++    public overload extern inline function makeVisible(attribute:String):Void {
++        makeVisibleInternal(attribute);
++    }
+ 
+-	public overload extern inline function makeHidden(attribute:String):Void {
+-		makeHiddenInternal(attribute);
+-	}
++    public overload extern inline function makeVisible(attributes:Array<String>):Void {
++        for (attribute in attributes)
++            makeVisible(attribute);
++    }
+ 
+-	public overload extern inline function makeHidden(attributes:Array<String>):Void {
+-		for(attribute in attributes)
+-			makeHidden(attribute);
+-	}
++    public overload extern inline function makeVisible(attributes:...String):Void {
++        for (attribute in attributes)
++            makeVisible(attribute);
++    }
+ 
+-	public overload extern inline function makeHidden(attributes:...String):Void {
+-		for(attribute in attributes)
+-			makeHidden(attribute);
+-	}
++    public overload extern inline function makeHidden(attribute:String):Void {
++        makeHiddenInternal(attribute);
++    }
+ 
+-	private function makeVisibleInternal(attribute:String):Void {
+-		if (!__visibleFields.contains(attribute)) {
+-			__visibleFields.push(attribute);
+-		}
+-	}
++    public overload extern inline function makeHidden(attributes:Array<String>):Void {
++        for (attribute in attributes)
++            makeHidden(attribute);
++    }
+ 
+-	private function makeHiddenInternal(attribute:String):Void {
+-		__visibleFields.remove(attribute);
+-	}
++    public overload extern inline function makeHidden(attributes:...String):Void {
++        for (attribute in attributes)
++            makeHidden(attribute);
++    }
+ 
+-	/**
+-	 * Convert this model to a plain object containing only visible fields.
+-	 * Useful for serialization, API responses, and data transfer.
+-	 * @return Dynamic object with visible fields only
+-	 */
+-	public function toObject():Dynamic {
+-		var data:Dynamic = {};
++    private function makeVisibleInternal(attribute:String):Void {
++        if (!__visibleFields.contains(attribute)) {
++            __visibleFields.push(attribute);
++        }
++    }
+ 
+-		for (field in getVisibleDatabaseFields()) {
+-			var fieldValue:Dynamic = Reflect.getProperty(this, field);
+-			Reflect.setProperty(data, field, fieldValue);
+-		}
++    private function makeHiddenInternal(attribute:String):Void {
++        __visibleFields.remove(attribute);
++    }
+ 
+-		return data;
+-	}
++    /**
++     * Convert this model to a plain object containing only visible fields.
++     * Useful for serialization, API responses, and data transfer.
++     * @return Dynamic object with visible fields only
++     */
++    public function toObject():Dynamic {
++        var data:Dynamic = {};
++        var declaredFields = getDatabaseFields();
+ 
+-	/**
+-	 * Get a JSON response containing only visible fields.
+-	 * @return JsonResponse with visible model data
+-	 */
+-	public function getResponse():Response {
+-		return new JsonResponse(toObject());
+-	}
++        for (field in getVisibleDatabaseFields()) {
++            if (__loadedValues != null && !Reflect.hasField(__loadedValues, field)) {
++                continue;
++            }
++            var declared = declaredFields.contains(field);
++            var fieldValue:Dynamic = declared ? Reflect.getProperty(this,
++                field) : Reflect.field(__serializedValues, field);
++            if (__loadedValues != null && declared
++                && fieldValue == Reflect.field(__loadedValues, field)) {
++                fieldValue = Reflect.field(__serializedValues, field);
++            }
++            Reflect.setProperty(data, field, fieldValue);
++        }
+ 
+-	// Internal Helpers
+-	private inline function primaryFieldValue():Dynamic {
+-		return Reflect.field(this, __primary);
+-	}
++        return data;
++    }
+ 
+-	private function primaryQuery():QueryBuilder<T> {
+-		return new QueryBuilder(this).where(__primary, primaryFieldValue());
+-	}
++    /**
++     * Get a JSON response containing only visible fields.
++     * @return JsonResponse with visible model data
++     */
++    public function getResponse():Response {
++        return new JsonResponse(toObject());
++    }
++
++    // Internal Helpers
++    private inline function primaryFieldValue():Dynamic {
++        return Reflect.field(this, __primary);
++    }
++
++    private function primaryQuery():QueryBuilder<T> {
++        return new QueryBuilder(this).where(__primary, primaryFieldValue());
++    }
+ }
+diff --git a/src/hx/well/model/BaseModelQuery.hx b/src/hx/well/model/BaseModelQuery.hx
+--- a/src/hx/well/model/BaseModelQuery.hx
++++ b/src/hx/well/model/BaseModelQuery.hx
+@@ -31,14 +31,14 @@
+ 
+     public function updateOrCreate(whereData:StringMap<Dynamic>, data:StringMap<Dynamic>):T {
+         var existing:Null<T> = where(whereData).first();
+-        if(existing != null) {
++        if (existing != null) {
+             existing.update(data);
+             return existing;
+         } else {
+             var combinedData:StringMap<Dynamic> = new StringMap<Dynamic>();
+-            for(key in whereData.keys())
++            for (key in whereData.keys())
+                 combinedData.set(key, whereData.get(key));
+-            for(key in data.keys())
++            for (key in data.keys())
+                 combinedData.set(key, data.get(key));
+             return create(combinedData);
+         }
+@@ -46,7 +46,7 @@
+ 
+     public function insert(data:StringMap<Dynamic>):Int {
+         var pk:Dynamic = parent.primaryKeyFactory();
+-        if(pk != null && !data.exists(getPrimary())) {
++        if (pk != null && !data.exists(getPrimary())) {
+             data.set(getPrimary(), pk);
+         }
+         return new QueryBuilder(parent).insert(data);
+@@ -54,6 +54,14 @@
+ 
+     public function select(columns:Array<String>):QueryBuilder<T> {
+         return new QueryBuilder(parent).select(columns);
++    }
++
++    public function selectCount(column:String = "*", alias:String = "count"):QueryBuilder<T> {
++        return new QueryBuilder(parent).selectCount(column, alias);
++    }
++
++    public function whereColumn(first:String, second:String):QueryBuilder<T> {
++        return new QueryBuilder(parent).whereColumn(first, second);
+     }
+ 
+     public function selectRaw(expression:String, ...bindings):QueryBuilder<T> {
+@@ -64,7 +72,8 @@
+         return new QueryBuilder(parent).where(column, value);
+     }
+ 
+-    public overload extern inline function where(column:String, op:String, value:Dynamic):QueryBuilder<T> {
++    public overload extern inline function where(column:String, op:String,
++            value:Dynamic):QueryBuilder<T> {
+         return new QueryBuilder(parent).where(column, op, value);
+     }
+ 
+@@ -72,11 +81,16 @@
+         return new QueryBuilder(parent).where(data);
+     }
+ 
++    public overload extern inline function where(callback:QueryBuilder<T>->Void):QueryBuilder<T> {
++        return new QueryBuilder(parent).where(callback);
++    }
++
+     public overload extern inline function orWhere(column:String, value:Dynamic):QueryBuilder<T> {
+         return new QueryBuilder(parent).orWhere(column, value);
+     }
+ 
+-    public overload extern inline function orWhere(column:String, op:String, value:Dynamic):QueryBuilder<T> {
++    public overload extern inline function orWhere(column:String, op:String,
++            value:Dynamic):QueryBuilder<T> {
+         return new QueryBuilder(parent).orWhere(column, op, value);
+     }
+ 
+@@ -84,19 +98,27 @@
+         return new QueryBuilder(parent).orWhere(data);
+     }
+ 
+-    public function innerJoin(table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public overload extern inline function orWhere(callback:QueryBuilder<T>->Void):QueryBuilder<T> {
++        return new QueryBuilder(parent).orWhere(callback);
++    }
++
++    public function innerJoin(table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         return new QueryBuilder(parent).innerJoin(table, column1, op, column2);
+     }
+ 
+-    public function leftJoin(table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public function leftJoin(table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         return new QueryBuilder(parent).leftJoin(table, column1, op, column2);
+     }
+ 
+-    public function rightJoin(table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public function rightJoin(table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         return new QueryBuilder(parent).rightJoin(table, column1, op, column2);
+     }
+ 
+-    public function join(type:String, table:String, column1:String, op:String, column2:String):QueryBuilder<T> {
++    public function join(type:String, table:String, column1:String, op:String,
++            column2:String):QueryBuilder<T> {
+         return new QueryBuilder(parent).join(type, table, column1, op, column2);
+     }
+ 
+@@ -120,7 +142,8 @@
+         return new QueryBuilder(parent).getResultSet();
+     }
+ 
+-    public function getResultSetResponse(?resultSetReplacer:Dynamic->Void, statusCode:Null<Int> = null):Response {
++    public function getResultSetResponse(?resultSetReplacer:Dynamic->Void,
++            statusCode:Null<Int> = null):Response {
+         return new QueryBuilder(parent).getResultSetResponse(resultSetReplacer, statusCode);
+     }
+ 
+@@ -129,4 +152,13 @@
+         var primaryKey:String = getPrimary();
+         return data.exists(primaryKey) ? find(data.get(primaryKey)) : find(id);
+     }
++
++    public function upsert(data:StringMap<Dynamic>, uniqueBy:Array<String>,
++            update:Array<String>):Void {
++        var primary = parent.primaryKeyFactory();
++        if (primary != null && !data.exists(getPrimary())) {
++            data.set(getPrimary(), primary);
++        }
++        new QueryBuilder(parent).upsert(data, uniqueBy, update);
++    }
+ }
+diff --git a/src/hx/well/pool/DatabasePool.hx b/src/hx/well/pool/DatabasePool.hx
+--- a/src/hx/well/pool/DatabasePool.hx
++++ b/src/hx/well/pool/DatabasePool.hx
+@@ -1,22 +1,42 @@
+ package hx.well.pool;
++
+ import sys.db.Connection;
++import sys.db.Sqlite;
++import sys.db.Mysql;
++import hx.well.database.schema.SqliteSchemaGrammar;
+ 
+ class DatabasePool extends AbstractPool<Connection> {
+     private var key:String;
+     private var config:Dynamic;
++    private var connector:Null<Void->Connection>;
+ 
+-    public function new(key:String, config:Dynamic) {
++    public function new(key:String, config:Dynamic, ?connector:Void->Connection) {
+         this.key = key;
+         this.config = config;
++        this.connector = connector;
+ 
+         super();
+     }
+ 
+     public function create():Connection {
+-        if(this.config.path != null)
+-            return sys.db.Sqlite.open(this.config.path);
+-        else
+-            return sys.db.Mysql.connect(this.config);
++        var connection:Connection;
++        if (connector != null) {
++            connection = connector();
++        } else if (this.config.path != null) {
++            connection = Sqlite.open(this.config.path);
++        } else {
++            connection = Mysql.connect(this.config);
++        }
++        if (this.config.path != null) {
++            try {
++                var grammar = new SqliteSchemaGrammar();
++                connection.request(grammar.compileEnableForeignKeyConstraints());
++            } catch (error:Dynamic) {
++                connection.close();
++                throw error;
++            }
++        }
++        return connection;
+     }
+ 
+     public function size():Int {
+@@ -28,14 +48,12 @@
+         mutex.acquire();
+         try {
+             // Only add the pool elements back.
+-            if(objects.indexOf(object) == -1)
++            if (objects.indexOf(object) == -1)
+                 object.close();
+-        } catch (e) {
+-
+-        }
++        } catch (e) {}
+         mutex.release();
+ 
+         super.free(object);
+         #end
+     }
+-}
+\ No newline at end of file
++}

@@ -1,0 +1,308 @@
+diff --git a/src/hx/well/inertia/InertiaMiddleware.hx b/src/hx/well/inertia/InertiaMiddleware.hx
+--- a/src/hx/well/inertia/InertiaMiddleware.hx
++++ b/src/hx/well/inertia/InertiaMiddleware.hx
+@@ -67,7 +67,7 @@
+ 			if (clientVersion != null && clientVersion != "" && clientVersion != serverVersion) {
+ 				// Version mismatch - force full page reload
+ 				var response = new Response(409);
+-				response.header("X-Inertia-Location", request.path);
++				response.header("X-Inertia-Location", Inertia.resolveUrl(request));
+ 				return response;
+ 			}
+ 		}
+diff --git a/src/hx/well/inertia/InertiaResponse.hx b/src/hx/well/inertia/InertiaResponse.hx
+--- a/src/hx/well/inertia/InertiaResponse.hx
++++ b/src/hx/well/inertia/InertiaResponse.hx
+@@ -4,7 +4,11 @@
+ import haxe.Json;
+ import haxe.Template;
+ import haxe.io.Bytes;
++#if jvm
++import hx.well.inertia.JvmHttp as Http;
++#else
+ import haxe.Http;
++#end
+ import hx.well.http.Response;
+ import hx.well.http.StringResponse;
+ import hx.well.http.Request;
+@@ -50,6 +54,7 @@
+ 		super(responseBody, 200);
+ 
+ 		// Set appropriate headers
++		header("Vary", "X-Inertia");
+ 		if (checkIsInertiaRequest()) {
+ 			header("Content-Type", "application/json");
+ 			header("X-Inertia", "true");
+@@ -140,13 +145,13 @@
+ 		if (InertiaConfig.ssrEnabled) {
+ 			var ssrResult = fetchSsrContent(pageJson);
+ 			if (ssrResult != null) {
+-				return buildSsrHtml(ssrResult, pageJson);
++				return buildSsrHtml(ssrResult, pageJson, pageData);
+ 			}
+ 			// SSR failed, fall through to CSR
+ 		}
+ 
+ 		// CSR: Try to get template from TemplateData
+-		var template:Template = TemplateData.data.get(_rootViewName);
++		var template:Template = TemplateData.create(_rootViewName);
+ 
+ 		if (template != null) {
+ 			// Build context for template
+@@ -159,7 +164,9 @@
+ 
+ 			// Add page data - both as 'page' object and as JSON string
+ 			Reflect.setField(context, "page", pageData);
+-			Reflect.setField(context, "pageJson", pageJson);
++			Reflect.setField(context, "ssrHead", "<title>Fieldnotes</title>");
++			Reflect.setField(context, "ssrBody", '<div id="app" data-page="' + StringTools.htmlEscape(pageJson, true) + '"></div>');
++			Reflect.setField(context, "pageJson", StringTools.htmlEscape(pageJson, true));
+ 
+ 			// Add Vite assets
+ 			Reflect.setField(context, "viteAssets", getViteAssets());
+@@ -178,6 +185,7 @@
+ 	private function fetchSsrContent(pageJson:String):Null<SsrResult> {
+ 		try {
+ 			var http = new Http(InertiaConfig.ssrUrl);
++			http.cnxTimeout = InertiaConfig.ssrTimeout;
+ 			http.setHeader("Content-Type", "application/json");
+ 			http.setPostData(pageJson);
+ 
+@@ -217,9 +225,9 @@
+ 	/**
+ 	 * Build HTML with SSR result.
+ 	 */
+-	private function buildSsrHtml(ssr:SsrResult, pageJson:String):String {
++	private function buildSsrHtml(ssr:SsrResult, pageJson:String, pageData:Dynamic):String {
+ 		// Try to get template from TemplateData
+-		var template:Template = TemplateData.data.get(_rootViewName);
++		var template:Template = TemplateData.create(_rootViewName);
+ 
+ 		if (template != null) {
+ 			// Build context for template
+@@ -231,7 +239,8 @@
+ 			}
+ 
+ 			// Add page data
+-			Reflect.setField(context, "pageJson", pageJson);
++			Reflect.setField(context, "pageJson", StringTools.htmlEscape(pageJson, true));
++			Reflect.setField(context, "page", pageData);
+ 
+ 			// Add SSR content
+ 			Reflect.setField(context, "ssrHead", ssr.head != null ? ssr.head.join("\n") : "");
+@@ -245,7 +254,7 @@
+ 		}
+ 
+ 		// Fallback: build basic SSR HTML
+-		var escapedPageJson = StringTools.htmlEscape(pageJson);
++		var escapedPageJson = StringTools.htmlEscape(pageJson, true);
+ 		var headContent = ssr.head != null ? ssr.head.join("\n    ") : "";
+ 		var bodyContent = ssr.body != null ? ssr.body : "";
+ 		var viteAssets = getViteAssets();
+@@ -268,7 +277,7 @@
+ 	 * Fallback HTML when no template is found (CSR only).
+ 	 */
+ 	private function buildFallbackHtml(pageData:Dynamic):String {
+-		var pageJson = StringTools.htmlEscape(Json.stringify(pageData));
++		var pageJson = StringTools.htmlEscape(Json.stringify(pageData), true);
+ 		var viteAssets = getViteAssets();
+ 
+ 		return '<!DOCTYPE html>
+@@ -303,7 +312,7 @@
+ 		var entries:Array<String> = [appEntry];
+ 
+ 		// Add page component if we have a component name
+-		if (_component != null && _component != "") {
++		if (Environment.env("VITE_INCLUDE_PAGE_ENTRY", "true") == "true" && _component != null && _component != "") {
+ 			var pageEntry = pagesPath + "/" + _component + pageExtension;
+ 			entries.push(pageEntry);
+ 		}
+diff --git a/src/hx/well/inertia/Vite.hx b/src/hx/well/inertia/Vite.hx
+--- a/src/hx/well/inertia/Vite.hx
++++ b/src/hx/well/inertia/Vite.hx
+@@ -1,7 +1,11 @@
+ package hx.well.inertia;
+ 
+ import haxe.Json;
++#if jvm
++import hx.well.inertia.JvmHttp as Http;
++#else
+ import haxe.Http;
++#end
+ import sys.io.File;
+ import sys.FileSystem;
+ import hx.well.facades.Environment;
+@@ -54,7 +58,7 @@
+ 	 */
+ 	public static function isDevelopment():Bool {
+ 		var appEnv = Environment.env("APP_ENV", "production");
+-		return appEnv == "development" || appEnv == "dev" || appEnv == "local";
++		return Environment.env("VITE_USE_BUILD", "false") != "true" && (appEnv == "development" || appEnv == "dev" || appEnv == "local");
+ 	}
+ 
+ 	/**
+diff --git a/src/hx/well/inertia/JvmHttp.hx b/src/hx/well/inertia/JvmHttp.hx
+--- /dev/null
++++ b/src/hx/well/inertia/JvmHttp.hx
+@@ -0,0 +1,73 @@
++package hx.well.inertia;
++
++import haxe.io.Bytes;
++import java.io.ByteArrayOutputStream;
++import java.net.HttpURLConnection;
++import java.net.URL;
++
++/** Native JVM HTTP transport, independent of Haxe socket overrides. */
++class JvmHttp {
++    var url:String;
++    var headers:Map<String, String> = new Map();
++    var postData:String = "";
++
++    public var cnxTimeout:Float = 2;
++    public var onData:String->Void = function(_) {};
++    public var onError:String->Void = function(_) {};
++    public var onStatus:Int->Void = function(_) {};
++
++    public function new(url:String) {
++        this.url = url;
++    }
++
++    public function setHeader(key:String, value:String):Void {
++        headers.set(key, value);
++    }
++
++    public function setPostData(value:String):Void {
++        postData = value;
++    }
++
++    public function request(post:Bool):Void {
++        var connection:HttpURLConnection = null;
++        try {
++            connection = cast new URL(url).openConnection();
++            var timeoutMilliseconds = Std.int(cnxTimeout * 1000);
++            connection.setConnectTimeout(timeoutMilliseconds);
++            connection.setReadTimeout(timeoutMilliseconds);
++            connection.setRequestMethod(post ? "POST" : "GET");
++            for (key => value in headers) {
++                connection.setRequestProperty(key, value);
++            }
++            if (post) {
++                connection.setDoOutput(true);
++                var output = connection.getOutputStream();
++                var bytes = Bytes.ofString(postData).getData();
++                output.write(bytes);
++                output.close();
++            }
++            var status = connection.getResponseCode();
++            onStatus(status);
++            if (status >= 400) {
++                onError("HTTP " + status);
++            } else {
++                var input = connection.getInputStream();
++                var response = new ByteArrayOutputStream();
++                var buffer = Bytes.alloc(8192).getData();
++                var count = input.read(buffer, 0, 8192);
++                while (count != -1) {
++                    response.write(buffer, 0, count);
++                    count = input.read(buffer, 0, 8192);
++                }
++                input.close();
++                var responseData = Bytes.ofData(response.toByteArray()).toString();
++                onData(responseData);
++            }
++        } catch (error:Dynamic) {
++            onError(Std.string(error));
++        }
++        if (connection != null) {
++            connection.disconnect();
++        }
++    }
++}
+diff --git a/src/hx/well/facades/Inertia.hx b/src/hx/well/facades/Inertia.hx
+--- a/src/hx/well/facades/Inertia.hx
++++ b/src/hx/well/facades/Inertia.hx
+@@ -1,10 +1,16 @@
+ package hx.well.facades;
+ 
+ import haxe.ThreadLocal;
++import haxe.ds.StringMap;
+ import hx.well.http.RequestStatic.request;
+ import hx.well.http.Request;
+ import hx.well.inertia.InertiaResponse;
+-import hx.well.inertia.props.*;
++import hx.well.inertia.props.AlwaysProp;
++import hx.well.inertia.props.DeferProp;
++import hx.well.inertia.props.LazyProp;
++import hx.well.inertia.props.MergeProp;
++import hx.well.inertia.props.OnceProp;
++import hx.well.inertia.props.OptionalProp;
+ 
+ /**
+  * Inertia.js Facade for hxwell framework.
+@@ -29,7 +35,7 @@
+ 
+ 	// ===== Session Keys =====
+ 	private static inline var SESSION_CLEAR_HISTORY:String = "_inertia_clear_history";
+-	private static inline var SESSION_FLASH_PREFIX:String = "_inertia_flash_";
++	private static inline var SESSION_FLASH_DATA:String = "_inertia_flash_data";
+ 
+ 	/**
+ 	 * Get or create the thread-local state for this request.
+@@ -82,7 +88,7 @@
+ 		var s = state();
+ 		if (Std.isOfType(key, String)) {
+ 			s.sharedProps.set(cast key, value);
+-		} else if (Std.isOfType(key, haxe.ds.StringMap)) {
++		} else if (Std.isOfType(key, StringMap)) {
+ 			var map:Map<String, Dynamic> = cast key;
+ 			for (k in map.keys()) {
+ 				s.sharedProps.set(k, map.get(k));
+@@ -270,7 +276,7 @@
+ 			return new Map<String, Dynamic>();
+ 
+ 		// Already a Map
+-		if (Std.isOfType(props, haxe.ds.StringMap))
++		if (Std.isOfType(props, StringMap))
+ 			return cast props;
+ 
+ 		// Anonymous struct - convert via Reflect
+@@ -310,14 +316,16 @@
+ 		if (req == null || req.session == null)
+ 			return;
+ 
++		var data:Map<String, Dynamic> = req.session.get(SESSION_FLASH_DATA, new Map());
+ 		if (Std.isOfType(key, String)) {
+-			req.session.put(SESSION_FLASH_PREFIX + cast(key, String), value);
+-		} else if (Std.isOfType(key, haxe.ds.StringMap)) {
+-			var map:Map<String, Dynamic> = cast key;
+-			for (k in map.keys()) {
+-				req.session.put(SESSION_FLASH_PREFIX + k, map.get(k));
++			data.set(cast key, value);
++		} else if (Std.isOfType(key, StringMap)) {
++			var values:Map<String, Dynamic> = cast key;
++			for (name => entry in values) {
++				data.set(name, entry);
+ 			}
+ 		}
++		req.session.put(SESSION_FLASH_DATA, data);
+ 	}
+ 
+ 	/**
+@@ -336,14 +344,14 @@
+ 		// Try to get flash data that was stored
+ 		// Note: This is a simplified implementation
+ 		// Full implementation would require session flash support
+-		var flashData:Dynamic = r.session.get("_inertia_flash_data");
+-		if (flashData != null && Std.isOfType(flashData, haxe.ds.StringMap)) {
++		var flashData:Dynamic = r.session.get(SESSION_FLASH_DATA);
++		if (flashData != null && Std.isOfType(flashData, StringMap)) {
+ 			var map:Map<String, Dynamic> = cast flashData;
+ 			for (key in map.keys()) {
+ 				result.set(key, map.get(key));
+ 			}
+ 			// Consume flash data
+-			r.session.forget("_inertia_flash_data");
++			r.session.forget(SESSION_FLASH_DATA);
+ 		}
+ 
+ 		return result;

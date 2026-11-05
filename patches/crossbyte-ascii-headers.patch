@@ -1,0 +1,28 @@
+diff --git a/src/crossbyte/_internal/http/HttpSyntax.hx b/src/crossbyte/_internal/http/HttpSyntax.hx
+--- a/src/crossbyte/_internal/http/HttpSyntax.hx
++++ b/src/crossbyte/_internal/http/HttpSyntax.hx
+@@ -262,13 +262,19 @@
+ 	 * new string every time natively, whatever it holds.
+ 	 */
+ 	public static function lowerAscii(text:String):String {
++		var result:StringBuf = null;
+ 		for (i in 0...text.length) {
+ 			var code:Int = StringTools.fastCodeAt(text, i);
+-			if ((code >= "A".code && code <= "Z".code) || code >= 0x80) {
+-				return text.toLowerCase();
+-			}
+-		}
+-		return text;
++			if (code >= 65 && code <= 90) {
++				if (result == null) {
++					result = new StringBuf();
++					result.add(text.substr(0, i));
++				}
++				code += 32;
++			}
++			if (result != null) result.addChar(code);
++		}
++		return result == null ? text : result.toString();
+ 	}
+ 
+ 	/**

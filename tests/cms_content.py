@@ -1,0 +1,304 @@
+"""Exercise content editing, working copies, revisions, schedules and media protection."""
+
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import time
+
+from e2e import Client, check
+from fixture_store import FixtureStore
+
+ROOT = Path(__file__).resolve().parents[1]
+HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
+
+
+def props(client, path):
+    status, _, body = client.request(path, extra_headers=HEADERS)
+    check(status == 200, path + " returned " + str(status) + ": " + body[:200])
+    return json.loads(body)["props"]
+
+
+def save(admin, kind, data):
+    status, headers, body = admin.request("/admin/" + kind + "/save", "POST", data)
+    check(status == 303, "content save returned " + str(status) + ": " + body[:300])
+    return headers["location"]
+
+
+def run():
+    with FixtureStore.from_environment() as fixtures:
+        verify(fixtures)
+
+
+def verify(fixtures):
+    admin = Client()
+    public = Client()
+    admin.request("/admin/login")
+    check(
+        admin.request(
+            "/admin/login",
+            "POST",
+            {
+                "email": os.environ["TEST_ADMIN_EMAIL"],
+                "password": os.environ["TEST_ADMIN_PASSWORD"],
+            },
+        )[0]
+        == 303,
+        "content owner login",
+    )
+    suffix = secrets.token_hex(5)
+    initial = props(admin, "/admin/pages/new")
+    data = {
+        "id": "",
+        "title": "A permanent CMS page",
+        "slug": "cms-page-" + suffix,
+        "excerpt": "",
+        "content": "## A useful page\n\nA complete page with **bold** and *italic* text.\n\n| Place | Note |\n| --- | --- |\n| Home | Calm |\n\n- [x] Published thoughtfully\n\n<script>alert('unsafe')</script>",
+        "category": "",
+        "image": "",
+        "image_alt": "",
+        "status": "draft",
+        "featured": "0",
+        "published_at": "2026-11-03",
+        "version": "1",
+        "draft_key": initial["draftKey"],
+        "tags": "",
+        "stay": "1",
+        "seo_title": "A page for curious readers",
+        "seo_description": "A specific search description.",
+    }
+    working = {**data, "draft_version": "1"}
+    check(
+        admin.request("/admin/pages/working-copy", "POST", working)[0] == 200,
+        "save new-page working copy",
+    )
+    restored = props(admin, "/admin/pages/new?draft=" + initial["draftKey"])
+    check(
+        restored["workingCopy"]["data"]["content"] == data["content"],
+        "new-page working copy did not restore",
+    )
+    location = save(admin, "pages", data)
+    page_id = int(re.search(r"/pages/(\d+)/edit", location).group(1))
+    data["id"] = str(page_id)
+    check(
+        admin.request("/admin/pages/working-copy", "POST", {**working, "draft_version": "2"})[0]
+        == 422,
+        "late autosave recreated a consumed new working copy",
+    )
+    check(public.request("/pages/" + data["slug"])[0] == 404, "draft page became public")
+    check(
+        public.request("/content/" + data["slug"])[0] == 404,
+        "page leaked into content item routing",
+    )
+    editor = props(admin, "/admin/pages/" + str(page_id) + "/edit")
+    data["version"] = str(editor["item"]["version"])
+    data["status"] = "published"
+    save(admin, "pages", data)
+    status, _, html = public.request("/pages/" + data["slug"])
+    check(
+        status == 200
+        and "<table" in html
+        and "<em>italic</em>" in html
+        and 'type="checkbox"' in html,
+        "GFM content was not rendered",
+    )
+    check("&lt;script&gt;" in html and "<script>alert(" not in html, "raw HTML executed")
+    check(
+        "A page for curious readers" in html and "A specific search description." in html,
+        "page SEO fields were ignored",
+    )
+    check(
+        re.search(r"<title[^>]*>A page for curious readers</title>", html),
+        "custom SEO title was changed",
+    )
+    check(
+        all(item["id"] != page_id for item in props(public, "/content")["items"]),
+        "pages entered content",
+    )
+
+    history_status, _, history_body = admin.request("/admin/pages/" + str(page_id) + "/history")
+    history = json.loads(history_body)["revisions"]
+    check(
+        history_status == 200 and [row["version"] for row in history] == [2, 1],
+        "manual saves did not create revisions",
+    )
+    check(
+        admin.request("/admin/pages/save", "POST", {**data, "version": "1"})[0] == 409,
+        "stale editor overwrote content",
+    )
+    current = props(admin, "/admin/pages/" + str(page_id) + "/edit")["item"]
+    data["version"] = str(current["version"])
+    data["content"] = "## An updated working copy\n\nThis should stay private until manually saved."
+    check(
+        admin.request("/admin/pages/working-copy", "POST", {**data, "draft_version": "5"})[0]
+        == 200,
+        "save existing working copy",
+    )
+    check(
+        admin.request(
+            "/admin/pages/working-copy",
+            "POST",
+            {**data, "content": "Older payload", "draft_version": "4"},
+        )[0]
+        == 200,
+        "older working-copy request",
+    )
+    copy = props(admin, "/admin/pages/" + str(page_id) + "/edit")["workingCopy"]
+    check(
+        copy["data"]["content"] == data["content"],
+        "out-of-order autosave replaced a newer working copy",
+    )
+    check(
+        "An updated working copy" not in public.request("/pages/" + data["slug"])[2],
+        "working copy overwrote the published page",
+    )
+    save(admin, "pages", data)
+    after = props(admin, "/admin/pages/" + str(page_id) + "/edit")
+    check(
+        after["workingCopy"] is None and after["item"]["version"] == 3,
+        "manual save did not clear the working copy",
+    )
+    old_revision = history[-1]["id"]
+    check(
+        admin.request(
+            "/admin/pages/" + str(page_id) + "/history/" + str(old_revision) + "/restore",
+            "POST",
+            {},
+        )[0]
+        == 303,
+        "restore revision",
+    )
+    restored = props(admin, "/admin/pages/" + str(page_id) + "/edit")
+    check(
+        "A useful page" in restored["workingCopy"]["data"]["content"],
+        "revision restore did not create a working copy",
+    )
+    check(
+        "An updated working copy" in public.request("/pages/" + data["slug"])[2],
+        "revision restore changed live content before manual save",
+    )
+    admin.request("/admin/pages/" + str(page_id) + "/discard-working", "POST", {})
+    data["version"] = str(after["item"]["version"])
+    data["status"] = "scheduled"
+    data["scheduled_epoch"] = str(int(time.time() * 1000) + 120000)
+    save(admin, "pages", data)
+    check(public.request("/pages/" + data["slug"])[0] == 404, "scheduled page was published early")
+    fixtures.update(
+        "items", {"scheduled_epoch": int(time.time() * 1000) - 1000}, [("id", "=", page_id)]
+    )
+    check(
+        admin.request("/admin/content/publish-due", "POST", {})[0] == 200,
+        "run scheduled site",
+    )
+    check(
+        public.request("/pages/" + data["slug"])[0] == 200,
+        "due content did not publish or its cache stayed stale",
+    )
+    check(
+        admin.request("/admin/pages/" + str(page_id) + "/trash", "POST", {})[0] == 303, "trash page"
+    )
+    check(public.request("/pages/" + data["slug"])[0] == 404, "trashed page stayed public")
+    check(
+        any(row["id"] == page_id for row in props(admin, "/admin/pages?status=trash")["items"]),
+        "trash collection lost the page",
+    )
+    check(
+        admin.request("/admin/pages/" + str(page_id) + "/restore", "POST", {})[0] == 303,
+        "restore trashed page",
+    )
+    check(
+        public.request("/pages/" + data["slug"])[0] == 200,
+        "restoring a published page did not refresh its cache",
+    )
+    check(
+        admin.request("/admin/pages/" + str(page_id) + "/permanent-delete", "POST", {})[0] == 422,
+        "active page was permanently deleted without trashing",
+    )
+    admin.request("/admin/pages/" + str(page_id) + "/trash", "POST", {})
+    admin.request("/admin/pages/" + str(page_id) + "/permanent-delete", "POST", {})
+    check(
+        fixtures.count("content_revisions", [("document_id", "=", page_id)]) == 0,
+        "permanent deletion left revision bodies",
+    )
+
+    fixture = (ROOT / "public/images/coast.jpg").read_bytes()
+    status, _, body = admin.request(
+        "/admin/media/upload",
+        "POST",
+        raw=fixture,
+        content_type="image/jpeg",
+        extra_headers={"X-File-Name": "CMS%20coast.jpg"},
+    )
+    check(status == 201, "upload image into catalog")
+    image = json.loads(body)
+    check(image["id"] > 0, "upload did not register media metadata")
+    gallery = props(admin, "/admin/media?q=CMS%20coast")
+    check(any(row["id"] == image["id"] for row in gallery["images"]), "media search is stale")
+    check(
+        admin.request(
+            "/admin/media/" + str(image["id"]) + "/save",
+            "POST",
+            {"title": "A quiet coast", "alt": "Calm water at the coast"},
+        )[0]
+        == 303,
+        "save media metadata",
+    )
+    content = {
+        "id": "",
+        "title": "A protected media content item",
+        "slug": "cms-media-" + suffix,
+        "excerpt": "A content item that protects a referenced image.",
+        "content": "## At the coast\n\n![Calm water][photo]\n\n[photo]: " + image["url"],
+        "category": props(admin, "/admin/content/new")["item"]["category"],
+        "status": "published",
+        "image": image["url"],
+        "image_alt": "A coast",
+        "featured": "0",
+        "published_at": "2026-11-03",
+        "stay": "1",
+        "tags": "",
+    }
+    location = save(admin, "content", content)
+    content_id = int(re.search(r"/content/(\d+)/edit", location).group(1))
+    check(
+        admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0] == 422,
+        "referenced image was deleted",
+    )
+    content.update(
+        id=str(content_id),
+        content="## A text-only version\n\nThe original photograph remains in revision history.",
+        image="",
+    )
+    save(admin, "content", content)
+    check(
+        admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0] == 422,
+        "revision image was deleted",
+    )
+    invalid = {
+        **content,
+        "content": "An external reference image.\n\n![Unsafe][remote]\n\n[remote]: https://example.com/a.jpg",
+    }
+    check(
+        admin.request("/admin/content/save", "POST", invalid)[0] == 422,
+        "external reference image bypassed upload-only validation",
+    )
+    code = {
+        **content,
+        "content": "## Image syntax in code\n\n```text\n![Example](https://example.com/a.jpg)\n```",
+    }
+    save(admin, "content", code)
+    admin.request("/admin/content/" + str(content_id) + "/delete", "POST", {})
+    check(
+        admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0] == 303,
+        "unused media could not be deleted",
+    )
+    check(public.request(image["url"])[0] == 404, "deleted media file is still served")
+    print(
+        "PASS CMS content: pages, GFM/SEO, private ordered working copies, revision restore, stale-save rejection, scheduling, trash/restore and referenced-media protection",
+        flush=True,
+    )
+
+
+if __name__ == "__main__":
+    run()

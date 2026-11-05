@@ -1,0 +1,9 @@
+.reading-companion-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--green, #526147);
+  z-index: 50;
+  pointer-events: none;
+}

@@ -1,0 +1,44 @@
+.cms-site[data-layout='gallery'] {
+  background: var(--paper);
+  color: var(--ink);
+}
+.cms-site[data-layout='gallery'] .featured-content {
+  display: block;
+  position: relative;
+  border-radius: 3px;
+}
+.cms-site[data-layout='gallery'] .featured-image {
+  display: block;
+  height: 610px;
+}
+.cms-site[data-layout='gallery'] .featured-copy {
+  position: absolute;
+  bottom: 25px;
+  left: 25px;
+  max-width: 640px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 35px;
+}
+.cms-site[data-layout='gallery'] .featured-copy h2 {
+  font-size: 42px;
+}
+.cms-site[data-layout='gallery'] .content-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 42px;
+}
+.cms-site[data-layout='gallery'] .content-card img {
+  aspect-ratio: 4 / 3;
+}
+@media (max-width: 750px) {
+  .cms-site[data-layout='gallery'] .featured-copy {
+    position: static;
+    max-width: none;
+    padding: 26px;
+  }
+  .cms-site[data-layout='gallery'] .featured-image {
+    height: 350px;
+  }
+  .cms-site[data-layout='gallery'] .content-grid {
+    grid-template-columns: 1fr;
+  }
+}

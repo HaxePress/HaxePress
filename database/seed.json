@@ -1,0 +1,98 @@
+[
+  {
+    "title": "Welcome to HaxePress",
+    "slug": "welcome-to-haxepress",
+    "excerpt": "Create and manage content for any kind of website.",
+    "content": "## Your content workspace\n\nHaxePress brings content, pages, media, themes and plugins together. Use the administration area to create a draft, add an image and publish when you are ready.\n\n## Start with a draft\n\nEvery content item has its own title, URL, excerpt and body. Save your work privately before publishing it.\n\n## Make the site yours\n\nChoose a theme, organize your navigation and configure your site settings.",
+    "category": "Content management",
+    "image": "/images/interior.jpg",
+    "image_alt": "Sample image for welcome to hxwell cms",
+    "status": "published",
+    "featured": 1,
+    "published_at": "2026-10-28"
+  },
+  {
+    "title": "Create and organize content",
+    "slug": "create-and-organize-content",
+    "excerpt": "Use categories, tags and clear URLs to organize your content.",
+    "content": "## Organize your content\n\nCategories group related content. Tags connect items through more specific subjects. Both can be managed from the administration area.\n\n## Keep URLs clear\n\nChoose a short URL that describes the content. You can update it later from the editor.",
+    "category": "Getting started",
+    "image": "/images/coast.jpg",
+    "image_alt": "Sample image for create and organize content",
+    "status": "published",
+    "featured": 0,
+    "published_at": "2026-10-24"
+  },
+  {
+    "title": "Build useful pages",
+    "slug": "build-useful-pages",
+    "excerpt": "Create permanent pages for information your visitors need.",
+    "content": "## Pages for your site\n\nUse pages for contact information, services, documentation or any other content that should have a permanent address.\n\n## Add pages to navigation\n\nThe navigation manager can link directly to a published page. The link follows changes to its URL.",
+    "category": "Site administration",
+    "image": "/images/slow-living.jpg",
+    "image_alt": "Sample image for build useful pages",
+    "status": "published",
+    "featured": 0,
+    "published_at": "2026-10-21"
+  },
+  {
+    "title": "Manage your media library",
+    "slug": "manage-your-media-library",
+    "excerpt": "Upload and reuse images across content and pages.",
+    "content": "## A shared media library\n\nUpload images from the editor or media library. Add a description so the image can be understood by more visitors.\n\n## Reuse existing uploads\n\nChoose an existing image when you need it again. Images already used by content are protected from accidental removal.",
+    "category": "Content management",
+    "image": "/images/coffee.jpg",
+    "image_alt": "Sample image for manage your media library",
+    "status": "published",
+    "featured": 0,
+    "published_at": "2026-10-17"
+  },
+  {
+    "title": "Customize the site appearance",
+    "slug": "customize-the-site-appearance",
+    "excerpt": "Preview and configure themes without changing your content.",
+    "content": "## Choose a theme\n\nThemes control how your public site presents its content. Preview a theme with desktop, tablet and mobile views before activating it.\n\n## Keep content separate\n\nYour content stays in the database when the active theme changes.",
+    "category": "Extensions",
+    "image": "/images/books.jpg",
+    "image_alt": "Sample image for customize the site appearance",
+    "status": "published",
+    "featured": 0,
+    "published_at": "2026-10-12"
+  },
+  {
+    "title": "Extend your CMS with plugins",
+    "slug": "extend-your-cms-with-plugins",
+    "excerpt": "Install plugins that add routes, features and their own data models.",
+    "content": "## Add the features you need\n\nPlugins can add forms, feeds, admin pages and integrations. Install a package from the administration area, review its settings and activate it.\n\n## Native extension APIs\n\nPlugin authors can use HxWell models, query builder, Schema, Cache and Storage. Each plugin can track its own schema migrations and scoped data.",
+    "category": "Documentation",
+    "image": "/images/forest.jpg",
+    "image_alt": "Sample image for extend your cms with plugins",
+    "status": "published",
+    "featured": 0,
+    "published_at": "2026-10-08"
+  },
+  {
+    "title": "Work with your team",
+    "slug": "work-with-your-team",
+    "excerpt": "Give each team member access appropriate to their work.",
+    "content": "## Work together\n\nOwners manage the site and extensions. Editors manage and publish content. Writers can prepare their own drafts.\n\n## Review changes\n\nContent revisions and the activity log help your team keep track of its work.",
+    "category": "Documentation",
+    "image": "/images/journal.jpg",
+    "image_alt": "Sample image for work with your team",
+    "status": "published",
+    "featured": 0,
+    "published_at": "2026-10-03"
+  },
+  {
+    "title": "Your next content item",
+    "slug": "your-next-content-item",
+    "excerpt": "A private draft for your next idea.",
+    "content": "## Start here\n\nUse this draft as a starting point. Replace the title and content, add media if needed, then choose when to publish.",
+    "category": "Documentation",
+    "image": "/images/journal.jpg",
+    "image_alt": "Sample image for your next content item",
+    "status": "draft",
+    "featured": 0,
+    "published_at": null
+  }
+]

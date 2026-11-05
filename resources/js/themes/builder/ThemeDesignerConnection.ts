@@ -1,0 +1,276 @@
+import { MAX_MCP_REQUEST_BYTES } from './types';
+import {
+  Client,
+  type JSONRPCMessage,
+  type Transport,
+  type TransportSendOptions,
+} from '@modelcontextprotocol/client';
+
+export interface AiPermissions {
+  read: boolean;
+  edit: boolean;
+  media: boolean;
+}
+export interface DesignerPresence {
+  browsers: number;
+  llms: number;
+}
+export interface DesignChange {
+  themeId: string;
+  version: number;
+  publishedVersion: number;
+}
+export type DesignerTool = Awaited<ReturnType<Client['listTools']>>['tools'][number];
+export type DesignerResult = Awaited<ReturnType<Client['callTool']>>;
+export type DesignerStatus = 'connecting' | 'connected' | 'disconnected';
+export type DesignerEvent =
+  | { type: 'state' }
+  | { type: 'presence' }
+  | { type: 'design_changed'; change: DesignChange }
+  | { type: 'permissions' };
+
+class BrowserSocketTransport implements Transport {
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: (message: JSONRPCMessage) => void;
+  socket: WebSocket | null = null;
+  closeCode = 1006;
+
+  constructor(
+    private readonly url: URL,
+    private readonly notification: (method: string, params: unknown) => void,
+  ) {}
+
+  async start(): Promise<void> {
+    const socket = new WebSocket(this.url);
+    this.socket = socket;
+    socket.addEventListener('message', (event) => {
+      if (typeof event.data !== 'string' || event.data.length > 10 * 1024 * 1024) {
+        socket.close();
+        return;
+      }
+      try {
+        const message = JSON.parse(event.data);
+        if (
+          typeof message.method === 'string' &&
+          message.method.startsWith('notifications/haxepress/')
+        ) {
+          this.notification(message.method, message.params);
+        } else {
+          this.onmessage?.(message);
+        }
+      } catch {
+        this.onerror?.(new Error('An invalid collaboration message was received.'));
+        socket.close();
+      }
+    });
+    socket.addEventListener('close', (event) => {
+      this.closeCode = event.code;
+      this.onclose?.();
+    });
+    socket.addEventListener('error', () =>
+      this.onerror?.(new Error('The collaboration connection failed.')),
+    );
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        socket.close();
+        reject(new Error('The collaboration connection timed out.'));
+      }, 10000);
+      socket.addEventListener(
+        'open',
+        () => {
+          clearTimeout(timeout);
+          resolve();
+        },
+        { once: true },
+      );
+      socket.addEventListener(
+        'error',
+        () => {
+          clearTimeout(timeout);
+          reject(new Error('The collaboration connection failed.'));
+        },
+        { once: true },
+      );
+    });
+  }
+
+  async send(message: JSONRPCMessage, _options?: TransportSendOptions): Promise<void> {
+    if (this.socket?.readyState !== WebSocket.OPEN)
+      throw new Error('The collaboration connection is closed.');
+    const source = JSON.stringify(message);
+    if (new TextEncoder().encode(source).length > MAX_MCP_REQUEST_BYTES) {
+      throw new Error('The design request exceeds its size limit.');
+    }
+    this.socket.send(source);
+  }
+
+  async close(): Promise<void> {
+    const socket = this.socket;
+    if (!socket || socket.readyState === WebSocket.CLOSED) return;
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(resolve, 1000);
+      socket.addEventListener(
+        'close',
+        () => {
+          clearTimeout(timeout);
+          resolve();
+        },
+        { once: true },
+      );
+      socket.close();
+    });
+  }
+}
+
+/** A browser is an authenticated peer of the site's theme MCP, never a server process. */
+export class ThemeDesignerConnection {
+  status: DesignerStatus = 'disconnected';
+  permissions: AiPermissions = { read: false, edit: false, media: false };
+  presence: DesignerPresence = { browsers: 0, llms: 0 };
+  private client: Client | null = null;
+  private pending: Promise<Client> | null = null;
+  private stopped = false;
+  private retries = 0;
+  private retry: ReturnType<typeof setTimeout> | null = null;
+  private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private readonly listeners = new Set<(event: DesignerEvent) => void>();
+
+  constructor(readonly themeId: string) {}
+
+  subscribe(listener: (event: DesignerEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit(event: DesignerEvent) {
+    for (const listener of this.listeners) listener(event);
+  }
+
+  private notification(method: string, params: unknown) {
+    if (!params || typeof params !== 'object') return;
+    const data = params as Record<string, unknown>;
+    if (method === 'notifications/haxepress/permissions' && data.themeId === this.themeId) {
+      const permissions = data.permissions as AiPermissions | undefined;
+      if (
+        !permissions ||
+        !['read', 'edit', 'media'].every(
+          (key) => typeof permissions[key as keyof AiPermissions] === 'boolean',
+        )
+      )
+        return;
+      const changed =
+        this.permissions.read !== permissions.read ||
+        this.permissions.edit !== permissions.edit ||
+        this.permissions.media !== permissions.media;
+      this.permissions = { ...permissions };
+      if (changed) this.emit({ type: 'permissions' });
+    }
+    if (
+      method === 'notifications/haxepress/presence' &&
+      Number.isSafeInteger(data.browsers) &&
+      Number.isSafeInteger(data.llms)
+    ) {
+      this.presence = { browsers: Number(data.browsers), llms: Number(data.llms) };
+      this.emit({ type: 'presence' });
+    }
+    if (
+      method === 'notifications/haxepress/design_changed' &&
+      data.themeId === this.themeId &&
+      Number.isSafeInteger(data.version) &&
+      Number.isSafeInteger(data.publishedVersion)
+    ) {
+      this.emit({ type: 'design_changed', change: data as unknown as DesignChange });
+    }
+  }
+
+  async ready(): Promise<Client> {
+    if (this.status === 'connected' && this.client) return this.client;
+    if (this.pending) return this.pending;
+    if (this.stopped) throw new Error('The collaboration connection is closed.');
+    this.status = 'connecting';
+    this.emit({ type: 'state' });
+    const url = new URL(
+      '/admin/themes/' + encodeURIComponent(this.themeId) + '/ai/ws',
+      location.origin,
+    );
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const transport = new BrowserSocketTransport(url, (method, params) =>
+      this.notification(method, params),
+    );
+    const client = new Client(
+      { name: 'haxepress-browser-editor', version: '1.0.0' },
+      { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+    );
+    this.client = client;
+    client.onclose = () => {
+      if (this.client !== client) return;
+      this.client = null;
+      this.pending = null;
+      this.permissions = { read: false, edit: false, media: false };
+      this.presence = { browsers: 0, llms: 0 };
+      this.status = 'disconnected';
+      if (this.heartbeat) clearInterval(this.heartbeat);
+      this.emit({ type: 'permissions' });
+      this.emit({ type: 'state' });
+      if (!this.stopped && transport.closeCode !== 1000 && this.retries < 5) {
+        this.retries++;
+        this.retry = setTimeout(
+          () => void this.ready().catch(() => {}),
+          Math.min(10000, 1000 * 2 ** this.retries),
+        );
+      }
+    };
+    this.pending = client
+      .connect(transport)
+      .then(() => {
+        if (this.stopped || this.client !== client)
+          throw new Error('The collaboration connection is closed.');
+        this.status = 'connected';
+        this.retries = 0;
+        this.heartbeat = setInterval(() => {
+          void client.discover().catch(() => client.close());
+        }, 25000);
+        this.emit({ type: 'state' });
+        return client;
+      })
+      .catch(async (error: unknown) => {
+        await client.close();
+        throw error;
+      })
+      .finally(() => {
+        this.pending = null;
+      });
+    return this.pending;
+  }
+
+  async listTools(): Promise<DesignerTool[]> {
+    const client = await this.ready();
+    if (!this.permissions.read) return [];
+    return (await client.listTools()).tools;
+  }
+
+  async callTool(
+    name: string,
+    args: Record<string, unknown> = {},
+    signal?: AbortSignal,
+  ): Promise<DesignerResult> {
+    const client = await this.ready();
+    return client.callTool({ name, arguments: args }, signal ? { signal } : undefined);
+  }
+
+  reconnect(): void {
+    if (this.retry) clearTimeout(this.retry);
+    this.retries = 0;
+    void this.ready().catch(() => {});
+  }
+
+  async close(): Promise<void> {
+    this.stopped = true;
+    if (this.retry) clearTimeout(this.retry);
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    const client = this.client;
+    this.client = null;
+    await client?.close();
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "slug": "rss",
+  "name": "RSS Feed",
+  "version": "2.16.0",
+  "description": "Publishes the latest content as an RSS feed.",
+  "author": "HaxePress",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.rss.RssPlugin"
+  },
+  "hooks": ["ui.navigation"],
+  "fields": [],
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
+  }
+}

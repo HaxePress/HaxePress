@@ -1,0 +1,24 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "slug": "media-test",
+  "name": "Media dependency test",
+  "version": "2.16.0",
+  "description": "Persistent media ID, URL and JSON dependency checks.",
+  "author": "CMS tests",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.mediatest.MediaTestPlugin"
+  },
+  "hooks": [],
+  "fields": [
+    {
+      "key": "private_asset",
+      "label": "Private asset",
+      "kind": "secret"
+    }
+  ]
+}

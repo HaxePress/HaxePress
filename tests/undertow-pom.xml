@@ -1,0 +1,13 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>hx.press.tests</groupId>
+  <artifactId>undertow-lifecycle</artifactId>
+  <version>1.0.0</version>
+  <dependencies>
+    <dependency>
+      <groupId>io.undertow</groupId>
+      <artifactId>undertow-core</artifactId>
+      <version>2.3.27.Final</version>
+    </dependency>
+  </dependencies>
+</project>

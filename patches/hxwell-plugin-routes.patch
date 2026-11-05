@@ -1,0 +1,606 @@
+diff --git a/src/hx/well/route/Route.hx b/src/hx/well/route/Route.hx
+--- a/src/hx/well/route/Route.hx
++++ b/src/hx/well/route/Route.hx
+@@ -1,4 +1,5 @@
+ package hx.well.route;
++
+ import haxe.http.HttpMethod;
+ import hx.well.route.RouteElement;
+ import hx.well.http.Request;
+@@ -8,25 +9,107 @@
+ import hx.well.handler.AbstractHandler;
+ import hx.well.handler.DynamicHandler;
+ import hx.well.http.AbstractResponse;
++import haxe.ThreadLocal;
++#if target.threaded
++import sys.thread.Mutex;
++#else
++import hx.well.thread.FakeMutex as Mutex;
++#end
++
+ using StringTools;
++
++private class RouteChanges {
++    public var routes:Array<RouteElement>;
++    public var names:Map<String, RouteElement>;
++    public var created:Array<RouteElement> = [];
++
++    public function new(routes:Array<RouteElement>, names:Map<String, RouteElement>) {
++        this.routes = routes.copy();
++        this.names = names.copy();
++    }
++}
++
+ class Route {
+     public static var routes:Array<RouteElement> = [];
+     public static var routeByName:Map<String, RouteElement> = new Map();
+     public static var publicHandler:AbstractHandler = new PublicHandler();
+-
+-    public static function log():Void
+-    {
+-        for(route in routes)
+-        {
+-            if(route.__routeType == RouteType.PATH)
+-            {
+-                if(route._name != null) {
++    static final routeWrites = new Mutex();
++    static final pending = new ThreadLocal<RouteChanges>();
++
++    /** Publish a complete registration/removal batch without exposing partial routes. */
++    public static function batch(callback:Void->Void,
++            ?decorate:RouteElement->Void):Array<RouteElement> {
++        var current = pending.get();
++        if (current != null) {
++            var start = current.created.length;
++            callback();
++            return current.created.slice(start).filter(route -> current.routes.contains(route));
++        }
++        routeWrites.acquire();
++        var groups = RouteElement.groups.copy();
++        var changes = new RouteChanges(routes, routeByName);
++        pending.set(changes);
++        try {
++            callback();
++            var added = changes.created.filter(route -> changes.routes.contains(route));
++            if (decorate != null) {
++                for (route in added) {
++                    decorate(route);
++                }
++            }
++            routes = changes.routes;
++            routeByName = changes.names;
++            pending.remove();
++            RouteElement.groups = groups;
++            routeWrites.release();
++            return added;
++        } catch (error:Dynamic) {
++            pending.remove();
++            RouteElement.groups = groups;
++            routeWrites.release();
++            throw error;
++        }
++    }
++
++    public static function unregister(route:RouteElement):Void {
++        var current = pending.get();
++        if (current != null) {
++            current.routes.remove(route);
++            if (route._name != null && current.names.get(route._name) == route) {
++                current.names.remove(route._name);
++            }
++            return;
++        }
++        batch(() -> unregister(route));
++    }
++
++    public static function assignName(route:RouteElement, name:String):Void {
++        var current = pending.get();
++        if (current == null) {
++            batch(() -> assignName(route, name));
++            return;
++        }
++        var existing = current.names.get(name);
++        if (existing != null && existing != route) {
++            throw name + " named route already exists.";
++        }
++        if (route._name != null && current.names.get(route._name) == route) {
++            current.names.remove(route._name);
++        }
++        route._name = name;
++        current.names.set(name, route);
++    }
++
++    public static function log():Void {
++        for (route in routes) {
++            if (route.__routeType == RouteType.PATH) {
++                if (route._name != null) {
+                     trace('${route._name} - ${route.getMethods()} - ${route.value} service registered.');
+-                }else{
++                } else {
+                     trace('${route.getMethods()} - ${route.value} service registered.');
+                 }
+-            } else if(route.__routeType == RouteType.WEBSOCKET) {
+-                if(route._name != null) {
++            } else if (route.__routeType == RouteType.WEBSOCKET) {
++                if (route._name != null) {
+                     trace('${route._name} - WS - ${route.value} websocket registered.');
+                 } else {
+                     trace('WS - ${route.value} websocket registered.');
+@@ -37,23 +120,23 @@
+ 
+     public static function resolveRequest(httpRequest:Request):Null<{route:RouteElement, params:Map<String, String>}> {
+         var path:String = httpRequest.path;
+-        if(path.endsWith("/")) {
++        if (path.endsWith("/")) {
+             path = path.substring(0, path.lastIndexOf("/"));
+         }
+ 
+         for (route in routes) {
+-            if(route.__routeType != RouteType.PATH && route.__routeType != RouteType.WEBSOCKET)
++            if (route.__routeType != RouteType.PATH && route.__routeType != RouteType.WEBSOCKET)
+                 continue;
+ 
+             var params = route.matches(path);
+             if (params != null && route.getMethods().contains(httpRequest.method)) {
+                 var hostWithoutPort = httpRequest.host.split(":")[0];
+                 var routeDomainPattern = route.routeDomainPattern == null ? null : route.routeDomainPattern.match(hostWithoutPort);
+-                if(route.routeDomainPattern != null && routeDomainPattern == null)
++                if (route.routeDomainPattern != null && routeDomainPattern == null)
+                     continue;
+ 
+-                if(routeDomainPattern != null) {
+-                    for(keyValueIterator in routeDomainPattern.keyValueIterator())
++                if (routeDomainPattern != null) {
++                    for (keyValueIterator in routeDomainPattern.keyValueIterator())
+                         params.set(keyValueIterator.key, keyValueIterator.value);
+                 }
+ 
+@@ -64,27 +147,28 @@
+         return null;
+     }
+ 
+-    public static function resolveWebSocket(path:String, host:String):Null<{route:RouteElement, params:Map<String, String>}> {
+-        if(path.endsWith("/")) {
++    public static function resolveWebSocket(path:String,
++            host:String):Null<{route:RouteElement, params:Map<String, String>}> {
++        if (path.endsWith("/")) {
+             path = path.substring(0, path.lastIndexOf("/"));
+         }
+ 
+         var hostWithoutPort = host == null ? "" : host.split(":")[0];
+ 
+-        for(route in routes) {
+-            if(route.__routeType != RouteType.WEBSOCKET)
++        for (route in routes) {
++            if (route.__routeType != RouteType.WEBSOCKET)
+                 continue;
+ 
+             var params = route.matches(path);
+-            if(params == null)
++            if (params == null)
+                 continue;
+ 
+             var routeDomainPattern = route.routeDomainPattern == null ? null : route.routeDomainPattern.match(hostWithoutPort);
+-            if(route.routeDomainPattern != null && routeDomainPattern == null)
+-                continue;
+-
+-            if(routeDomainPattern != null) {
+-                for(keyValueIterator in routeDomainPattern.keyValueIterator())
++            if (route.routeDomainPattern != null && routeDomainPattern == null)
++                continue;
++
++            if (routeDomainPattern != null) {
++                for (keyValueIterator in routeDomainPattern.keyValueIterator())
+                     params.set(keyValueIterator.key, keyValueIterator.value);
+             }
+ 
+@@ -96,26 +180,26 @@
+ 
+     public static function allowedMethods(httpRequest:Request):Array<HttpMethod> {
+         var path:String = httpRequest.path;
+-        if(path.endsWith("/")) {
++        if (path.endsWith("/")) {
+             path = path.substring(0, path.lastIndexOf("/"));
+         }
+ 
+         var allowed:Array<HttpMethod> = [];
+         for (route in routes) {
+-            if(route.__routeType != RouteType.PATH && route.__routeType != RouteType.WEBSOCKET)
+-                continue;
+-
+-            if(route.matches(path) == null)
+-                continue;
+-
+-            if(route.routeDomainPattern != null) {
++            if (route.__routeType != RouteType.PATH && route.__routeType != RouteType.WEBSOCKET)
++                continue;
++
++            if (route.matches(path) == null)
++                continue;
++
++            if (route.routeDomainPattern != null) {
+                 var hostWithoutPort = httpRequest.host == null ? "" : httpRequest.host.split(":")[0];
+-                if(route.routeDomainPattern.match(hostWithoutPort) == null)
++                if (route.routeDomainPattern.match(hostWithoutPort) == null)
+                     continue;
+             }
+ 
+             for (method in route.getMethods()) {
+-                if(!allowed.contains(method))
++                if (!allowed.contains(method))
+                     allowed.push(method);
+             }
+         }
+@@ -125,7 +209,7 @@
+ 
+     public static function resolveStatusCode(code:String):RouteElement {
+         for (route in routes) {
+-            if(route.__routeType != RouteType.STATUS_CODE)
++            if (route.__routeType != RouteType.STATUS_CODE)
+                 continue;
+ 
+             if (route.value == code) {
+@@ -140,11 +224,13 @@
+         return method(HttpMethod.Get, path);
+     }
+ 
+-    public static overload extern inline function get(path:String, callback:Request->AbstractResponse):RouteElement {
++    public static overload extern inline function get(path:String,
++            callback:Request->AbstractResponse):RouteElement {
+         return method(HttpMethod.Get, path)._handler(new DynamicHandler(callback));
+     }
+ 
+-    public static overload extern inline function get(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function get(path:String,
++            handler:AbstractHandler):RouteElement {
+         return method(HttpMethod.Get, path)._handler(handler);
+     }
+ 
+@@ -152,11 +238,13 @@
+         return method(HttpMethod.Post, path);
+     }
+ 
+-    public static overload extern inline function post(path:String, callback:Request->AbstractResponse):RouteElement {
++    public static overload extern inline function post(path:String,
++            callback:Request->AbstractResponse):RouteElement {
+         return method(HttpMethod.Post, path)._handler(new DynamicHandler(callback));
+     }
+ 
+-    public static overload extern inline function post(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function post(path:String,
++            handler:AbstractHandler):RouteElement {
+         return method(HttpMethod.Post, path)._handler(handler);
+     }
+ 
+@@ -164,11 +252,13 @@
+         return method(HttpMethod.Put, path);
+     }
+ 
+-    public static overload extern inline function put(path:String, callback:Request->AbstractResponse):RouteElement {
++    public static overload extern inline function put(path:String,
++            callback:Request->AbstractResponse):RouteElement {
+         return method(HttpMethod.Put, path)._handler(new DynamicHandler(callback));
+     }
+ 
+-    public static overload extern inline function put(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function put(path:String,
++            handler:AbstractHandler):RouteElement {
+         return method(HttpMethod.Put, path)._handler(handler);
+     }
+ 
+@@ -176,11 +266,13 @@
+         return method(HttpMethod.Delete, path);
+     }
+ 
+-    public static overload extern inline function delete(path:String, callback:Request->AbstractResponse):RouteElement {
++    public static overload extern inline function delete(path:String,
++            callback:Request->AbstractResponse):RouteElement {
+         return method(HttpMethod.Delete, path)._handler(new DynamicHandler(callback));
+     }
+ 
+-    public static overload extern inline function delete(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function delete(path:String,
++            handler:AbstractHandler):RouteElement {
+         return method(HttpMethod.Delete, path)._handler(handler);
+     }
+ 
+@@ -188,11 +280,13 @@
+         return method(HttpMethod.Patch, path);
+     }
+ 
+-    public static overload extern inline function patch(path:String, callback:Request->AbstractResponse):RouteElement {
++    public static overload extern inline function patch(path:String,
++            callback:Request->AbstractResponse):RouteElement {
+         return method(HttpMethod.Patch, path)._handler(new DynamicHandler(callback));
+     }
+ 
+-    public static overload extern inline function patch(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function patch(path:String,
++            handler:AbstractHandler):RouteElement {
+         return method(HttpMethod.Patch, path)._handler(handler);
+     }
+ 
+@@ -200,11 +294,13 @@
+         return method(HttpMethod.Head, path);
+     }
+ 
+-    public static overload extern inline function head(path:String, callback:Request->AbstractResponse):RouteElement {
++    public static overload extern inline function head(path:String,
++            callback:Request->AbstractResponse):RouteElement {
+         return method(HttpMethod.Head, path)._handler(new DynamicHandler(callback));
+     }
+ 
+-    public static overload extern inline function head(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function head(path:String,
++            handler:AbstractHandler):RouteElement {
+         return method(HttpMethod.Head, path)._handler(handler);
+     }
+ 
+@@ -212,11 +308,13 @@
+         return method(HttpMethod.Options, path);
+     }
+ 
+-    public static overload extern inline function options(path:String, callback:Request->AbstractResponse):RouteElement {
++    public static overload extern inline function options(path:String,
++            callback:Request->AbstractResponse):RouteElement {
+         return method(HttpMethod.Options, path)._handler(new DynamicHandler(callback));
+     }
+ 
+-    public static overload extern inline function options(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function options(path:String,
++            handler:AbstractHandler):RouteElement {
+         return method(HttpMethod.Options, path)._handler(handler);
+     }
+ 
+@@ -232,59 +330,61 @@
+         return match(AbstractEnumTools.getValues(HttpMethod), path);
+     }
+ 
+-    public static overload extern inline function any(path:String, callback:Request->AbstractResponse):RouteElement {
+-        return match(AbstractEnumTools.getValues(HttpMethod), path)._handler(new DynamicHandler(callback));
+-    }
+-
+-    public static overload extern inline function any(path:String, handler:AbstractHandler):RouteElement {
++    public static overload extern inline function any(path:String,
++            callback:Request->AbstractResponse):RouteElement {
++        return match(AbstractEnumTools.getValues(HttpMethod),
++            path)._handler(new DynamicHandler(callback));
++    }
++
++    public static overload extern inline function any(path:String,
++            handler:AbstractHandler):RouteElement {
+         return match(AbstractEnumTools.getValues(HttpMethod), path)._handler(handler);
+     }
+ 
+     private static function create():RouteElement {
+         var routerElement = new RouteElement();
+-        routes.push(routerElement);
++        var current = pending.get();
++        if (current != null) {
++            current.routes.push(routerElement);
++            current.created.push(routerElement);
++        } else {
++            routeWrites.acquire();
++            routes = routes.concat([routerElement]);
++            routeWrites.release();
++        }
+         return routerElement;
+     }
+ 
+     public static function name(name:String):RouteElement {
+-        return create()
+-            .name(name);
++        return create().name(name);
+     }
+ 
+     public static function domain(domain:String):RouteElement {
+-        return create()
+-            .domain(domain);
++        return create().domain(domain);
+     }
+ 
+     public static function path(path:String):RouteElement {
+-        return create()
+-            .path(path);
++        return create().path(path);
+     }
+ 
+     public static function redirect(url:String, destination:String, status:Int = 302):RouteElement {
+-        return create()
+-            .redirect(url, destination, status);
++        return create().redirect(url, destination, status);
+     }
+ 
+     public static function permanentRedirect(url:String, destination:String):RouteElement {
+-        return create()
+-            .permanentRedirect(url, destination);
++        return create().permanentRedirect(url, destination);
+     }
+ 
+     public static function match(methods:Array<HttpMethod>, path:String):RouteElement {
+-        return create()
+-            .setMethods(methods)
+-            .path(path);
++        return create().setMethods(methods).path(path);
+     }
+ 
+     public static function method(method:HttpMethod, path:String):RouteElement {
+-        if(path.endsWith("/")) {
++        if (path.endsWith("/")) {
+             path = path.substring(0, path.lastIndexOf("/"));
+         }
+ 
+-        return create()
+-            .setMethod(method)
+-            .path(path);
++        return create().setMethod(method).path(path);
+     }
+ 
+     public static function websocket(path:String):RouteElement {
+@@ -292,14 +392,10 @@
+     }
+ 
+     public static function status(code:Int):RouteElement {
+-        return create()
+-            .any()
+-            .status(code);
+-    }
+-
+-    public static function middleware(middlewares:Array<Class<AbstractMiddleware>>):RouteElement
+-    {
+-        return create()
+-            ._middleware(middlewares);
++        return create().any().status(code);
++    }
++
++    public static function middleware(middlewares:Array<Class<AbstractMiddleware>>):RouteElement {
++        return create()._middleware(middlewares);
+     }
+ }
+diff --git a/src/hx/well/route/RouteElement.hx b/src/hx/well/route/RouteElement.hx
+--- a/src/hx/well/route/RouteElement.hx
++++ b/src/hx/well/route/RouteElement.hx
+@@ -20,19 +20,30 @@
+     private var routePattern:RoutePattern;
+     private var routePath(default, null):String;
+     private var routeDomainPattern:RoutePattern;
++
+     public var value(default, null):String;
++
+     private var serviceHandler:AbstractHandler;
+     private var _wsHandler:AbstractWebSocketHandler;
+     private var stream:Bool;
+     private var middlewares:Array<Class<AbstractMiddleware>> = [];
+     private var _where:Map<String, String> = new Map();
++    private var attributes:Map<String, Dynamic> = new Map();
++
++    public function attribute(key:String, value:Dynamic):RouteElement {
++        attributes.set(key, value);
++        return this;
++    }
++
++    public function getAttribute<T>(key:String, ?defaultValue:T):T {
++        return attributes.exists(key) ? attributes.get(key) : defaultValue;
++    }
+ 
+     public function new() {
+-        for(group in groups)
+-        {
++        for (group in groups) {
+             middlewares = middlewares.concat(group.middlewares);
+ 
+-            if(group.routeDomainPattern != null)
++            if (group.routeDomainPattern != null)
+                 routeDomainPattern = group.routeDomainPattern;
+         }
+     }
+@@ -124,17 +135,12 @@
+         group(routeGroup.template);
+     }
+ 
+-    public overload extern inline function group(callback:Void->Void):Void
+-    {
++    public overload extern inline function group(callback:Void->Void):Void {
+         _group(callback);
+     }
+ 
+-    private function _group(callback:Void->Void):Void
+-    {
+-        Route.routes.remove(this);
+-
+-        if(_name != null)
+-            Route.routeByName.remove(_name);
++    private function _group(callback:Void->Void):Void {
++        Route.unregister(this);
+ 
+         var group:RouteGroupElement = new RouteGroupElement();
+         group.name = this._name;
+@@ -142,8 +148,13 @@
+         group.middlewares = middlewares;
+         group.routeDomainPattern = routeDomainPattern;
+         RouteElement.groups.push(group);
+-        callback();
+-        RouteElement.groups.pop();
++        try {
++            callback();
++            RouteElement.groups.pop();
++        } catch (error:Dynamic) {
++            RouteElement.groups.pop();
++            throw error;
++        }
+     }
+ 
+     public function setMethod(method:HttpMethod):RouteElement {
+@@ -156,21 +167,21 @@
+     }
+ 
+     public function path(path:String):RouteElement {
+-        if(path.endsWith("/"))
++        if (path.endsWith("/"))
+             path = path.substring(0, path.lastIndexOf("/"));
+ 
+-        if(!path.startsWith("/"))
++        if (!path.startsWith("/"))
+             path = "/" + path;
+ 
+-        if(path == "/")
++        if (path == "/")
+             path = "";
+ 
+-        if(this.__routeType == null)
++        if (this.__routeType == null)
+             this.__routeType = PATH;
+         // Add group paths
+         var fullPath = "";
+         for (group in groups) {
+-            if(group.path == "/")
++            if (group.path == "/")
+                 continue; // Skip root group path
+ 
+             fullPath += group.path;
+@@ -185,8 +196,7 @@
+     public function redirect(url:String, destination:String, status:Int = 302):RouteElement {
+         var redirectHandler:RedirectHandler = new RedirectHandler(destination, status);
+ 
+-        return path(url)
+-            .handler(redirectHandler);
++        return path(url).handler(redirectHandler);
+     }
+ 
+     public function permanentRedirect(url:String, destination:String):RouteElement {
+@@ -242,31 +252,22 @@
+ 
+     public function name(name:String):RouteElement {
+         var prefix = "";
+-        for(group in groups)
++        for (group in groups)
+             prefix += group.name ?? "";
+ 
+         name = prefix + name;
+ 
+-        if(Route.routeByName.exists(name))
+-            throw '${name} named route already exists.';
+-
+-        // Remove old
+-        if(_name != null)
+-            Route.routeByName.remove(_name);
+-
+-        // Create new
+-        Route.routeByName.set(name, this);
+-        this._name = name;
++        Route.assignName(this, name);
+         return this;
+     }
+ 
+     public function where(param:String, pattern:String):RouteElement {
+-        if(routePattern == null)
++        if (routePattern == null)
+             throw 'where("${param}") requires a path; call path() before where().';
+ 
+         _where.set(param, pattern);
+         routePattern.addConstraint(param, pattern);
+-        if(routeDomainPattern != null)
++        if (routeDomainPattern != null)
+             routeDomainPattern.addConstraint(param, pattern);
+         return this;
+     }

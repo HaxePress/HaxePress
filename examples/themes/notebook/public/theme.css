@@ -1,0 +1,41 @@
+.cms-site[data-layout='notebook'] {
+  background: var(--paper);
+  color: var(--ink);
+}
+.cms-site[data-layout='notebook'] .site-header {
+  border-bottom: 2px solid var(--green);
+  min-height: 88px;
+}
+.cms-site[data-layout='notebook'] .featured-content {
+  grid-template-columns: 0.9fr 1.1fr;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: white;
+}
+.cms-site[data-layout='notebook'] .featured-copy h2 {
+  font-family: var(--sans);
+  font-size: 32px;
+  font-weight: 600;
+}
+.cms-site[data-layout='notebook'] .content-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 40px;
+}
+.cms-site[data-layout='notebook'] .content-card {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  column-gap: 18px;
+}
+.cms-site[data-layout='notebook'] .content-image {
+  grid-row: span 4;
+}
+.cms-site[data-layout='notebook'] .content-card h3 {
+  font-family: var(--sans);
+  font-size: 21px;
+}
+@media (max-width: 800px) {
+  .cms-site[data-layout='notebook'] .featured-content,
+  .cms-site[data-layout='notebook'] .content-grid {
+    grid-template-columns: 1fr;
+  }
+}

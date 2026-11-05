@@ -1,0 +1,45 @@
+{
+  "name": "haxepress",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run build:themes && npm run build:mcp && vite build && vite build --ssr resources/js/ssr.tsx --outDir bootstrap/ssr",
+    "ssr": "node bootstrap/ssr/ssr.js",
+    "format:haxe": "haxelib run formatter -s src -s tests/haxe -s tests/plugins -s examples/plugins",
+    "format:web": "prettier --write mcp resources/js resources/css resources/lang resources/themes examples tests/plugins scripts/*.mjs tests/*.mjs vite.config.ts",
+    "format:python": "UV_TOOL_DIR=.tools/uv-tools uv --cache-dir .tools/uv-cache tool run --from black==26.10.1 black scripts tests",
+    "format": "npm run format:haxe && npm run format:web && npm run format:python",
+    "format:check": "haxelib run formatter -s src -s tests/haxe -s tests/plugins -s examples/plugins --check && prettier --check mcp resources/js resources/css resources/lang resources/themes examples tests/plugins scripts/*.mjs tests/*.mjs vite.config.ts && UV_TOOL_DIR=.tools/uv-tools uv --offline --cache-dir .tools/uv-cache tool run --from black==26.10.1 black --check scripts tests",
+    "build:themes": "node scripts/build_themes.mjs",
+    "test:theme-builder": "node tests/theme_builder_model.mjs",
+    "build:mcp": "node scripts/build_theme_mcp.mjs"
+  },
+  "dependencies": {
+    "@inertiajs/react": "2.3.29",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "html-to-image": "1.11.13",
+    "react": "19.2.9",
+    "react-dom": "19.2.9",
+    "react-markdown": "10.1.0",
+    "rehype-slug": "6.0.0",
+    "remark-gfm": "4.0.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "esbuild": "0.28.2",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "ws": "8.22.1"
+  }
+}

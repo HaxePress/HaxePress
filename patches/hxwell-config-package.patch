@@ -1,0 +1,121 @@
+diff --git a/src/hx/well/macro/ConfigDataMacro.hx b/src/hx/well/macro/ConfigDataMacro.hx
+--- a/src/hx/well/macro/ConfigDataMacro.hx
++++ b/src/hx/well/macro/ConfigDataMacro.hx
+@@ -27,7 +27,8 @@
+ 
+             var existing = seenFields.get(formattedName);
+             if (existing != null)
+-                Context.fatalError('Config class name collision: "${existing}" and "${fullClass}" both map to ConfigData.${formattedName}. Rename one of them.', clazz.pos);
++                Context.fatalError('Config class name collision: "${existing}" and "${fullClass}" both map to ConfigData.${formattedName}. Rename one of them.',
++                    clazz.pos);
+             seenFields.set(formattedName, fullClass);
+ 
+             var typePath = toTypePath(clazz);
+@@ -60,41 +61,58 @@
+     }
+ 
+     private static function discoverConfigClasses():Array<ClassType> {
+-        var packageParts = CONFIG_PACKAGE.split(".");
++        var applicationPackage = Context.definedValue("hxwell_config_package");
++        var packages = [CONFIG_PACKAGE];
++        if (applicationPackage != null && applicationPackage != ""
++            && applicationPackage != CONFIG_PACKAGE) {
++            packages.push(applicationPackage);
++        }
++        var selected:StringMap<ClassType> = new StringMap();
+         var seenModules:StringMap<Bool> = new StringMap();
+-        var classes:Array<ClassType> = [];
+ 
+-        for (classPath in Context.getClassPath()) {
+-            var directory = Path.join([classPath].concat(packageParts));
+-            if (!FileSystem.exists(directory) || !FileSystem.isDirectory(directory))
+-                continue;
+-
+-            for (entry in FileSystem.readDirectory(directory)) {
+-                if (!entry.endsWith(".hx"))
++        for (configPackage in packages) {
++            var packageParts = configPackage.split(".");
++            for (classPath in Context.getClassPath()) {
++                var directory = Path.join([classPath].concat(packageParts));
++                if (!FileSystem.exists(directory) || !FileSystem.isDirectory(directory))
+                     continue;
+ 
+-                var moduleName = entry.substr(0, entry.length - 3);
+-                if (moduleName == "ConfigData" || moduleName == "import")
+-                    continue;
++                for (entry in FileSystem.readDirectory(directory)) {
++                    if (!entry.endsWith(".hx"))
++                        continue;
+ 
+-                var modulePath = '${CONFIG_PACKAGE}.${moduleName}';
+-                if (seenModules.exists(modulePath))
+-                    continue;
+-                seenModules.set(modulePath, true);
++                    var moduleName = entry.substr(0, entry.length - 3);
++                    if (moduleName == "ConfigData" || moduleName == "import")
++                        continue;
+ 
+-                for (type in Context.getModule(modulePath)) {
+-                    switch (type) {
+-                        case TInst(classRef, _):
+-                            var clazz = classRef.get();
+-                            if (!clazz.isInterface && !clazz.isExtern && implementsIConfig(clazz))
+-                                classes.push(clazz);
+-                        case _:
++                    var modulePath = '${configPackage}.${moduleName}';
++                    if (seenModules.exists(modulePath))
++                        continue;
++                    seenModules.set(modulePath, true);
++
++                    for (type in Context.getModule(modulePath)) {
++                        switch (type) {
++                            case TInst(classRef, _):
++                                var clazz = classRef.get();
++                                if (!clazz.isInterface && !clazz.isExtern
++                                    && implementsIConfig(clazz)) {
++                                    var key = clazz.name.toLowerCase();
++                                    var previous = selected.get(key);
++                                    if (previous != null
++                                        && previous.pack.join(".") == clazz.pack.join(".")
++                                        && previous.module != clazz.module) {
++                                        Context.fatalError('Config key collision: ${key}',
++                                            clazz.pos);
++                                    }
++                                    selected.set(key, clazz);
++                                }
++                            case _:
++                        }
+                     }
+                 }
+             }
+         }
+-
+-        return classes;
++        return [for (clazz in selected) clazz];
+     }
+ 
+     private static function implementsIConfig(classType:ClassType):Bool {
+@@ -120,8 +138,7 @@
+ 
+     private static function toTypePath(clazz:ClassType):TypePath {
+         var moduleName = clazz.module.split(".").pop();
+-        return moduleName == clazz.name
+-            ? {pack: clazz.pack, name: clazz.name}
+-            : {pack: clazz.pack, name: moduleName, sub: clazz.name};
++        return moduleName == clazz.name ? {pack: clazz.pack, name: clazz.name} : {pack: clazz.pack,
++            name: moduleName, sub: clazz.name};
+     }
+ }
+diff --git a/src/hx/well/console/StartServerCommand.hx b/src/hx/well/console/StartServerCommand.hx
+--- a/src/hx/well/console/StartServerCommand.hx
++++ b/src/hx/well/console/StartServerCommand.hx
+@@ -4,9 +4,6 @@
+ import sys.thread.Thread;
+ #end
+ 
+-#if !php
+-import hx.well.config.InstanceConfig;
+-#end
+ 
+ import haxe.Exception;
+ import hx.well.server.instance.IInstance;

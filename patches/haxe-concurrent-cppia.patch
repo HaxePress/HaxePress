@@ -1,0 +1,68 @@
+diff --git a/src/hx/concurrent/lock/Acquirable.hx b/src/hx/concurrent/lock/Acquirable.hx
+--- a/src/hx/concurrent/lock/Acquirable.hx
++++ b/src/hx/concurrent/lock/Acquirable.hx
+@@ -40,6 +40,10 @@
+ 
+ abstract class AbstractAcquirable implements Acquirable {
+ 
++   public function tryAcquire(timeoutMS:Int = 0):Bool {
++      throw "Derived lock classes must implement tryAcquire.";
++   }
++
+    public var availablePermits(get, never):Int;
+    abstract function get_availablePermits():Int;
+ 
+diff --git a/src/hx/concurrent/lock/RLock.hx b/src/hx/concurrent/lock/RLock.hx
+--- a/src/hx/concurrent/lock/RLock.hx
++++ b/src/hx/concurrent/lock/RLock.hx
+@@ -94,7 +94,7 @@
+     *
+     * @return `false` if lock could not be acquired
+     */
+-   public function tryAcquire(timeoutMS = 0):Bool {
++   public override function tryAcquire(timeoutMS = 0):Bool {
+       if (timeoutMS < 0) throw "[timeoutMS] must be >= 0";
+ 
+       if (tryAcquireInternal(timeoutMS)) {
+diff --git a/src/hx/concurrent/lock/Semaphore.hx b/src/hx/concurrent/lock/Semaphore.hx
+--- a/src/hx/concurrent/lock/Semaphore.hx
++++ b/src/hx/concurrent/lock/Semaphore.hx
+@@ -40,7 +40,7 @@
+ 
+ 
+    inline //
+-   public function tryAcquire(timeoutMS = 0):Bool
++   public override function tryAcquire(timeoutMS = 0):Bool
+       return _sem.tryAcquire(timeoutMS, java.util.concurrent.TimeUnit.MILLISECONDS);
+ 
+ 
+@@ -87,7 +87,7 @@
+ 
+ 
+    inline //
+-   public function tryAcquire(timeoutMS = 0):Bool
++   public override function tryAcquire(timeoutMS = 0):Bool
+       #if threads
+          return Threads.await(tryAcquireInternal, timeoutMS);
+       #else
+diff --git a/src/hx/concurrent/lock/RWLock.hx b/src/hx/concurrent/lock/RWLock.hx
+--- a/src/hx/concurrent/lock/RWLock.hx
++++ b/src/hx/concurrent/lock/RWLock.hx
+@@ -101,7 +101,7 @@
+    }
+ 
+ 
+-   public function tryAcquire(timeoutMS:Int = 0):Bool {
++   public override function tryAcquire(timeoutMS:Int = 0):Bool {
+       final requestor = Threads.current;
+ 
+       inline function attempt():Bool {
+@@ -178,7 +178,7 @@
+ 
+ 
+    override //
+-   public function tryAcquire(timeoutMS = 0):Bool {
++   public override function tryAcquire(timeoutMS = 0):Bool {
+       final requestor = Threads.current;
+       final readLockHolders = rwLock.readLock.holders;
+ 

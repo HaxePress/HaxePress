@@ -1,0 +1,30 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "slug": "lifecycle-test",
+  "name": "Lifecycle Test",
+  "version": "2.16.0",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.lifecycle.LifecyclePlugin"
+  },
+  "hooks": [],
+  "fields": [
+    {
+      "key": "fail_create",
+      "label": "Fail creation",
+      "kind": "boolean",
+      "defaultValue": "false"
+    },
+    {
+      "key": "fail_destroy",
+      "label": "Fail destruction",
+      "kind": "boolean",
+      "defaultValue": "false"
+    }
+  ],
+  "description": ""
+}

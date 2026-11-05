@@ -1,0 +1,78 @@
+--- a/java/_std/sys/db/Mysql.hx
++++ b/java/_std/sys/db/Mysql.hx
+@@ -22,35 +22,46 @@
+ 
+ package sys.db;
+ 
++import java.lang.Class as JavaClass;
++import java.sql.DriverManager;
++import java.util.Properties;
++import java.db.Jdbc;
++
+ class Mysql {
+-	static var init = false;
++    static var init = false;
+ 
+-	public static function connect(params:{
+-		host:String,
+-		?port:Int,
+-		user:String,
+-		pass:String,
+-		?socket:String,
+-		?database:String
+-	}):sys.db.Connection {
+-		if (!init) {
+-			java.lang.Class.forName("com.mysql.jdbc.Driver");
+-			init = true;
+-		}
+-		var url = new StringBuf();
+-		url.add('jdbc:mysql:');
+-		if (params.socket != null) {
+-			url.add(params.socket);
+-		} else {
+-			url.add('//');
+-			url.add(params.host);
+-			if (params.port != null)
+-				url.add(':${params.port}');
+-		}
+-		if (params.database != null) {
+-			url.add('/${params.database}');
+-		}
+-		var cnx = java.sql.DriverManager.getConnection(url.toString(), params.user, params.pass);
+-		return java.db.Jdbc.create(cnx);
+-	}
++    public static function connect(params:{
++        host:String,
++        ?port:Int,
++        user:String,
++        pass:String,
++        ?socket:String,
++        ?database:String
++    }):Connection {
++        if (!init) {
++            JavaClass.forName("com.mysql.cj.jdbc.Driver");
++            init = true;
++        }
++        var url = new StringBuf();
++        url.add('jdbc:mysql:');
++        if (params.socket != null) {
++            url.add(params.socket);
++        } else {
++            url.add('//');
++            var host = params.host.indexOf(":") >= 0 ? "[" + params.host + "]" : params.host;
++            url.add(host);
++            if (params.port != null)
++                url.add(':${params.port}');
++        }
++        if (params.database != null) {
++            url.add('/${params.database}');
++        }
++        var properties = new Properties();
++        properties.setProperty("user", params.user);
++        properties.setProperty("password", params.pass);
++        properties.setProperty("connectTimeout", "5000");
++        properties.setProperty("socketTimeout", "10000");
++        var cnx = DriverManager.getConnection(url.toString(), properties);
++        return Jdbc.create(cnx);
++    }
+ }

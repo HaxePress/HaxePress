@@ -1,0 +1,26 @@
+--- a/java/db/Jdbc.hx
++++ b/java/db/Jdbc.hx
+@@ -109,16 +109,19 @@
+ 	public function commit() {
+ 		try {
+ 			cnx.commit();
++			cnx.setAutoCommit(true);
+ 		} catch (e:Dynamic) {
+ 			throw e;
+ 		}
+ 	}
+ 
+ 	public function rollback() {
+-		try
+-			cnx.rollback()
+-		catch (e:Dynamic)
+-			throw e;
++		try {
++			cnx.rollback();
++			cnx.setAutoCommit(true);
++		} catch (e:Dynamic) {
++			throw e;
++		}
+ 	}
+ 
+ 	public function request(s:String):sys.db.ResultSet {

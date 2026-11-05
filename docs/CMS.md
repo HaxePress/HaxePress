@@ -1,0 +1,43 @@
+# HaxePress CMS acceptance
+
+The current release is **2.16.0 / API 4**. Its content, administration and extension architecture is described in [the definition-driven CMS record](DYNAMIC-CMS.md). This includes the current behavioral contract and verification evidence.
+
+Release 2.15 adds theme-owned images in a separate Storage disk and ORM table. The editor and AI can upload images without adding site-media entries. Visual exports include unused owned images, import rebases ownership and filename collisions, and uninstall removes only the owning theme's files. See [theme images](THEME-ASSETS.md). Verification is recorded in `outputs/theme-assets/`: full JVM, export/asset/MCP, C++/CPPIA, PHP, format and unchanged-data upgrade checks, plus a real browser upload/rendering capture.
+
+Release 2.14 makes the browser and external LLM authenticated peers of one HxWell WebSocket theme channel. Saved changes arrive live without revision polling. Browser extensions use the same server tools through `window.haxePress.themeDesigner` or native WebMCP when available. Per-administrator/theme read, edit and media permissions are enforced by the server, reflected in discovery and pushed to browser registrations. Client-side stdio/server downloads and process configuration are removed. See [MCP collaboration](THEME-MCP.md).
+
+Release 2.14 evidence is under `outputs/mcp-collaboration/`: full JVM, C++/CPPIA, PHP and format logs, an unchanged-data upgrade rehearsal and `live-verification.json`. Real browser QA discovered seven WebMCP tools, edited an isolated draft through a registered tool, and observed a separate authenticated LLM socket update the live preview without reloading. The original contents, saved design, media and existing connection key remain unchanged after deployment.
+
+The Undertow regression reproduces a retained session after TCP reset in the original adapter. The compatibility patch binds transport closure to one atomic detach operation and returns session snapshots for safe concurrent iteration. Crossbyte additionally detaches while an application callback is blocked. See [WebSocket session lifecycle](WEBSOCKET-LIFECYCLE.md) for the test commands and boundaries.
+
+Release 2.13 verification: `outputs/site-mcp/tests-jvm.log`, `tests-mcp-large-image.log`, `tests-cppia.log`, `tests-php.log` and `format-check.log`. The live report at `outputs/site-mcp/live-verification.json` retains identical original ORM and media hashes, including the existing AI connection. Independent Undertow results are recorded in `outputs/websocket-audit/undertow-regression.log`.
+
+Release 2.8 adds optional, developer-defined theme customization directly in the isolated live preview. Existing package fields generate the controls; themes without public fields show no customizer. Unsaved changes use native Inertia page props and remain local to the preview. Saving retains the existing package validation, permission/CSRF checks, cache invalidation and encrypted-secret behavior. See [themes](THEMES.md) for the package contract and button-color inheritance.
+
+Release 2.7 audits the installed framework APIs across application handlers, queries, middleware, storage, extension runtime and example plugins. Model results use native `get()`, `first()` and `toObject()` directly; `RecordData` and redundant locking/image forwarding methods are removed. Cached results remain plain records, with SQL projections and bounded pages unchanged. Authentication uses the model already refreshed by `SessionAuthMiddleware`, retaining active-account, role and password-version checks.
+
+Form errors use `Inertia.flash()` / `getFlashed()`. The adapter compatibility patch fixes their inconsistent session keys and merges multiple flash calls. `MapTools.toDynamic()` now has the correct native return type and prepares working-copy objects while preserving the request input-source rules. Collection/role/navigation-region writes also use native handler validation, and collection deletion routes bind handler instances directly. Numeric route constraints use `whereNumber`; stored-image and module MIME handling uses Storage and the native content-type registry.
+
+The installed framework does not provide CMS cursor pagination, revision-based cache invalidation, capability policy, image-content decoding or bounded ZIP inspection. Those domain services remain. The CSV export input decorator also remains: Crossbyte's `onAfter` callback does not execute after a stream/disconnect failure, while closing the decorated input guarantees temporary-file cleanup. No application workaround is added for this driver limitation.
+
+Browser image rules keep JavaScript-compatible escaping: JVM `EReg.escape()` emits Java `Pattern.quote` syntax. The integration test checks the actual returned pattern with Node's `RegExp`. Native API verification is recorded in `outputs/native-api-full-test.log`, `outputs/native-api-final-focused.log`, `outputs/native-api-cppia-verified.log`, `outputs/native-api-php-verified.log` and `outputs/native-api-format-check.log`. Upgrade and live checks retain identical original ORM and media hashes in `outputs/native-api-upgrade-verification.json` and `outputs/native-api-live-verification.json`.
+
+Collections, custom fields, roles/capabilities, navigation regions, public paths, template names and homepage selection are stored definitions. The shared editor, publication workflow, history, working copies, SQL projections and query-specific caches consume those definitions. Native plugins can register owned collections and add behavior through the existing lifecycle/routes/hooks.
+
+Release 2.2 adds live media dependency checks, persistent owner-scoped references and watched ORM columns. Content, history, working copies, settings, plugin data and incoming foreign keys block deletion; disabled or uninstalled packages keep protecting retained data. See [the media dependency contract](MEDIA-DEPENDENCIES.md) for plugin integration and target-specific verification.
+
+Release 2.3 adds managed site logos with theme-font text fallback, WebP decoding and generic site/publisher settings. Existing personal-profile setting values migrate to their new keys. See [site identity](SITE-IDENTITY.md) for the contract and verification.
+
+Release 2.4 adds real miniature theme previews and an embedded, protected default theme. Its settings and the user's active theme survive the upgrade. See [themes](THEMES.md) for behavior and verification.
+
+Release 2.6 moves content, taxonomy, media metadata, navigation, member/account, site/package settings, password, locale and newsletter field validation into native handler `validate()` methods. Collection routes register handlers directly; managed plugin routes forward validation. A native 422 status route preserves scoped Inertia errors and JSON endpoint responses through the shared `ValidationResponder` contract. Stateful permission, ownership, uniqueness and concurrency rules remain in the operation. Password validation uses a native custom rule for the 72-byte limit.
+
+Newsletter signup uses the native ORM upsert to retain one email record and its original creation date. This avoids recovering from a duplicate-insert exception on C++ SQLite, whose failed statement can prevent the next query from finalizing.
+
+The UTF-8 cache compatibility fix in `patches/hxwell-cache-bytes.patch` stores key and serialized-value lengths in bytes. Native PHP validation responses can therefore reuse translated catalogues without truncating serialized data. Setup applies this patch alongside the existing framework compatibility changes.
+
+Validation evidence: `outputs/validation-lifecycle-final-full-test.log`, `outputs/validation-lifecycle-cppia-verified.log`, `outputs/validation-lifecycle-php-verified.log` and `outputs/validation-lifecycle-format-check.log`. The production upgrade rehearsal and live verification retain identical ORM record and media-file hashes; see `outputs/validation-lifecycle-upgrade-verification.json` and `outputs/validation-lifecycle-live-verification.json`.
+
+Existing content, credentials, subscriptions, private working copies, menu references, installed package settings and media survive the upgrade. The global slug index becomes a collection-scoped unique index; old collection paths redirect; menu references use the generic `content_id` column. New registry/value/grant tables preserve the existing content table.
+
+Historical implementation records remain under `docs/history/`, including [CMS 2.0](history/v2.0-CMS.md) and [the earlier API 2 ledger](history/v1-CMS.md). Current package authors should use [the API 4 contract](PLUGIN-PACKAGES.md).

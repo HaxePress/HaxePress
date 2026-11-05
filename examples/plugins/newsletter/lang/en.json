@@ -1,0 +1,23 @@
+{
+  "Collects newsletter subscriptions and manages subscribers in the studio.": "Collects newsletter subscriptions and manages subscribers in the studio.",
+  "Could not subscribe.": "Could not subscribe.",
+  "Email address": "Email address",
+  "Enter a valid email address.": "Enter a valid email address.",
+  "Export CSV": "Export CSV",
+  "Newsletter": "Newsletter",
+  "Newsletter heading": "Newsletter heading",
+  "Newsletter subscriptions and subscriber management.": "Newsletter subscriptions and subscriber management.",
+  "No {items} yet.": "No {items} yet.",
+  "Please try again in a moment.": "Please try again in a moment.",
+  "Remove subscriber": "Remove subscriber",
+  "Remove this subscriber?": "Remove this subscriber?",
+  "Subscribe": "Subscribe",
+  "Subscribed at": "Subscribed at",
+  "Subscribers": "Subscribers",
+  "Subscribing…": "Subscribing…",
+  "The people following your site.": "The people following your site.",
+  "Your email address": "Your email address",
+  "Your subscription has been saved.": "Your subscription has been saved.",
+  "subscribers": "subscribers",
+  "{count} subscribers. [Manage subscribers](/admin/subscribers).": "{count} subscribers. [Manage subscribers](/admin/subscribers)."
+}
