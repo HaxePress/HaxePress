@@ -8,7 +8,7 @@ The current release is **2.16.0**, with **plugin/theme API 4**. The application 
 
 ## Run locally
 
-Install Git, Make, Python 3.12+, Java 21+, Node.js 22.12+ with npm, and Neko for the HxWell CLI. Install uv if you run the format checks. Setup uses Haxe 4.3.7 and installs the Haxe libraries, Git snapshots and JVM dependencies from `dependencies.lock.json` in the workspace. For development, set `HXWELL_PATH` or `HXWELL_CROSSBYTE_PATH` to a compatible local checkout.
+Install Git, Make, Python 3.12+, Java 21+, Maven, Node.js 22.12+ with npm, and Neko for the HxWell CLI. Install uv if you run the format checks. Setup uses Haxe 4.3.7 and installs the Haxe libraries and Git snapshots from `dependencies.lock.json` in the workspace. Maven resolves the JVM dependencies from `pom.xml` and copies the runtime JARs into `java-lib`. For development, set `HXWELL_PATH` or `HXWELL_CROSSBYTE_PATH` to a compatible local checkout.
 
 ```sh
 make setup

@@ -143,6 +143,9 @@ def refresh_source(source, destination):
 
 
 def main():
+    maven = shutil.which("mvn")
+    if not maven:
+        raise SystemExit("Install Maven to resolve the JVM dependencies in pom.xml.")
     version = LOCK["haxe"]
     compiler_override = os.environ.get("HXWELL_HAXE")
     compiler = Path(compiler_override or ROOT / ".tools/haxe/haxe").resolve()
@@ -255,14 +258,17 @@ def main():
         (entry / ".current").write_text(version + "\n")
     for name in ("sessions", "cache"):
         (ROOT / "storage" / name).mkdir(parents=True, exist_ok=True)
-    for library, entry in LOCK.items():
-        if not isinstance(entry, dict) or not entry.get("url", "").endswith(".jar"):
-            continue
-        target = ROOT / "java-lib" / (library + "-" + entry["version"] + ".jar")
-        if not target.exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            print("Downloading " + library + "…", flush=True)
-            urllib.request.urlretrieve(entry["url"], target)
+    subprocess.run(
+        [
+            maven,
+            "--batch-mode",
+            "--no-transfer-progress",
+            "-Dmaven.repo.local=" + str(ROOT / ".tools/maven-cache"),
+            "generate-resources",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
     if prepare_environment(ROOT):
         print(
             "Created private .env with HxWell's application key. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."
