@@ -193,7 +193,7 @@ def main():
         (ROOT / ".env").write_text(text)
         (ROOT / ".env").chmod(0o600)
         print(
-            "Created private .env. Configure INSTALL_TRUSTED_IPS, start the site, and complete /admin/install."
+            "Created private .env. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."
         )
     config = ROOT / ".env"
     content = config.read_text()

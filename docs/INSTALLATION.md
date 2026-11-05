@@ -2,13 +2,13 @@
 
 HaxePress is a development preview and is not production-ready. The first-run wizard follows the administration interface's typography, palette and field conventions.
 
-`make setup` prepares project-local dependencies and creates a private `.env` with a random `APP_KEY`, `APP_INSTALLED=false` and an empty `INSTALL_TRUSTED_IPS`. It does not create or print an initial administrator password. Configure trusted literal IPv4/IPv6 socket-peer addresses explicitly, then build and start the site.
+`make setup` prepares project-local dependencies and creates a private `.env` with a random `APP_KEY`, `APP_INSTALLED=false` and an empty `INSTALL_TRUSTED_IPS`. It does not create or print an initial administrator password. Direct `127.0.0.1` connections automatically open the wizard without configuring trusted IPs, including when that setting is missing or invalid. For other peers, configure trusted literal IPv4/IPv6 addresses explicitly, then build and start the site.
 
 ```dotenv
-INSTALL_TRUSTED_IPS=127.0.0.1,::1
+INSTALL_TRUSTED_IPS=192.0.2.10,::1
 ```
 
-There is no wildcard or implicit loopback allowlist. Without an allowed address, the wizard returns a locked warning before creating a session or connecting to a fresh database. Client-submitted settings and forwarded identity headers cannot grant trust. Use a direct connection or an SSH tunnel for installation. The gate checks the actual peer address; it is not a generic reverse-proxy identity resolver.
+The built-in exception is exactly `127.0.0.1`, including its IPv4-mapped representation. Other `127.*` addresses and IPv6 `::1` still need an explicit entry; wildcard and hostname entries do not grant trust. A disallowed peer receives a locked warning before a session or fresh database connection is created. Client-submitted settings and forwarded identity headers cannot grant trust, including through a loopback proxy. Use a direct connection or an SSH tunnel for installation. The gate checks the actual peer address; it is not a generic reverse-proxy identity resolver.
 
 The wizard is at `/admin/install`, so setup sessions keep the existing `/admin` cookie scope. Native session and CSRF middleware run only after the IP guard. Ordinary application routes, database migrations, plugins, scheduled jobs and MCP startup remain unavailable until installation completes. Static build assets still load so the locked screen is usable.
 
@@ -36,4 +36,4 @@ If initialization fails, the main environment file is not replaced. Use an empty
 
 ## Verification
 
-`tests/installation.py` launches isolated JVM/SSR applications and covers missing/wrong trusted IPs, forwarded-header rejection, no blocked sessions or database files, CSRF, path validation, native database/DDL checks, administrator creation, optional sample content, private `.env`, literal password reload, disabled setup and restart/login. A real isolated MySQL server can also be exercised through `verify_mysql`; its database is created/dropped with the test-only native Schema fixture.
+`tests/installation.py` launches isolated JVM/SSR applications and covers the automatic `127.0.0.1` exception with missing/wrong/invalid configuration, explicit nonlocal and IPv6 trust rules, forwarded-header rejection, no blocked sessions or database files, CSRF, path validation, native database/DDL checks, administrator creation, optional sample content, private `.env`, literal password reload, disabled setup and restart/login. A real isolated MySQL server can also be exercised through `verify_mysql`; its database is created/dropped with the test-only native Schema fixture.

@@ -14,13 +14,13 @@ Prerequisites: Python 3.12+, Java 21+, Node.js 22.12+, npm, uv, Haxelib and matc
 make setup
 ```
 
-Setup creates a private `.env` with a generated `APP_KEY`. Before starting the application, explicitly configure the IP addresses allowed to run the first installation:
+Setup creates a private `.env` with a generated `APP_KEY`. Direct connections from **127.0.0.1** automatically open the first-run wizard, even when `INSTALL_TRUSTED_IPS` is empty or invalid. To install from another address, explicitly allow its socket-peer IP:
 
 ```dotenv
-INSTALL_TRUSTED_IPS=127.0.0.1,::1
+INSTALL_TRUSTED_IPS=192.0.2.10,::1
 ```
 
-Use the actual socket-peer addresses for your installation connection. There is no automatic trusted-IP default. Without this setting, setup stays locked and no database initialization runs. Use a direct connection or an SSH tunnel; forwarded identity headers are rejected during installation.
+Replace the example with the actual socket-peer addresses for your installation connection. Other addresses stay locked unless allowed; the exception is specifically `127.0.0.1`, not the entire loopback range or `::1`. Use a direct connection or an SSH tunnel; forwarded identity headers are rejected during installation.
 
 ```sh
 make build

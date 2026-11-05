@@ -101,7 +101,6 @@ class SetupServer:
             "STORAGE_PATH": str(work / "storage"),
             "CACHE_PATH": str(work / "storage/cache"),
             "SESSION_PATH": str(work / "storage/sessions"),
-            "INSTALL_TRUSTED_IPS": trusted,
             "VITE_USE_BUILD": "true",
             "VITE_INCLUDE_PAGE_ENTRY": "false",
             "INERTIA_SSR_ENABLED": "true",
@@ -109,6 +108,8 @@ class SetupServer:
             "INERTIA_SSR_TIMEOUT": "3",
             "UNRELATED_SETTING": "preserved",
         }
+        if trusted is not None:
+            values["INSTALL_TRUSTED_IPS"] = trusted
         (work / ".env").write_text(
             "".join(key + "=" + value + "\n" for key, value in values.items())
         )
@@ -258,18 +259,41 @@ def verify_mysql(mysql_port, mysql_work):
     )
 
 
+def verify_trust_rules():
+    with tempfile.TemporaryDirectory(prefix="haxepress-install-trust-") as directory:
+        work = Path(directory)
+        work.chmod(0o700)
+        key = base64.b64encode(secrets.token_bytes(32)).decode()
+        (work / ".env").write_text("APP_NAME=haxepress_test\nAPP_KEY=" + key + "\n")
+        (work / ".env").chmod(0o600)
+        classpath = str(TEST_BINARY) + os.pathsep + str(TEST_BINARY.parent / "lib/*")
+        result = subprocess.run(
+            ["java", "-cp", classpath, "fixtures.InstallationTrustFixture"],
+            cwd=work,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        print(result.stdout.strip(), flush=True)
+
+
 def run():
-    for configured in ("", "192.0.2.11", "deadbeef"):
-        with tempfile.TemporaryDirectory(prefix="haxepress-install-denied-") as name:
+    verify_trust_rules()
+    for configured in (None, "", "192.0.2.11", "deadbeef"):
+        with tempfile.TemporaryDirectory(prefix="haxepress-install-loopback-") as name:
             server = SetupServer(Path(name), configured)
             try:
                 client = SetupClient(server.url)
-                status, headers, data = client.request("/admin/install", inertia=True)
-                check(
-                    status == 403 and data["props"]["setup"]["blocked"],
-                    "Setup opened without a trusted IP",
-                )
-                check("set-cookie" not in headers, "A blocked installation started a session")
+                for header in ("Forwarded", "X-Forwarded-For", "X-Real-IP"):
+                    value = "for=127.0.0.1" if header == "Forwarded" else "127.0.0.1"
+                    status, headers, data = client.request(
+                        "/admin/install", headers={header: value}, inertia=True
+                    )
+                    check(
+                        status == 403 and data["props"]["setup"]["blocked"],
+                        "A forwarded connection used the loopback exception",
+                    )
+                    check("set-cookie" not in headers, "A blocked installation started a session")
                 check(
                     client.request(
                         "/admin/install/database",
@@ -287,10 +311,23 @@ def run():
                     not list((server.work / "storage").glob("*.sqlite")),
                     "An untrusted request created a database",
                 )
+                status, headers, _ = client.request("/")
+                check(
+                    status == 303 and headers.get("location") == "/admin/install",
+                    "Loopback did not automatically redirect to setup",
+                )
+                status, _, data = client.request("/admin/install", inertia=True)
+                check(
+                    status == 200
+                    and not data["props"]["setup"]["blocked"]
+                    and data["props"]["setup"]["message"] == ""
+                    and client.csrf,
+                    "Loopback setup was blocked by missing, wrong or invalid trusted IP settings",
+                )
             finally:
                 server.close()
     with tempfile.TemporaryDirectory(prefix="haxepress-install-allowed-") as name:
-        server = SetupServer(Path(name), "127.0.0.1,::1")
+        server = SetupServer(Path(name), None)
         password = "Setup $literal # 'quote' \\ path 42!"
         try:
             client = SetupClient(server.url)
@@ -433,7 +470,7 @@ def run():
         finally:
             server.close()
     print(
-        "PASS Installation: required trusted socket IP, forwarded-header rejection, no blocked sessions/DB writes, native SQLite/DDL and MySQL failure checks, CSRF, admin creation, optional demo data, private atomic dotenv, literal secrets, disabled installer and restart/login",
+        "PASS Installation: automatic loopback setup, explicit remote trust, forwarded-header rejection, no blocked sessions/DB writes, native SQLite/DDL and MySQL failure checks, CSRF, admin creation, optional demo data, private atomic dotenv, literal secrets, disabled installer and restart/login",
         flush=True,
     )
 

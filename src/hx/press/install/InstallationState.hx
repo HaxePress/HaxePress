@@ -84,6 +84,9 @@ class InstallationState {
         if (peer == null || legacyFailure) {
             return false;
         }
+        if (peer == "127.0.0.1") {
+            return true;
+        }
         var configured = Environment.env("INSTALL_TRUSTED_IPS", "");
         if (StringTools.trim(configured) == "") {
             return false;
