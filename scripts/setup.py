@@ -6,14 +6,80 @@ import json
 import os
 from pathlib import Path
 import platform
-import secrets
 import shutil
 import subprocess
+import sys
 import tarfile
+import tempfile
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = json.loads((ROOT / "dependencies.lock.json").read_text())
+
+
+def prepare_environment(project_root):
+    config = project_root / ".env"
+    created = not config.exists()
+    content = (ROOT / ".env.example").read_text() if created else config.read_text()
+    values = {}
+    for line in content.splitlines():
+        if "=" in line and not line.lstrip().startswith("#"):
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+
+    existing_key = values.get("APP_KEY", "").split("#", 1)[0].strip().strip("\"'")
+    if not existing_key:
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/hxwell.py"), "generate:key"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        generated_keys = [
+            line.removeprefix("APP_KEY=").strip()
+            for line in result.stdout.splitlines()
+            if line.startswith("APP_KEY=")
+        ]
+        if result.returncode != 0 or len(generated_keys) != 1:
+            raise SystemExit("HxWell could not generate the initial application key.")
+        generated_key = generated_keys[0]
+        try:
+            valid_key = len(base64.b64decode(generated_key, validate=True)) == 32
+        except ValueError:
+            valid_key = False
+        if not valid_key:
+            raise SystemExit("HxWell did not return a valid application key.")
+        lines = []
+        for line in content.splitlines():
+            if "=" in line and line.split("=", 1)[0].strip() == "APP_KEY":
+                line = "APP_KEY=" + generated_key
+            lines.append(line)
+        if "APP_KEY" not in values:
+            lines.append("APP_KEY=" + generated_key)
+        content = "\n".join(lines) + "\n"
+
+    defaults = {
+        "VITE_USE_BUILD": "true",
+        "INERTIA_SSR_ENABLED": "true",
+        "INERTIA_SSR_URL": "http://127.0.0.1:13714/render",
+        "INERTIA_SSR_TIMEOUT": "3",
+    }
+    for key, value in defaults.items():
+        if key not in values:
+            if content and not content.endswith("\n"):
+                content += "\n"
+            content += key + "=" + value + "\n"
+    if not created and content == config.read_text():
+        config.chmod(0o600)
+        return False
+    descriptor, temporary = tempfile.mkstemp(prefix=".env.setup-", dir=project_root, text=True)
+    try:
+        with os.fdopen(descriptor, "w") as output:
+            output.write(content)
+        os.replace(temporary, config)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return created
 
 
 def download_archive(url, dest):
@@ -184,37 +250,10 @@ def main():
             print("Downloading " + library + "…", flush=True)
             urllib.request.urlretrieve(entry["url"], target)
     subprocess.run(["haxelib", "fixrepo"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
-    if not (ROOT / ".env").exists():
-        text = (
-            (ROOT / ".env.example")
-            .read_text()
-            .replace("APP_KEY=", "APP_KEY=" + base64.b64encode(secrets.token_bytes(32)).decode())
-        )
-        (ROOT / ".env").write_text(text)
-        (ROOT / ".env").chmod(0o600)
+    if prepare_environment(ROOT):
         print(
-            "Created private .env. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."
+            "Created private .env with HxWell's application key. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."
         )
-    config = ROOT / ".env"
-    content = config.read_text()
-    keys = {
-        line.split("=", 1)[0].strip()
-        for line in content.splitlines()
-        if "=" in line and not line.lstrip().startswith("#")
-    }
-    defaults = {
-        "VITE_USE_BUILD": "true",
-        "INERTIA_SSR_ENABLED": "true",
-        "INERTIA_SSR_URL": "http://127.0.0.1:13714/render",
-        "INERTIA_SSR_TIMEOUT": "3",
-    }
-    for key, value in defaults.items():
-        if key not in keys:
-            if content and not content.endswith("\n"):
-                content += "\n"
-            content += key + "=" + value + "\n"
-    config.write_text(content)
-    config.chmod(0o600)
     print(
         "Project-local Haxe, Crossbyte, and Inertia are ready. Global Haxelib registrations are unchanged."
     )

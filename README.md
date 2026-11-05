@@ -14,7 +14,7 @@ Prerequisites: Python 3.12+, Java 21+, Node.js 22.12+, npm, uv, Haxelib and matc
 make setup
 ```
 
-Setup creates a private `.env` with a generated `APP_KEY`. Direct connections from **127.0.0.1** automatically open the first-run wizard, even when `INSTALL_TRUSTED_IPS` is empty or invalid. To install from another address, explicitly allow its socket-peer IP:
+Setup uses HxWell's native `generate:key` command, the same key-generation process used by `hxwell new`, to initialize `APP_KEY` when needed. An existing `.env` and its nonempty key are preserved. The web installer keeps that key and updates only CMS settings. Direct connections from **127.0.0.1** automatically open the first-run wizard, even when `INSTALL_TRUSTED_IPS` is empty or invalid. To install from another address, explicitly allow its socket-peer IP:
 
 ```dotenv
 INSTALL_TRUSTED_IPS=192.0.2.10,::1

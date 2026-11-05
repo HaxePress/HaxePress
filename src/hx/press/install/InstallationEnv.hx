@@ -16,8 +16,11 @@ class InstallationEnv {
     }
 
     public static function prepare(values:Map<String, String>):String {
+        if (values.exists("APP_KEY")) {
+            throw new Exception("Application keys are managed by HxWell's project bootstrap.");
+        }
         var disk = Storage.disk("configuration");
-        var source = disk.fileExists(".env") ? disk.get(".env") : "";
+        var source = disk.get(".env");
         var remaining = values.copy();
         var lines = [];
         for (line in source.split("\n")) {

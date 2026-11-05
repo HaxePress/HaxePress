@@ -22,6 +22,8 @@ from fixture_store import FixtureStore, TEST_BINARY
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = Path(os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
 SSR = Path(os.environ.get("CMS_TEST_SSR_PATH", ROOT / "bootstrap/ssr/ssr.js"))
+sys.path.insert(0, str(ROOT / "scripts"))
+from setup import prepare_environment
 
 
 def port():
@@ -88,11 +90,16 @@ class SetupServer:
         (work / "storage").mkdir()
         (work / "public").symlink_to(PUBLIC, target_is_directory=True)
         (work / "database").symlink_to(ROOT / "database", target_is_directory=True)
+        prepare_environment(work)
+        initial_key_line = next(
+            line for line in (work / ".env").read_text().splitlines() if line.startswith("APP_KEY=")
+        )
+        self.application_key_line = initial_key_line
         values = {
             "APP_NAME": "haxepress_test",
             "APP_ENV": "development",
             "APP_INSTALLED": "false",
-            "APP_KEY": base64.b64encode(secrets.token_bytes(32)).decode(),
+            "APP_KEY": initial_key_line.split("=", 1)[1],
             "APP_URL": self.url,
             "HOST": "127.0.0.1",
             "PORT": str(self.port),
@@ -277,7 +284,69 @@ def verify_trust_rules():
         print(result.stdout.strip(), flush=True)
 
 
+def verify_environment_bootstrap():
+    with tempfile.TemporaryDirectory(prefix="haxepress-native-environment-") as directory:
+        work = Path(directory)
+        work.chmod(0o700)
+        fresh = work / "fresh"
+        fresh.mkdir()
+        check(prepare_environment(fresh), "A fresh environment was not prepared")
+        source = (fresh / ".env").read_text()
+        key = next(
+            line.split("=", 1)[1] for line in source.splitlines() if line.startswith("APP_KEY=")
+        )
+        check(
+            len(base64.b64decode(key, validate=True)) == 32, "The native application key is invalid"
+        )
+        check(
+            stat.S_IMODE((fresh / ".env").stat().st_mode) == 0o600, "Bootstrap .env is not private"
+        )
+        check(not prepare_environment(fresh), "Repeated setup recreated the environment")
+        check(
+            (fresh / ".env").read_text() == source,
+            "Repeated setup changed the application key/configuration",
+        )
+
+        native = work / "native"
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/hxwell.py"), "new", os.path.relpath(native, ROOT)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        check(
+            result.returncode == 0 and (native / ".env").exists(),
+            "HxWell did not create the native project environment",
+        )
+        check(not prepare_environment(native), "An existing native environment was replaced")
+        native_source = (native / ".env").read_text()
+        native_key = next(
+            line for line in native_source.splitlines() if line.startswith("APP_KEY=")
+        )
+        check(
+            native_key != "APP_KEY=" and native_key != "APP_KEY=" + key,
+            "Native project bootstrap reused an application key",
+        )
+        (native / ".env").write_text(
+            native_source + "APP_INSTALLED=true\n# Keep the framework environment\n"
+        )
+        preserved = (native / ".env").read_bytes()
+        prepare_environment(native)
+        check(
+            (native / ".env").read_bytes() == preserved,
+            "Existing framework settings/key were overwritten",
+        )
+        check(
+            not list(work.rglob(".env.setup-*")), "Bootstrap left a private environment temporary"
+        )
+    print(
+        "PASS Native environment: HxWell project/key generation, private files, existing-key preservation and idempotent setup",
+        flush=True,
+    )
+
+
 def run():
+    verify_environment_bootstrap()
     verify_trust_rules()
     for configured in (None, "", "192.0.2.11", "deadbeef"):
         with tempfile.TemporaryDirectory(prefix="haxepress-install-loopback-") as name:
@@ -399,12 +468,26 @@ def run():
                 "admin_password": password,
                 "confirm_password": "different",
                 "sample_content": "0",
+                "APP_KEY": "must-not-replace-the-framework-key",
             }
             check(
                 client.request("/admin/install/finish", inputs)[0] == 422,
                 "Mismatched administrator passwords were accepted",
             )
             inputs["confirm_password"] = password
+            environment = server.work / ".env"
+            original_environment = environment.read_bytes()
+            environment.unlink()
+            check(
+                client.request("/admin/install/finish", inputs)[0] == 422,
+                "Installation completed without the framework environment",
+            )
+            check(
+                not environment.exists(),
+                "The web installer recreated a missing framework environment",
+            )
+            environment.write_bytes(original_environment)
+            environment.chmod(0o600)
             status, _, result = client.request("/admin/install/finish", inputs)
             check(
                 status == 200 and result["installed"], "First installation failed: " + str(result)
@@ -415,6 +498,10 @@ def run():
                 and "ADMIN_PASSWORD=" in config
                 and "UNRELATED_SETTING=preserved" in config,
                 "Private configuration was not persisted",
+            )
+            check(
+                server.application_key_line in config.splitlines(),
+                "The installer changed HxWell's application key",
             )
             check(
                 stat.S_IMODE((server.work / ".env").stat().st_mode) == 0o600,
