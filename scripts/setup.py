@@ -98,28 +98,37 @@ def download_archive(url, dest):
     archive.unlink()
 
 
-def download_locked_source(name, destination):
-    if (destination / "haxelib.json").exists():
-        return
+def locked_source(name):
     entry = LOCK[name]
-    repository = entry["repository"].replace("https://github.com/", "https://codeload.github.com/")
-    download_archive(repository + "/tar.gz/" + entry["commit"], destination)
+    destination = ROOT / ".deps" / (name + "-" + entry["commit"])
+    if not (destination / "haxelib.json").is_file():
+        repository = entry["repository"].replace(
+            "https://github.com/", "https://codeload.github.com/"
+        )
+        download_archive(repository + "/tar.gz/" + entry["commit"], destination)
+    return destination
 
 
-def refresh_framework(source, destination):
+def refresh_source(source, destination):
+    if not (source / "haxelib.json").is_file():
+        raise SystemExit(f"Missing {destination.name} checkout: {source}")
     if source.resolve() == destination.resolve():
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="hxwell-copy-", dir=destination.parent) as directory:
+    with tempfile.TemporaryDirectory(
+        prefix=destination.name + "-copy-", dir=destination.parent
+    ) as directory:
         temporary = Path(directory)
         staging = temporary / "source"
         staging.mkdir()
-        for folder in ("src", "resource", "resources", "template", "tools"):
+        for folder in ("src", "std", "compat", "resource", "resources", "template", "tools"):
             origin = source / folder
             if origin.exists():
                 shutil.copytree(origin, staging / folder)
         for filename in ("haxelib.json", "extraParams.hxml", "run.n", "LICENSE"):
-            shutil.copy2(source / filename, staging / filename)
+            origin = source / filename
+            if origin.is_file():
+                shutil.copy2(origin, staging / filename)
 
         # A clean copy excludes files introduced by the previous patch set.
         previous = temporary / "previous"
@@ -134,78 +143,73 @@ def refresh_framework(source, destination):
 
 
 def main():
-    compiler = ROOT / ".tools/haxe/haxe"
-    if not compiler.exists() and not os.environ.get("HXWELL_HAXE"):
+    version = LOCK["haxe"]
+    compiler_override = os.environ.get("HXWELL_HAXE")
+    compiler = Path(compiler_override or ROOT / ".tools/haxe/haxe").resolve()
+    if not compiler.is_file():
+        if compiler_override:
+            raise SystemExit(f"Haxe executable not found: {compiler}")
         suffix = {"Darwin": "osx", "Linux": "linux64"}.get(platform.system())
         if not suffix:
-            raise SystemExit("Set HXWELL_HAXE to a Haxe 4.3.7 executable on this platform.")
+            raise SystemExit(f"Set HXWELL_HAXE to a Haxe {version} executable on this platform.")
         download_archive(
-            "https://github.com/HaxeFoundation/haxe/releases/download/4.3.7/haxe-4.3.7-"
-            + suffix
-            + ".tar.gz",
+            f"https://github.com/HaxeFoundation/haxe/releases/download/{version}/haxe-{version}-{suffix}.tar.gz",
             compiler.parent,
         )
-    for name in ("crossbyte", "emitter", "hxwell-inertia"):
-        download_locked_source(name, ROOT / ".deps" / name)
-    framework_override = os.environ.get("HXWELL_PATH")
-    if framework_override:
-        framework_source = Path(framework_override).resolve()
-    else:
-        framework_source = ROOT / ".deps" / ("hxwell-" + LOCK["hxwell"]["commit"])
-        download_locked_source("hxwell", framework_source)
+    environment = os.environ.copy()
+    environment["PATH"] = str(compiler.parent) + os.pathsep + environment.get("PATH", "")
+    actual_version = subprocess.check_output(
+        [str(compiler), "--version"], env=environment, text=True
+    ).strip()
+    if actual_version != version:
+        raise SystemExit(f"Haxe {version} is required, found {actual_version}.")
+    haxelib = shutil.which("haxelib", path=environment["PATH"])
+    if not haxelib or not shutil.which("neko", path=environment["PATH"]):
+        raise SystemExit("Haxelib and Neko are required to run the HxWell CLI.")
+
     repo = ROOT / ".haxelib"
     repo.mkdir(exist_ok=True)
-    hxcpp_version = LOCK["hxcpp"]
-    hxcpp = repo / "hxcpp" / hxcpp_version.replace(".", ",")
-    if not (hxcpp / "haxelib.json").exists():
-        subprocess.run(
-            ["haxelib", "install", "hxcpp", hxcpp_version, "--quiet"], cwd=ROOT, check=True
-        )
-    global_repo = Path(
-        subprocess.check_output(
-            ["haxelib", "config"],
-            cwd="/private/tmp" if platform.system() == "Darwin" else "/tmp",
-            text=True,
-        ).strip()
-    )
-    concurrent_source = global_repo / "haxe-concurrent" / LOCK["haxe-concurrent"].replace(".", ",")
+    # Haxelib tools such as formatter ship CommonJS scripts.
+    package_scope = repo / "package.json"
+    if not package_scope.exists():
+        package_scope.write_text('{"type": "commonjs"}\n')
+    paths = {}
+    for name in ("haxe-concurrent", "crypto", "uuid", "hxjava", "formatter", "hxcpp"):
+        library_version = LOCK[name]
+        path = repo / name / library_version.replace(".", ",")
+        if not (path / "haxelib.json").is_file():
+            if path.is_symlink():
+                path.unlink()
+            subprocess.run(
+                [haxelib, "install", name, library_version, "--always", "--quiet"],
+                cwd=ROOT,
+                env=environment,
+                check=True,
+            )
+        paths[name] = path
+
     concurrent = ROOT / ".deps/haxe-concurrent"
-    shutil.copytree(
-        concurrent_source, concurrent, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git")
-    )
+    refresh_source(paths["haxe-concurrent"], concurrent)
     for filename in ["Acquirable.hx", "RLock.hx", "Semaphore.hx", "RWLock.hx"]:
         file = concurrent / "src/hx/concurrent/lock" / filename
         file.write_text(file.read_text())
-    paths = {
-        "haxe-concurrent": concurrent,
-        "hxcpp": hxcpp,
-        "hxwell-crossbyte": Path(
-            os.environ.get("HXWELL_CROSSBYTE_PATH", str(ROOT.parent / "hxwell-crossbyte"))
-        ),
-        "hxwell-inertia": ROOT / ".deps/hxwell-inertia",
-        "crossbyte": ROOT / ".deps/crossbyte",
-        "emitter": ROOT / ".deps/emitter",
-    }
-    framework = ROOT / ".deps/hxwell"
-    if not (framework_source / "haxelib.json").exists():
-        raise SystemExit("Missing hxwell checkout: " + str(framework_source))
-    refresh_framework(framework_source, framework)
-    paths["hxwell"] = framework
-    driver_source = paths["hxwell-crossbyte"].resolve()
-    driver = ROOT / ".deps/hxwell-crossbyte"
-    if driver_source != driver.resolve():
-        driver.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(driver_source / "src", driver / "src", dirs_exist_ok=True)
-        for filename in ("haxelib.json", "extraParams.hxml", "LICENSE"):
-            if (driver_source / filename).exists():
-                shutil.copy2(driver_source / filename, driver / filename)
-    paths["hxwell-crossbyte"] = driver
+    paths["haxe-concurrent"] = concurrent
+
+    overrides = {"hxwell": "HXWELL_PATH", "hxwell-crossbyte": "HXWELL_CROSSBYTE_PATH"}
+    for name in ("hxwell", "hxwell-crossbyte", "hxwell-inertia", "crossbyte", "emitter"):
+        override = os.environ.get(overrides[name]) if name in overrides else None
+        source = Path(override).resolve() if override else locked_source(name)
+        destination = ROOT / ".deps" / name
+        refresh_source(source, destination)
+        paths[name] = destination
+
     standard_library = ROOT / ".tools/haxe/std"
     if not standard_library.exists():
-        custom_compiler = Path(os.environ.get("HXWELL_HAXE", str(compiler))).resolve()
-        source_library = custom_compiler.parent / "std"
+        source_library = compiler.parent / "std"
         if not source_library.exists():
-            raise SystemExit("The Haxe 4.3.7 standard library is required beside its compiler.")
+            raise SystemExit(
+                f"The Haxe {version} standard library is required beside its compiler."
+            )
         shutil.copytree(source_library, standard_library)
     for package, filename in [
         ("hxwell", "hxwell-query-builder.patch"),
@@ -237,16 +241,6 @@ def main():
             )
             if not applied:
                 subprocess.run(["git", "apply", str(patch)], cwd=target, env=patch_env, check=True)
-    for name in ("haxe-concurrent", "crypto", "uuid", "hxjava", "formatter"):
-        version = LOCK[name]
-        path = global_repo / name / version.replace(".", ",")
-        if not (path / "haxelib.json").exists():
-            raise SystemExit(
-                "Install the prerequisite first: haxelib install " + name + " " + version
-            )
-        paths[name] = concurrent if name == "haxe-concurrent" else path
-    repo = ROOT / ".haxelib"
-    repo.mkdir(exist_ok=True)
     for name, path in paths.items():
         path = path.resolve()
         if not (path / "haxelib.json").exists():
@@ -269,7 +263,9 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             print("Downloading " + library + "…", flush=True)
             urllib.request.urlretrieve(entry["url"], target)
-    subprocess.run(["haxelib", "fixrepo"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(
+        [haxelib, "fixrepo"], cwd=ROOT, env=environment, check=True, stdout=subprocess.DEVNULL
+    )
     if prepare_environment(ROOT):
         print(
             "Created private .env with HxWell's application key. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."

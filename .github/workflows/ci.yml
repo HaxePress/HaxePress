@@ -1,0 +1,67 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jvm:
+    name: Haxe 4.3.7 on JVM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends neko
+          python3 -m pip install --disable-pip-version-check uv==0.11.8
+
+      - name: Install project dependencies
+        run: make setup
+
+      - name: Check formatting
+        env:
+          UV_TOOL_DIR: .tools/uv-tools
+        run: |
+          export PATH="$PWD/.tools/haxe:$PATH"
+          uv --cache-dir .tools/uv-cache tool run --from black==26.10.1 black --version
+          npm run format:check
+
+      - name: Build application and extension packages
+        run: make build
+
+      - name: Run JVM integration tests
+        run: |
+          python3 tests/build.py
+          python3 tests/run.py --skip-build

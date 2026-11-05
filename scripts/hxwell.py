@@ -16,6 +16,7 @@ env["PATH"] = str(compiler.parent) + os.pathsep + env.get("PATH", "")
 env["HAXE_STD_PATH"] = str(root / ".tools/haxe/std")
 if subprocess.check_output([str(compiler), "--version"], env=env, text=True).strip() != "4.3.7":
     raise SystemExit("The Crossbyte driver requires the pinned Haxe 4.3.7 compiler.")
-raise SystemExit(
-    subprocess.call([shutil.which("haxelib"), "run", "hxwell", *sys.argv[1:]], cwd=root, env=env)
-)
+haxelib = shutil.which("haxelib", path=env["PATH"])
+if not haxelib:
+    raise SystemExit("Haxelib is required. Run python3 scripts/setup.py first.")
+raise SystemExit(subprocess.call([haxelib, "run", "hxwell", *sys.argv[1:]], cwd=root, env=env))

@@ -6,6 +6,11 @@
     "repository": "https://github.com/hxwell/hxwell",
     "commit": "1427f18ad2a0d5626759d52e6c3a82cada9208a6"
   },
+  "hxwell-crossbyte": {
+    "version": "0.1.0",
+    "repository": "https://github.com/hxwell/hxwell-crossbyte",
+    "commit": "8dca380416689ae24400176b3909e20c09ef9e63"
+  },
   "crossbyte": {
     "version": "1.0.1",
     "repository": "https://github.com/DimensionscapeOrg/crossbyte",

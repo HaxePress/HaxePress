@@ -8,7 +8,7 @@ The current release is **2.16.0**, with **plugin/theme API 4**. The application 
 
 ## Run locally
 
-Prerequisites: Python 3.12+, Java 21+, Node.js 22.12+, npm, uv, Haxelib and a matching sibling `hxwell-crossbyte` source checkout. Setup pins Haxe 4.3.7 and downloads the HxWell revision in `dependencies.lock.json`. For framework development, `HXWELL_PATH` can point to a checkout containing the locked HxWell changes. Global Haxelib registrations and sibling sources are preserved.
+Install Git, Make, Python 3.12+, Java 21+, Node.js 22.12+ with npm, and Neko for the HxWell CLI. Install uv if you run the format checks. Setup uses Haxe 4.3.7 and installs the Haxe libraries, Git snapshots and JVM dependencies from `dependencies.lock.json` in the workspace. For development, set `HXWELL_PATH` or `HXWELL_CROSSBYTE_PATH` to a compatible local checkout.
 
 ```sh
 make setup
@@ -118,8 +118,10 @@ Bundled older packages are replaced with API 4 builds while retaining settings, 
 make test
 make test-cppia
 make test-php
-npm run format:check
+PATH="$PWD/.tools/haxe:$PATH" npm run format:check
 ```
+
+The [CI workflow](.github/workflows/ci.yml) runs setup, formatting, the application and extension build, and the JVM integration suite on Ubuntu for pushes and pull requests to `main`. It uses Haxe 4.3.7 and Java 21.
 
 The JVM suite uses temporary databases, actual Crossbyte/SSR processes and a test-only ORM fixture process. It exercises permissions, uploads, caches/projections, cursor pagination, revision/scheduling flows, package replacement, migrations and languages. Native C++ and PHP hosts load real extension modules and run the same persistence contract checks. An existing-installation rehearsal verifies preserved data, relationships, working copies, revision snapshots, package state, redirects and repeat startup.
 

@@ -142,6 +142,7 @@ diff --git a/src/hx/well/inertia/Vite.hx b/src/hx/well/inertia/Vite.hx
  
  	/**
 diff --git a/src/hx/well/inertia/JvmHttp.hx b/src/hx/well/inertia/JvmHttp.hx
+new file mode 100644
 --- /dev/null
 +++ b/src/hx/well/inertia/JvmHttp.hx
 @@ -0,0 +1,73 @@
