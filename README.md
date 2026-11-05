@@ -8,7 +8,7 @@ The current release is **2.16.0**, with **plugin/theme API 4**. The application 
 
 ## Run locally
 
-Prerequisites: Python 3.12+, Java 21+, Node.js 22.12+, npm, uv, Haxelib and matching sibling `hxwell` / `hxwell-crossbyte` source checkouts. Setup pins Haxe 4.3.7 and keeps dependencies and compatibility patches local to this workspace. Global Haxelib registrations and sibling sources are preserved.
+Prerequisites: Python 3.12+, Java 21+, Node.js 22.12+, npm, uv, Haxelib and a matching sibling `hxwell-crossbyte` source checkout. Setup pins Haxe 4.3.7 and downloads the HxWell revision in `dependencies.lock.json`. For framework development, `HXWELL_PATH` can point to a checkout containing the locked HxWell changes. Global Haxelib registrations and sibling sources are preserved.
 
 ```sh
 make setup

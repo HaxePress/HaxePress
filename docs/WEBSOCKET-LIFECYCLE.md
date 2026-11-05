@@ -4,11 +4,11 @@
 
 The installed Undertow adapter previously removed sessions only from `onCloseMessage`. An RFC 6455 close frame invokes that method, but a TCP reset or a server-side `channel.close()` need not. A reset reproduced the problem with two opened sessions, one close callback and one retained session.
 
-`patches/hxwell-websocket-sessions.patch` adds Undertow's native `addCloseTask` listener and shares an atomic, idempotent detach operation between close frames, transport errors, local closure and failed callbacks. Detaching removes the session and signals its send worker before invoking application callbacks. A callback exception cannot prevent removal or the close handshake. `getSessions()` now iterates a synchronized map copy so concurrent removal cannot invalidate an iterator.
+The pinned HxWell revision uses Undertow's native `addCloseTask` listener and shares an atomic, idempotent detach operation between close frames, transport errors, local closure and failed callbacks. Detaching removes the session and signals its send worker before invoking application callbacks. A callback exception cannot prevent removal or the close handshake. `getSessions()` iterates a synchronized map copy so concurrent removal cannot invalidate an iterator.
 
 Crossbyte already handles normal transport closure. Its registry removal previously waited behind queued application callbacks. `patches/hxwell-crossbyte-sessions.patch` detaches on the actual transport close even when an earlier message callback is waiting. The `onClose` callback keeps its existing serialized delivery. The same patch exposes the driver's existing message/queue/output size settings through its builder, allowing the MCP image tool's bounded responses to fit.
 
-Both patches apply to project-local dependencies through `scripts/setup.py`. Sibling framework and driver checkouts remain untouched.
+`scripts/setup.py` downloads the pinned HxWell revision and applies the remaining Crossbyte driver patch to the project-local driver. Sibling checkouts remain untouched.
 
 Run the Crossbyte regression after building the integration application and its packages:
 

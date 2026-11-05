@@ -98,6 +98,41 @@ def download_archive(url, dest):
     archive.unlink()
 
 
+def download_locked_source(name, destination):
+    if (destination / "haxelib.json").exists():
+        return
+    entry = LOCK[name]
+    repository = entry["repository"].replace("https://github.com/", "https://codeload.github.com/")
+    download_archive(repository + "/tar.gz/" + entry["commit"], destination)
+
+
+def refresh_framework(source, destination):
+    if source.resolve() == destination.resolve():
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="hxwell-copy-", dir=destination.parent) as directory:
+        temporary = Path(directory)
+        staging = temporary / "source"
+        staging.mkdir()
+        for folder in ("src", "resource", "resources", "template", "tools"):
+            origin = source / folder
+            if origin.exists():
+                shutil.copytree(origin, staging / folder)
+        for filename in ("haxelib.json", "extraParams.hxml", "run.n", "LICENSE"):
+            shutil.copy2(source / filename, staging / filename)
+
+        # A clean copy excludes files introduced by the previous patch set.
+        previous = temporary / "previous"
+        if destination.exists() or destination.is_symlink():
+            destination.rename(previous)
+        try:
+            staging.rename(destination)
+        except OSError:
+            if previous.exists() or previous.is_symlink():
+                previous.rename(destination)
+            raise
+
+
 def main():
     compiler = ROOT / ".tools/haxe/haxe"
     if not compiler.exists() and not os.environ.get("HXWELL_HAXE"):
@@ -111,15 +146,13 @@ def main():
             compiler.parent,
         )
     for name in ("crossbyte", "emitter", "hxwell-inertia"):
-        dest = ROOT / ".deps" / name
-        if not (dest / "haxelib.json").exists():
-            entry = LOCK[name]
-            download_archive(
-                entry["repository"].replace("https://github.com/", "https://codeload.github.com/")
-                + "/tar.gz/"
-                + entry["commit"],
-                dest,
-            )
+        download_locked_source(name, ROOT / ".deps" / name)
+    framework_override = os.environ.get("HXWELL_PATH")
+    if framework_override:
+        framework_source = Path(framework_override).resolve()
+    else:
+        framework_source = ROOT / ".deps" / ("hxwell-" + LOCK["hxwell"]["commit"])
+        download_locked_source("hxwell", framework_source)
     repo = ROOT / ".haxelib"
     repo.mkdir(exist_ok=True)
     hxcpp_version = LOCK["hxcpp"]
@@ -146,7 +179,6 @@ def main():
     paths = {
         "haxe-concurrent": concurrent,
         "hxcpp": hxcpp,
-        "hxwell": Path(os.environ.get("HXWELL_PATH", str(ROOT.parent / "hxwell"))),
         "hxwell-crossbyte": Path(
             os.environ.get("HXWELL_CROSSBYTE_PATH", str(ROOT.parent / "hxwell-crossbyte"))
         ),
@@ -154,18 +186,10 @@ def main():
         "crossbyte": ROOT / ".deps/crossbyte",
         "emitter": ROOT / ".deps/emitter",
     }
-    framework_source = paths["hxwell"].resolve()
     framework = ROOT / ".deps/hxwell"
     if not (framework_source / "haxelib.json").exists():
         raise SystemExit("Missing hxwell checkout: " + str(framework_source))
-    if framework_source != framework.resolve():
-        framework.mkdir(parents=True, exist_ok=True)
-        for folder in ("src", "resource", "resources", "template", "tools"):
-            source = framework_source / folder
-            if source.exists():
-                shutil.copytree(source, framework / folder, dirs_exist_ok=True)
-        for filename in ("haxelib.json", "extraParams.hxml", "run.n", "LICENSE"):
-            shutil.copy2(framework_source / filename, framework / filename)
+    refresh_framework(framework_source, framework)
     paths["hxwell"] = framework
     driver_source = paths["hxwell-crossbyte"].resolve()
     driver = ROOT / ".deps/hxwell-crossbyte"
@@ -187,10 +211,6 @@ def main():
         ("hxwell", "hxwell-query-builder.patch"),
         ("hxwell", "hxwell-config-package.patch"),
         ("hxwell", "hxwell-plugin-routes.patch"),
-        ("hxwell", "hxwell-cache-bytes.patch"),
-        ("hxwell", "hxwell-map-tools.patch"),
-        ("hxwell", "hxwell-websocket-sessions.patch"),
-        ("hxwell", "hxwell-env-literals.patch"),
         ("hxwell-crossbyte", "hxwell-crossbyte-sessions.patch"),
         ("haxe-concurrent", "haxe-concurrent-cppia.patch"),
         ("hxwell-inertia", "hxwell-inertia.patch"),

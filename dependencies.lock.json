@@ -1,6 +1,11 @@
 {
   "haxe": "4.3.7",
   "formatter": "1.18.0",
+  "hxwell": {
+    "version": "1.0.0",
+    "repository": "https://github.com/hxwell/hxwell",
+    "commit": "1427f18ad2a0d5626759d52e6c3a82cada9208a6"
+  },
   "crossbyte": {
     "version": "1.0.1",
     "repository": "https://github.com/DimensionscapeOrg/crossbyte",

@@ -34,7 +34,7 @@ Release 2.6 moves content, taxonomy, media metadata, navigation, member/account,
 
 Newsletter signup uses the native ORM upsert to retain one email record and its original creation date. This avoids recovering from a duplicate-insert exception on C++ SQLite, whose failed statement can prevent the next query from finalizing.
 
-The UTF-8 cache compatibility fix in `patches/hxwell-cache-bytes.patch` stores key and serialized-value lengths in bytes. Native PHP validation responses can therefore reuse translated catalogues without truncating serialized data. Setup applies this patch alongside the existing framework compatibility changes.
+The pinned HxWell revision stores UTF-8 cache key and serialized-value lengths in bytes. Native PHP validation responses can therefore reuse translated catalogues without truncating serialized data. HxWell also provides the dotenv literal, map-to-object and shared WebSocket lifecycle fixes directly.
 
 Validation evidence: `outputs/validation-lifecycle-final-full-test.log`, `outputs/validation-lifecycle-cppia-verified.log`, `outputs/validation-lifecycle-php-verified.log` and `outputs/validation-lifecycle-format-check.log`. The production upgrade rehearsal and live verification retain identical ORM record and media-file hashes; see `outputs/validation-lifecycle-upgrade-verification.json` and `outputs/validation-lifecycle-live-verification.json`.
 
