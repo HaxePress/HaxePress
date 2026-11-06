@@ -34,6 +34,7 @@ typedef ActivityEntryRecord = {
     var entity_id:Int;
     var label:String;
     var created_at:String;
+    var source:String;
 }
 
 typedef LinkFormRecord = {
@@ -353,7 +354,7 @@ class ManagementController {
         }
         var entity = request.query("entity", "").substr(0, 30);
         var cursor = Pagination.cursor(request);
-        var query = ActivityLog.query.select(["id", "actor", "action", "entity", "entity_id", "label", "created_at"]);
+        var query = ActivityLog.query.select(["id", "actor", "action", "entity", "entity_id", "label", "created_at", "source"]);
         var counter = ActivityLog.query.select(["id"]);
         if (entity != "") {
             query.where("entity", entity);
@@ -382,7 +383,8 @@ class ManagementController {
                     label: entry.label ?? "",
                     created_at: entry.created_at,
                     actionKey: 'activity.${entry.action}',
-                    datetime: StringTools.replace(entry.created_at, " ", "T")
+                    datetime: StringTools.replace(entry.created_at, " ", "T"),
+                    mcp: entry.source == Activity.MCP
                 }
         ];
         var entityChoices = [

@@ -1,6 +1,7 @@
 package hx.press.provider;
 
 import hx.press.ContentWorkflow;
+import hx.press.MediaCatalog;
 import hx.press.ai.AdminMcpAccess;
 import hx.press.WorkingCopies;
 import hx.press.media.ImageUploads;
@@ -33,6 +34,9 @@ class SiteRuntime {
             PackageManager.cleanupUploads();
             WorkingCopies.expire();
             AdminMcpAccess.cleanup();
+        });
+        ScheduledJobs.registerCore("media-trash", 3600, () -> {
+            MediaCatalog.purgeTrash();
         });
         Schedule.get().fixedDelay(_ -> {
             try {

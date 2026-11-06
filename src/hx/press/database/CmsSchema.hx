@@ -140,6 +140,12 @@ class CmsSchema {
                 table.timestamps();
             });
         }
+        if (!Schema.hasColumn("media_assets", "trashed_epoch")) {
+            Schema.table("media_assets", table -> {
+                table.double("trashed_epoch").defaultValue(0);
+                table.index(["trashed_epoch", "id"]);
+            });
+        }
         if (!Schema.hasTable("image_uploads")) {
             Schema.create("image_uploads", table -> {
                 table.string("key", 32).primary();
@@ -237,6 +243,9 @@ class CmsSchema {
                 table.dateTime("created_at");
                 table.index(["entity", "entity_id", "id"]);
             });
+        }
+        if (!Schema.hasColumn("activity_logs", "source")) {
+            Schema.table("activity_logs", table -> table.string("source", 16).defaultValue(""));
         }
         if (!Schema.hasIndex("content_items", "cms_documents_cursor")) {
             Schema.table("content_items",

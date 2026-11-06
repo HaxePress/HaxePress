@@ -21,6 +21,7 @@ typedef ContentAdminActivityView = {
     var action:String;
     var label:String;
     var created_at:String;
+    var mcp:Bool;
 }
 
 /** A custom field value prepared for a content list column. */
@@ -175,6 +176,9 @@ typedef ContentAdminMediaImageView = {
     var kilobytes:Int;
     var can_delete:Bool;
     var references_verified:Bool;
+
+    /** Days until the trash deletes the image; 0 outside the trash. **/
+    var days_left:Int;
 }
 
 /** An image whose references the references dialog can show. */

@@ -249,7 +249,7 @@ def verify(owner, public, fixtures):
             "Reactivated plugin validation did not return",
         )
     finally:
-        owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})
+        owner.delete_media(image_id)
         owner.request("/admin/logout", "POST", {})
     print(
         "PASS Native validation: all write handlers, plugin forwarding, JSON/page-data responses, no writes, byte limits, permissions and 404/409 precedence",

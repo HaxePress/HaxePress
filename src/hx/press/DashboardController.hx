@@ -22,11 +22,18 @@ class DashboardController {
             .map(item -> ContentItemData.adminSummary(item));
         var collections = ContentTypes.dashboard(author, capabilities);
         var collectionCount = ContentTypes.dashboardCount(capabilities);
-        var entries:Array<Dynamic> = CmsAccess.can("activity") ? ActivityLog.query.select(["id", "actor", "action", "entity", "label", "created_at"])
-            .orderBy("id", "DESC")
-            .limit(5)
-            .get()
-            .map(model -> cast model.toObject()) : [];
+        var entries:Array<Dynamic> = [];
+        if (CmsAccess.can("activity")) {
+            var rows = ActivityLog.query.select(["id", "actor", "action", "entity", "label", "created_at", "source"])
+                .orderBy("id", "DESC")
+                .limit(5)
+                .get();
+            entries = rows.map(model -> {
+                var entry:Dynamic = model.toObject();
+                entry.mcp = entry.source == Activity.MCP;
+                return entry;
+            });
+        }
         var summary = {
             published: published,
             drafts: drafts,

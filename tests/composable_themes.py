@@ -378,8 +378,8 @@ def verify(owner, public, fixtures):
             check(expected in css, f"Composed design stylesheet is missing: {expected}")
         check(html.count("Reusable notice") >= 2, "Shared component did not render both instances")
         check(
-            owner.request(f"/admin/media/{str(media_id)}/delete", "POST", {})[0] == 422,
-            "CSS background image was deleted",
+            owner.request(f"/admin/media/{str(media_id)}/trash", "POST", {})[0] == 422,
+            "CSS background image was moved to the trash",
         )
         props(public, "/")
         with fixtures.guard(blockDatabase=True):
@@ -438,7 +438,8 @@ def verify(owner, public, fixtures):
         owner.request(f"{base}/uninstall", "POST", {})
         fixtures.delete("items", [("category", "=", category)])
         if media_id is not None:
-            owner.request(f"/admin/media/{str(media_id)}/delete", "POST", {})
+            owner.request(f"/admin/media/{str(media_id)}/trash", "POST", {})
+            owner.request(f"/admin/media/{str(media_id)}/permanent-delete", "POST", {})
 
 
 if __name__ == "__main__":

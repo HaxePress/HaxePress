@@ -149,7 +149,7 @@ def verify(owner, public, fixtures):
             props(public, "/")["theme"]["id"] == previous, "Saving a draft changed the active theme"
         )
         check(
-            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})[0] == 422,
+            owner.request(f"/admin/media/{str(image_id)}/trash", "POST", {})[0] == 422,
             "An image referenced by a theme draft was deleted",
         )
         check(save(design, 1)[0] == 422, "An outdated editor overwrote a newer design")
@@ -183,7 +183,7 @@ def verify(owner, public, fixtures):
             "An active theme leaked an unpublished draft",
         )
         check(
-            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})[0] == 422,
+            owner.request(f"/admin/media/{str(image_id)}/trash", "POST", {})[0] == 422,
             "A published design image lost protection after editing the draft",
         )
         check(save(draft, 4, "publish")[0] == 200, "Republishing active theme failed")
@@ -192,7 +192,7 @@ def verify(owner, public, fixtures):
             "Republishing did not invalidate the rendered design",
         )
         check(
-            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})[0] == 303,
+            owner.delete_media(image_id)[0] == 303,
             "Unreferenced design image remained locked",
         )
         image_id = None
@@ -247,7 +247,7 @@ def verify(owner, public, fixtures):
             "Uninstall left theme media dependencies",
         )
         if image_id is not None:
-            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})
+            owner.delete_media(image_id)
 
 
 if __name__ == "__main__":

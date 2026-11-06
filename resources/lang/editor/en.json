@@ -129,5 +129,22 @@
   "The expiry could not be changed.": "The expiry could not be changed.",
   "Choose a supported expiry.": "Choose a supported expiry.",
   "This MCP link is already connected; its expiry can no longer change.": "This MCP link is already connected; its expiry can no longer change.",
-  "Unpublished changes. Visitors see the last published design.": "Unpublished changes. Visitors see the last published design."
+  "Unpublished changes. Visitors see the last published design.": "Unpublished changes. Visitors see the last published design.",
+  "Via MCP": "Via MCP",
+  "Image library sections": "Image library sections",
+  "Deleted permanently in {count} days": "Deleted permanently in {count} days",
+  "Delete permanently": "Delete permanently",
+  "Move to trash": "Move to trash",
+  "Delete {name} permanently": "Delete {name} permanently",
+  "Move {name} to the trash": "Move {name} to the trash",
+  "The trash is empty": "The trash is empty",
+  "Images you move to the trash stay here for {count} days.": "Images you move to the trash stay here for {count} days.",
+  "Move “{name}” to the trash? Its public URL stops working, and the trash deletes it after {count} days.": "Move “{name}” to the trash? Its public URL stops working, and the trash deletes it after {count} days.",
+  "Delete “{name}” permanently? This removes the uploaded file and cannot be undone.": "Delete “{name}” permanently? This removes the uploaded file and cannot be undone.",
+  "Images in the trash have no public URL. The trash deletes them permanently after {count} days.": "Images in the trash have no public URL. The trash deletes them permanently after {count} days.",
+  "The image was moved to the trash.": "The image was moved to the trash.",
+  "The image was restored.": "The image was restored.",
+  "The image was deleted permanently.": "The image was deleted permanently.",
+  "Move this image to the trash before deleting it permanently.": "Move this image to the trash before deleting it permanently.",
+  "Another file already uses this image's name.": "Another file already uses this image's name."
 }

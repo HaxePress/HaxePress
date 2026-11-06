@@ -405,7 +405,7 @@ def verify(fixtures):
         for row in fixtures.scan("media_assets", ["id"], [("id", ">", image["id"])]):
             image_ids.append(row["id"])
         for image_id in set(image_ids):
-            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})
+            owner.delete_media(image_id)
 
 
 if __name__ == "__main__":

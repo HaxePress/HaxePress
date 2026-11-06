@@ -2,6 +2,7 @@ package hx.press.routes;
 
 import hx.press.ContentController;
 import hx.press.ContentWorkflow;
+import hx.press.ai.AdminMcpPolicy;
 import hx.press.handler.admin.content.SaveContentHandler;
 import hx.press.handler.admin.content.SaveWorkingCopyHandler;
 import hx.press.handler.admin.content.DeleteContentHandler;
@@ -23,7 +24,9 @@ class CollectionRoutes {
         Route.post('${prefix}/preview',
             request -> ContentController.preview(request, resolve(request)))
             .attribute("content.preview", true);
-        Route.post('${prefix}/{id}/delete', new DeleteContentHandler(resolve)).whereNumber("id");
+        Route.post('${prefix}/{id}/delete', new DeleteContentHandler(resolve))
+            .whereNumber("id")
+            .attribute(AdminMcpPolicy.PEOPLE_ONLY, true);
         Route.post('${prefix}/working-copy', new SaveWorkingCopyHandler(resolve));
         Route.post('${prefix}/{id}/discard-working',
             request -> ContentController.discardWorking(request, resolve(request)));
@@ -37,6 +40,7 @@ class CollectionRoutes {
             request -> ContentWorkflow.change(request, resolve(request), false));
         Route.post('${prefix}/{id}/restore',
             request -> ContentWorkflow.change(request, resolve(request), true));
-        Route.post('${prefix}/{id}/permanent-delete', new DeleteContentHandler(resolve, true));
+        Route.post('${prefix}/{id}/permanent-delete', new DeleteContentHandler(resolve, true))
+            .attribute(AdminMcpPolicy.PEOPLE_ONLY, true);
     }
 }

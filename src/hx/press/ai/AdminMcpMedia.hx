@@ -20,6 +20,7 @@ class AdminMcpMedia {
     public static function read(id:Int):AbstractResponse {
         var image = MediaAsset.query.select(["filename", "mime_type"])
             .where("id", id)
+            .where("trashed_epoch", 0)
             .limit(1)
             .first();
         var disk = Storage.disk("media");
@@ -43,6 +44,7 @@ class AdminMcpMedia {
         }
         var image = MediaAsset.query.select(["id", "filename", "alt"])
             .where("id", Std.parseInt(request.route("id")))
+            .where("trashed_epoch", 0)
             .limit(1)
             .first();
         var disk = Storage.disk("media");

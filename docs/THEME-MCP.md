@@ -24,6 +24,8 @@ Use the site HTTPS origin configured in `APP_URL` for deployments. Local desktop
 
 The catalog includes content and revisions, categories and tags, the media library, themes, plugins, navigation, site settings, account views and backup schedule status. The tools call the same guarded controllers and validators as the panel. Use `get_admin_routes`, `read_admin` and `write_admin` for other permitted native routes. Credentials, role grants, package installation, backup archive downloads and theme publishing are managed interactively.
 
+MCP clients can move content and images to the trash and restore them, but only people delete them permanently. Routes marked people-only, including every permanent delete, are refused for MCP requests and left out of `get_admin_routes`. Changes made through an MCP connection, including the browser and theme designer connections, appear on the Activity page and dashboard with a **Via MCP** mark.
+
 Use `upload_media_image` to stage JPEG, PNG or GIF bytes. Review the echoed image, then call `verify_media_image` with its upload ID, SHA-256 and measured pixel dimensions. The verified media ID is accepted by `set_content_cover` and `insert_content_image`. Content edits require the current item version and preserve existing fields. Save an open working copy in the editor before editing through MCP.
 
 The upload tools accept canonical Base64 or an image attachment supplied by a host that supports the file input metadata. The worker retrieves a bounded attachment from the ChatGPT content domain and sends the original bytes through the same HaxePress staging and verification flow. [OpenAI Docs file inputs](https://developers.openai.com/plugins/reference#define-file-inputs)

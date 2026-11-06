@@ -109,6 +109,11 @@ class Client:
             csrf=csrf,
         )
 
+    def delete_media(self, media_id):
+        """Deletes an image as a person does: into the trash, then permanently."""
+        self.request(f"/admin/media/{str(media_id)}/trash", "POST", {})
+        return self.request(f"/admin/media/{str(media_id)}/permanent-delete", "POST", {})
+
     def upload_image(self, path, raw, content_type, dimensions, extra_headers=None):
         status, headers, payload = self.request(
             path,

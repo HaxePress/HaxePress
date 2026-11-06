@@ -7,6 +7,9 @@
   query="String"
   pagination="PageLinksView"
   notice="String"
+  trashed="Bool"
+  trashCount="Int"
+  trashDays="Int"
 />
 <AdminLayout :title="t('Media library')">
   <Island
@@ -35,7 +38,14 @@
     <Alert :message="notice" />
     <Alert error :message="error('media')" />
   </Island>
+  <nav class="status-tabs media-tabs" aria-label="{{ t('Image library sections') }}">
+    <a :class="not trashed ? 'selected'" href="/admin/media">{{ t('Library') }}</a>
+    <a :class="trashed ? 'selected'" href="/admin/media?status=trash"
+      >{{ icon('trash') }} {{ t('Trash') }} <span>{{ trashCount }}</span></a
+    >
+  </nav>
   <form class="category-search-form extension-search" action="/admin/media" method="get">
+    <input :if="trashed" type="hidden" name="status" value="trash" />
     <label class="sr-only" for="media-query">{{ t('Find an image') }}</label>
     <input
       id="media-query"
@@ -55,6 +65,7 @@
           :class="['admin-card media-card', selectedImage and selectedImage.id == image.id ? 'selected']"
         >
           <a
+            :if="not trashed"
             class="media-select"
             href="{{ url('/admin/media', q: query, cursor: query('cursor'), edit: image.id) }}"
             swap="media-workspace"
@@ -64,6 +75,11 @@
               >{{ image.width }} × {{ image.height }} · {{ image.kilobytes }} {{ t('KB') }}</span
             ></a
           >
+          <div :else class="media-select">
+            <img src="{{ image.url }}" alt="{{ image.alt }}" loading="lazy" /><strong
+              >{{ image.title ? image.title : image.filename }}</strong
+            ><span>{{ t('Deleted permanently in {count} days', count: image.days_left) }}</span>
+          </div>
           <div class="media-card-actions">
             <button
               :if="not image.can_delete"
@@ -73,21 +89,34 @@
             >
               {{ icon('link') }} {{ t('References') }}
             </button>
+            <button
+              :else-if="trashed"
+              type="submit"
+              form="media-restore-{{ image.id }}"
+              class="button button-outline"
+            >
+              {{ t('Restore') }}
+            </button>
             <span :else class="field-help">{{ t('Not in use') }}</span>
             <button
               type="submit"
-              form="media-delete-{{ image.id }}"
+              form="media-{{ trashed ? 'delete' : 'trash' }}-{{ image.id }}"
               class="icon-button danger"
               :disabled="not image.can_delete"
-              :title="not image.references_verified ? t('References could not be verified') : not image.can_delete ? t('Image in use') : t('Delete')"
-              :aria-label="not image.can_delete ? t('Deletion locked for {name}', name: image.title) : t('Delete {name}', name: image.title)"
+              :title="not image.references_verified ? t('References could not be verified') : not image.can_delete ? t('Image in use') : trashed ? t('Delete permanently') : t('Move to trash')"
+              :aria-label="not image.can_delete ? t('Deletion locked for {name}', name: image.title) : trashed ? t('Delete {name} permanently', name: image.title) : t('Move {name} to the trash', name: image.title)"
             >
               {{ icon(image.can_delete ? 'trash' : 'lock') }}
             </button>
           </div>
         </article>
       </div>
-      <section :if="not images" class="admin-card empty-state">
+      <section :if="not images and trashed" class="admin-card empty-state">
+        {{ icon('trash') }}
+        <h2>{{ t('The trash is empty') }}</h2>
+        <p>{{ t('Images you move to the trash stay here for {count} days.', count: trashDays) }}</p>
+      </section>
+      <section :else-if="not images" class="admin-card empty-state">
         {{ icon('image') }}
         <h2>{{ t('No images') }}</h2>
         <p>{{ t('Upload JPEG, PNG or GIF images up to 5 MB and 20 megapixels.') }}</p>
@@ -95,11 +124,24 @@
       <Pagination :links="pagination" :count="size(images)" :noun="t('images')" />
       <template :for="image in images"
         ><form
-          :if="image.can_delete"
-          id="media-delete-{{ image.id }}"
-          action="/admin/media/{{ image.id }}/delete"
+          :if="image.can_delete and not trashed"
+          id="media-trash-{{ image.id }}"
+          action="/admin/media/{{ image.id }}/trash"
           method="post"
-          data-well-confirm="{{ t('Delete “{name}”? This removes the uploaded file.', name: image.title) }}"
+          data-well-confirm="{{ t('Move “{name}” to the trash? Its public URL stops working, and the trash deletes it after {count} days.', name: image.title, count: trashDays) }}"
+        ></form>
+        <form
+          :if="trashed"
+          id="media-restore-{{ image.id }}"
+          action="/admin/media/{{ image.id }}/restore"
+          method="post"
+        ></form>
+        <form
+          :if="image.can_delete and trashed"
+          id="media-delete-{{ image.id }}"
+          action="/admin/media/{{ image.id }}/permanent-delete"
+          method="post"
+          data-well-confirm="{{ t('Delete “{name}” permanently? This removes the uploaded file and cannot be undone.', name: image.title) }}"
         ></form
       ></template>
     </section>
@@ -136,6 +178,10 @@
       load="idle"
     ></Island>
   </div>
+  <p :if="trashed" class="field-help">
+    {{ t('Images in the trash have no public URL. The trash deletes them permanently after {count}
+    days.', count: trashDays) }}
+  </p>
   <!-- prettier-ignore -->
-  <p class="field-help">{{ total }} {{ t('images. Referenced images are protected, including those in revisions and working copies.') }}</p>
+  <p :else class="field-help">{{ total }} {{ t('images. Referenced images are protected, including those in revisions and working copies.') }}</p>
 </AdminLayout>

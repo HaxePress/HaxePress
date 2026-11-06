@@ -271,7 +271,7 @@ def verify(fixtures):
     location = save(admin, "content", content)
     content_id = int(re.search(r"/content/(\d+)/edit", location).group(1))
     check(
-        admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 422,
+        admin.request(f"/admin/media/{str(image['id'])}/trash", "POST", {})[0] == 422,
         "referenced image was deleted",
     )
     content.update(
@@ -281,7 +281,7 @@ def verify(fixtures):
     )
     save(admin, "content", content)
     check(
-        admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 422,
+        admin.request(f"/admin/media/{str(image['id'])}/trash", "POST", {})[0] == 422,
         "revision image was deleted",
     )
     invalid = {
@@ -298,15 +298,108 @@ def verify(fixtures):
     }
     save(admin, "content", code)
     admin.request(f"/admin/content/{str(content_id)}/delete", "POST", {})
-    check(
-        admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 303,
-        "unused media could not be deleted",
-    )
-    check(public.request(image["url"])[0] == 404, "deleted media file is still served")
+    verify_media_trash(admin, public, fixtures, image, fixture)
     print(
-        "PASS CMS content: pages, GFM/SEO, private ordered working copies, revision restore, stale-save rejection, scheduling, trash/restore and referenced-media protection",
+        "PASS CMS content: pages, GFM/SEO, private ordered working copies, revision restore, stale-save rejection, scheduling, trash/restore, referenced-media protection and the media trash",
         flush=True,
     )
+
+
+def upload_trashed(admin, original):
+    status, _, body = admin.upload_image("/admin/media/upload", original, "image/jpeg", (1000, 750))
+    check(status == 201, "upload an image for the trash")
+    image = json.loads(body)
+    check(
+        admin.request(f"/admin/media/{str(image['id'])}/trash", "POST", {})[0] == 303,
+        "move an unused image to the trash",
+    )
+    return image
+
+
+def verify_media_trash(admin, public, fixtures, image, original):
+    media_id = str(image["id"])
+    filename = image["url"].rsplit("/", 1)[1]
+    storage = Path(os.environ["TEST_DB_PATH"]).parent / "media"
+    check(
+        admin.request(f"/admin/media/{media_id}/permanent-delete", "POST", {})[0] == 422,
+        "an image was deleted permanently without passing through the trash",
+    )
+    check(
+        admin.request(f"/admin/media/{media_id}/trash", "POST", {})[0] == 303,
+        "unused media could not be moved to the trash",
+    )
+    check(public.request(image["url"])[0] == 404, "a trashed image is still served")
+    check(
+        public.request(f"/media/.trash/{filename}")[0] in (403, 404),
+        "the hidden trash folder is publicly reachable",
+    )
+    check(
+        not (storage / filename).exists()
+        and (storage / ".trash" / filename).read_bytes() == original,
+        "the trashed file did not move to the hidden trash folder",
+    )
+    library = props(admin, "/admin/media")
+    trash = props(admin, "/admin/media?status=trash")
+    check(
+        all(row["id"] != image["id"] for row in library["images"])
+        and any(row["id"] == image["id"] for row in trash["images"])
+        and trash["trashCount"] >= 1,
+        "the media library or its trash lists the wrong images",
+    )
+    status, _, preview = admin.request(f"/admin/media/{media_id}/trashed", binary=True)
+    check(status == 200 and preview == original, "the trash could not preview its image")
+    check(
+        public.request(f"/admin/media/{media_id}/trashed")[0] != 200,
+        "a visitor could open a trashed image",
+    )
+    check(
+        admin.request(f"/admin/media/{media_id}/restore", "POST", {})[0] == 303
+        and public.request(image["url"], binary=True)[0] == 200,
+        "a restored image is not served again",
+    )
+    admin.request(f"/admin/media/{media_id}/trash", "POST", {})
+    check(
+        admin.request(f"/admin/media/{media_id}/permanent-delete", "POST", {})[0] == 303,
+        "a trashed image could not be deleted permanently",
+    )
+    check(
+        fixtures.count("media_assets", [("id", "=", image["id"])]) == 0
+        and not (storage / ".trash" / filename).exists(),
+        "permanent deletion left the image or its file",
+    )
+
+    # The trash deletes images 30 days after they were moved there.
+    expired = upload_trashed(admin, original)
+    recent = upload_trashed(admin, original)
+    day = 24 * 60 * 60 * 1000
+    now = int(time.time() * 1000)
+    fixtures.update("media_assets", {"trashed_epoch": now - 31 * day}, [("id", "=", expired["id"])])
+    fixtures.update("media_assets", {"trashed_epoch": now - 29 * day}, [("id", "=", recent["id"])])
+    fixtures.update("scheduled_jobs", {"next_epoch": now - 1000}, [("id", "=", "core:media-trash")])
+    deadline = time.monotonic() + 20
+    while fixtures.count("media_assets", [("id", "=", expired["id"])]) and (
+        time.monotonic() < deadline
+    ):
+        time.sleep(0.25)
+    expired_file = storage / ".trash" / expired["url"].rsplit("/", 1)[1]
+    recent_file = storage / ".trash" / recent["url"].rsplit("/", 1)[1]
+    check(
+        fixtures.count("media_assets", [("id", "=", expired["id"])]) == 0
+        and not expired_file.exists(),
+        "the trash kept an image for more than 30 days",
+    )
+    check(
+        fixtures.count("media_assets", [("id", "=", recent["id"])]) == 1 and recent_file.exists(),
+        "the trash deleted an image before 30 days",
+    )
+    automatic = [
+        ("entity", "=", "media"),
+        ("entity_id", "=", expired["id"]),
+        ("action", "=", "deleted"),
+        ("actor", "=", "System"),
+    ]
+    check(fixtures.count("activity_logs", automatic) == 1, "the trash did not record its deletion")
+    admin.request(f"/admin/media/{str(recent['id'])}/permanent-delete", "POST", {})
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import struct
 import tempfile
 import zipfile
 
@@ -26,7 +27,26 @@ BUNDLED = {"plugin-rss", "plugin-newsletter", "plugin-site-backup"}
 REINSTALLED = ["activity_logs", "cms_packages", "package_hooks"]
 # Archive entries that describe the backup rather than hold a stored file.
 METADATA = ("database/", "content/", "backup.", "content.index.json")
+# Archives cannot name hidden folders, so the site's media/.trash is stored as media/trash.
+TRASHED_MEDIA = "media/trash/"
 SHOWN_ROWS = 2000
+IMAGE = (Path(__file__).parent / "fixtures/media/logo-transparent.png").read_bytes()
+
+
+def storage_path(name):
+    if name.startswith(TRASHED_MEDIA):
+        return f"media/.trash/{name[len(TRASHED_MEDIA):]}"
+    return name
+
+
+def trashed_image(owner):
+    width, height = struct.unpack_from(">II", IMAGE, 16)
+    status, _, body = owner.upload_image("/admin/media/upload", IMAGE, "image/png", (width, height))
+    check(status == 201, "Could not upload an image for the trash")
+    image = json.loads(body)
+    status = owner.request(f"/admin/media/{image['id']}/trash", "POST", {})[0]
+    check(status == 303, "Could not move an image to the trash")
+    return image
 
 
 def digests(store):
@@ -115,23 +135,26 @@ def compare_tables(source, restored, expected):
     )
 
 
-def compare_files(archive, source_storage, restored_storage, media, moved):
+def compare_files(archive, source_storage, restored_storage, media, moved, trashed):
     with zipfile.ZipFile(io.BytesIO(archive)) as entries:
         stored = [
             entry.filename
             for entry in entries.infolist()
             if not entry.is_dir() and not entry.filename.startswith(METADATA)
         ]
-        missing_media = sorted({f"media/{filename}" for filename in media} - set(stored))
+        names = {
+            f"{TRASHED_MEDIA if filename in trashed else 'media/'}{filename}" for filename in media
+        }
+        missing_media = sorted(names - set(stored))
         check(not missing_media, f"The backup left out media files: {missing_media[:3]}")
         for path in stored:
             content = entries.read(path)
             check(
-                (source_storage / path).read_bytes() == content,
+                (source_storage / storage_path(path)).read_bytes() == content,
                 f"The backup copy of {path} differs from the site's file",
             )
             folder = next((old for old in moved if path.startswith(old)), None)
-            target = path if folder is None else moved[folder] + path[len(folder) :]
+            target = storage_path(path) if folder is None else moved[folder] + path[len(folder) :]
             restored = restored_storage / target
             check(
                 restored.is_file() and restored.read_bytes() == content,
@@ -160,10 +183,14 @@ def run():
         == 303,
         "Owner login failed",
     )
-    verify_round_trip(owner)
+    image = trashed_image(owner)
+    try:
+        verify_round_trip(owner, image["url"].rsplit("/", 1)[1])
+    finally:
+        owner.request(f"/admin/media/{image['id']}/permanent-delete", "POST", {})
 
 
-def verify_round_trip(owner):
+def verify_round_trip(owner, trashed):
     with FixtureStore.from_environment() as source:
         expected = digests(source)
         check(
@@ -186,13 +213,18 @@ def verify_round_trip(owner):
                 with FixtureStore(work) as restored:
                     moved = compare_tables(source, restored, expected)
                 files = compare_files(
-                    archive, source.work / "storage", work / "storage", media, moved
+                    archive, source.work / "storage", work / "storage", media, moved, {trashed}
+                )
+                check(
+                    (work / "storage/media/.trash" / trashed).read_bytes() == IMAGE
+                    and not (work / "storage/media" / trashed).exists(),
+                    "The restored site does not keep its trashed image hidden",
                 )
             finally:
                 server.close()
     total = sum(table["rows"] for table in expected.values())
     print(
-        f"PASS Backup round trip: {len(expected)} tables, {total} rows and {files} files match the source after restore",
+        f"PASS Backup round trip: {len(expected)} tables, {total} rows and {files} files, including a trashed image, match the source after restore",
         flush=True,
     )
 

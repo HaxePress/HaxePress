@@ -71,6 +71,12 @@ def succeeded(result):
     return result["structuredContent"]
 
 
+def refused(result):
+    return (
+        bool(result.get("isError")) or result.get("structuredContent", {}).get("status", 0) >= 400
+    )
+
+
 def verify_expiry(owner, public):
     """A link's expiry is chosen when it is generated and can change until a client connects."""
     hour = issue(owner, "cursor", hours=1)
@@ -185,11 +191,55 @@ def verify_media_and_content(owner, public, connection):
             and "Original body." in item["content"],
             "The inline image or original article body was lost",
         )
+        # MCP clients move items to the trash; only people delete them permanently.
+        succeeded(call(public, connection, "trash_content", document))
+        for path in (
+            f"/admin/content/{row['id']}/permanent-delete",
+            f"/admin/content/{row['id']}/delete",
+            f"/admin/media/{saved['id']}/permanent-delete",
+        ):
+            attempt = call(public, connection, "write_admin", {"path": path, "method": "POST"})
+            check(refused(attempt), f"An MCP client reached {path}")
+        routes = succeeded(call(public, connection, "get_admin_routes", {}))["data"]["routes"]
+        listed = {route["path"] for route in routes}
+        permanent = {
+            "/admin/content/{id}/delete",
+            "/admin/content/{id}/permanent-delete",
+            "/admin/pages/{id}/permanent-delete",
+            "/admin/collections/{kind}/{id}/permanent-delete",
+            "/admin/media/{id}/permanent-delete",
+        }
+        check(
+            "/admin/content/{id}/trash" in listed and not listed & permanent,
+            "MCP route discovery listed permanent deletes",
+        )
+        entry = [("entity", "=", "entry"), ("entity_id", "=", row["id"])]
+        with FixtureStore.from_environment() as store:
+            check(
+                store.count("items", [("id", "=", row["id"]), ("status", "=", "trash")]) == 1,
+                "An MCP client deleted trashed content",
+            )
+            check(
+                store.count("activity_logs", [*entry, ("source", "=", "mcp")]) >= 3,
+                "MCP changes were not recorded as MCP activity",
+            )
+        activity = owner.request("/admin/activity")[2]
+        check(
+            'class="featured-text"' in activity and "Via MCP" in activity,
+            "The activity page did not mark MCP changes",
+        )
     finally:
         owner.request(f"/admin/content/{row['id']}/trash", "POST", {})
         owner.request(f"/admin/content/{row['id']}/permanent-delete", "POST", {})
-        owner.request(f"/admin/media/{saved['id']}/delete", "POST", {})
+        owner.request(f"/admin/media/{saved['id']}/trash", "POST", {})
+        owner.request(f"/admin/media/{saved['id']}/permanent-delete", "POST", {})
         owner.request(f"/admin/categories/{category_id}/delete", "POST", {})
+    with FixtureStore.from_environment() as store:
+        check(
+            store.count("activity_logs", [*entry, ("action", "=", "deleted"), ("source", "=", "")])
+            == 1,
+            "A person's permanent delete was not recorded as their own activity",
+        )
 
 
 def run():
@@ -276,6 +326,11 @@ def run():
         "list_backup_schedules",
     }
     check(expected <= names and len(names) >= 35, "MCP discovery omitted native admin tools")
+    check(
+        {"trash_content", "restore_content", "trash_media_image", "restore_media_image"} <= names
+        and not {"permanently_delete_content", "delete_media_image"} & names,
+        "MCP tools still offer permanent deletes",
+    )
     verify_media_and_content(owner, public, first)
     latest = session_status(owner, first)
     check(

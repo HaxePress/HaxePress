@@ -207,7 +207,7 @@ def run():
             for identifier in packages:
                 owner.request(f"/admin/themes/{identifier}/uninstall", "POST", {})
             if image is not None:
-                owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
+                owner.delete_media(image["id"])
             store.delete("admins", [("email", "=", email)])
     print(
         "PASS Theme MCP: official legacy/modern Streamable HTTP, detailed drafts, verified images, JavaScript tools and scoped permissions",

@@ -131,7 +131,7 @@ def run():
                     "Logo bytes, transparency or media MIME type changed",
                 )
                 check(
-                    admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 422,
+                    admin.request(f"/admin/media/{str(image['id'])}/trash", "POST", {})[0] == 422,
                     "A configured site logo could be deleted",
                 )
                 check(
@@ -191,7 +191,7 @@ def run():
         check(admin.request("/admin/settings", "POST", original)[0] == 303, "Restore site identity")
         for image in created:
             check(
-                admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 303,
+                admin.delete_media(image["id"])[0] == 303,
                 "A detached logo could not be deleted",
             )
         admin.request("/admin/logout", "POST", {})

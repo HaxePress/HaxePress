@@ -139,6 +139,7 @@ typedef AdminActivityEntryView = {
     var created_at:String;
     var actionKey:String;
     var datetime:String;
+    var mcp:Bool;
 }
 
 /** An option of the activity filter; `label` is a translation key. */

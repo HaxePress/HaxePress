@@ -274,7 +274,7 @@ class SiteBackup {
             var skipDamaged = request.query("skip_damaged_content") == "1";
             var backup = extract(local, archive, stage, skipDamaged);
             for (path in backup.files) {
-                if (local.exists(path)) {
+                if (local.exists(SiteBackupDatabase.storagePath(path))) {
                     throw new Exception("Restore requires an empty site storage directory.");
                 }
             }
@@ -283,8 +283,9 @@ class SiteBackup {
                         commit) -> SiteBackupDatabase.replay(stage, backup, database, false,
                         skipDamaged, () -> {
                             for (path in backup.files) {
-                                local.move('${workspace}/restore/${path}', path);
-                                moved.push(path);
+                                var target = SiteBackupDatabase.storagePath(path);
+                                local.move('${workspace}/restore/${path}', target);
+                                moved.push(target);
                             }
                             commit();
                             published = true;

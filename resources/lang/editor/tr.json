@@ -129,5 +129,22 @@
   "The expiry could not be changed.": "Süre değiştirilemedi.",
   "Choose a supported expiry.": "Desteklenen bir süre seçin.",
   "This MCP link is already connected; its expiry can no longer change.": "Bu MCP bağlantısı kullanılmaya başlandı; süresi artık değiştirilemez.",
-  "Unpublished changes. Visitors see the last published design.": "Yayımlanmamış değişiklikler var. Ziyaretçiler son yayımlanan tasarımı görür."
+  "Unpublished changes. Visitors see the last published design.": "Yayımlanmamış değişiklikler var. Ziyaretçiler son yayımlanan tasarımı görür.",
+  "Via MCP": "MCP üzerinden",
+  "Image library sections": "Görsel kitaplığı bölümleri",
+  "Deleted permanently in {count} days": "{count} gün sonra kalıcı olarak silinecek",
+  "Delete permanently": "Kalıcı olarak sil",
+  "Move to trash": "Çöp kutusuna taşı",
+  "Delete {name} permanently": "{name} görselini kalıcı olarak sil",
+  "Move {name} to the trash": "{name} görselini çöp kutusuna taşı",
+  "The trash is empty": "Çöp kutusu boş",
+  "Images you move to the trash stay here for {count} days.": "Çöp kutusuna taşıdığınız görseller burada {count} gün kalır.",
+  "Move “{name}” to the trash? Its public URL stops working, and the trash deletes it after {count} days.": "“{name}” çöp kutusuna taşınsın mı? Herkese açık adresi çalışmayı bırakır ve çöp kutusu onu {count} gün sonra siler.",
+  "Delete “{name}” permanently? This removes the uploaded file and cannot be undone.": "“{name}” kalıcı olarak silinsin mi? Yüklenen dosya kaldırılır ve bu işlem geri alınamaz.",
+  "Images in the trash have no public URL. The trash deletes them permanently after {count} days.": "Çöp kutusundaki görsellerin herkese açık adresi yoktur. Çöp kutusu onları {count} gün sonra kalıcı olarak siler.",
+  "The image was moved to the trash.": "Görsel çöp kutusuna taşındı.",
+  "The image was restored.": "Görsel geri yüklendi.",
+  "The image was deleted permanently.": "Görsel kalıcı olarak silindi.",
+  "Move this image to the trash before deleting it permanently.": "Kalıcı olarak silmeden önce bu görseli çöp kutusuna taşıyın.",
+  "Another file already uses this image's name.": "Bu görselin adını başka bir dosya kullanıyor."
 }

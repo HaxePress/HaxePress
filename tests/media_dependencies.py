@@ -77,7 +77,7 @@ def run():
         check(report["canDelete"] is False, "Reference details authorized deleting an in-use image")
         check(locations or not report["verified"], "The report did not explain the deletion lock")
         before = fixtures.rows("media_assets", ["id", "filename"], [("id", "=", image["id"])])
-        status, _, body = owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
+        status, _, body = owner.request(f"/admin/media/{str(image['id'])}/trash", "POST", {})
         check(status == 422, f"Referenced media deletion returned {str(status)}: {body[:200]}")
         check(
             fixtures.rows("media_assets", ["id", "filename"], [("id", "=", image["id"])]) == before,
@@ -98,9 +98,13 @@ def run():
             not locations and report["canDelete"] and report["verified"],
             "Unused reference report was incorrect",
         )
-        status, _, body = owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
+        status, _, body = owner.request(f"/admin/media/{str(image['id'])}/trash", "POST", {})
+        check(status == 303, f"Unused media could not be trashed: {str(status)} {body[:300]}")
+        check(public.request(image["url"])[0] == 404, "Trashed media file is still served")
+        status, _, body = owner.request(
+            f"/admin/media/{str(image['id'])}/permanent-delete", "POST", {}
+        )
         check(status == 303, f"Unused media could not be deleted: {str(status)} {body[:300]}")
-        check(public.request(image["url"])[0] == 404, "Deleted media file is still served")
 
     package = build_plugin(
         ROOT / "tests/plugins/media",

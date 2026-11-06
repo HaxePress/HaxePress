@@ -19,4 +19,7 @@ class MediaAsset extends BaseModel<MediaAsset> {
     @:visible @:field public var size:Int = 0;
     @:visible @:field public var created_at:DatabaseDate = "";
     @:visible @:field public var updated_at:DatabaseDate = "";
+
+    /** When the image moved to the trash, in milliseconds since the epoch; 0 outside it. **/
+    @:visible @:field public var trashed_epoch:Float = 0;
 }

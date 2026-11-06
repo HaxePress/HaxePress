@@ -17,4 +17,7 @@ class ActivityLog extends BaseModel<ActivityLog> {
     @:visible @:field public var entity_id:Int = 0;
     @:visible @:field public var label:String = "";
     @:visible @:field public var created_at:DatabaseDate = "";
+
+    /** `mcp` when an MCP client made the change, otherwise empty. **/
+    @:visible @:field public var source:String = "";
 }

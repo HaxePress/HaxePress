@@ -241,11 +241,19 @@ export async function createAdminServer(options: AdminServerOptions) {
     );
     addTool(
       server,
-      'delete_media_image',
-      'Delete an uploaded image if the CMS finds no active references.',
+      'trash_media_image',
+      'Move an uploaded image to the trash if the CMS finds no active references. Its public URL stops working; a person can restore it, and the trash deletes it after 30 days.',
       z.object({ id }),
       false,
-      async ({ id }) => adminResult(await request(`/admin/media/${id}/delete`, 'POST')),
+      async ({ id }) => adminResult(await request(`/admin/media/${id}/trash`, 'POST')),
+    );
+    addTool(
+      server,
+      'restore_media_image',
+      'Restore an image from the trash.',
+      z.object({ id }),
+      false,
+      async ({ id }) => adminResult(await request(`/admin/media/${id}/restore`, 'POST')),
     );
   }
 

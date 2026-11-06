@@ -68,6 +68,20 @@ class SiteBackupDatabase {
         "capabilities"
     ];
 
+    /**
+        Archive entries cannot name hidden folders, so trashed media, which the
+        site keeps in `media/.trash`, is stored under `media/trash` instead.
+    **/
+    static inline var TRASHED_MEDIA = "media/trash/";
+
+    /** Where an archive entry lives in the site's storage. **/
+    public static function storagePath(name:String):String {
+        if (StringTools.startsWith(name, TRASHED_MEDIA)) {
+            return 'media/.trash/${name.substr(TRASHED_MEDIA.length)}';
+        }
+        return name;
+    }
+
     public static function exportData(target:StorageDisk, assets:StorageDisk,
             sections:BackupSelection):Array<ArchiveSource> {
         var schema = Schema.connection("default");
@@ -76,8 +90,8 @@ class SiteBackupDatabase {
         schema.startReadSnapshot();
         try {
             files = exportTables(target, sections);
-            for (path in managedFiles(assets, sections, "default", false)) {
-                files.push(SiteBackupArchive.file(assets, path, path));
+            for (name in managedFiles(assets, sections, "default", false)) {
+                files.push(SiteBackupArchive.file(assets, storagePath(name), name));
             }
         } catch (error:Dynamic) {
             connection.rollback();
@@ -303,16 +317,22 @@ class SiteBackupDatabase {
     static function managedFiles(storage:StorageDisk, sections:BackupSelection, connection:String,
             validatePackages:Bool):Array<String> {
         var files:Array<String> = [];
+        // The live site keeps files at their storage paths; a restore stage keeps archive names.
+        var located = validatePackages ? (name:String) -> name : storagePath;
+        var trash = Schema.connection(connection).hasColumn("media_assets", "trashed_epoch");
         var media = query("media_assets",
-            connection).select(["filename"])
+            connection).select(trash ? ["filename", "trashed_epoch"] : ["filename"])
             .limit(SiteBackupArchive.MAX_MANAGED_FILES + 1)
             .getResultSet();
         while (media.hasNext()) {
-            var filename:String = media.next().filename;
+            var image = media.next();
+            var filename:String = image.filename;
             if (!MediaReferences.validFilename(filename)) {
                 throw new Exception("The backup contains an invalid media filename.");
             }
-            includeFile(storage, files, 'media/${filename}');
+            var trashed = trash && Std.parseFloat(Std.string(image.trashed_epoch)) > 0;
+            var name = trashed ? '${TRASHED_MEDIA}${filename}' : 'media/${filename}';
+            includeFile(storage, files, name, located(name));
         }
         if (sections.themes) {
             var images = query("theme_assets",
@@ -325,7 +345,8 @@ class SiteBackupDatabase {
                     || !ThemeAssets.validFilename(image.filename)) {
                     throw new Exception("The backup contains an invalid theme image filename.");
                 }
-                includeFile(storage, files, 'themes/${image.theme_id}/${image.filename}');
+                var path = 'themes/${image.theme_id}/${image.filename}';
+                includeFile(storage, files, path, path);
             }
         }
         var packages = query("cms_packages", connection);
@@ -370,21 +391,22 @@ class SiteBackupDatabase {
                 }
             }
             for (path in storage.allFiles(directory)) {
-                includeFile(storage, files, path);
+                includeFile(storage, files, path, path);
             }
         }
         files.sort(Reflect.compare);
         return files;
     }
 
-    static function includeFile(storage:StorageDisk, files:Array<String>, path:String):Void {
+    static function includeFile(storage:StorageDisk, files:Array<String>, name:String,
+            path:String):Void {
         if (files.length >= SiteBackupArchive.MAX_MANAGED_FILES) {
             throw new Exception("The backup contains too many files.");
         }
         if (!storage.fileExists(path)) {
             throw new Exception("A file referenced by the backup is missing.");
         }
-        files.push(path);
+        files.push(name);
     }
 
     public static function replay(storage:StorageDisk, backup:ExtractedBackup, config:Dynamic,

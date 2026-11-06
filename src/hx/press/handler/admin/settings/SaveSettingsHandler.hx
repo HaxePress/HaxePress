@@ -111,7 +111,9 @@ class SaveSettingsHandler extends AbstractHandler implements ValidationResponder
             if (logo != "") {
                 var filename = logo.substr(MediaReferences.prefix().length);
                 var available = MediaReferences.storedImage(logo)
-                    && MediaAsset.query.where("filename", filename).exists();
+                    && MediaAsset.query.where("filename", filename)
+                        .where("trashed_epoch", 0)
+                        .exists();
                 if (!available) {
                     return AdminController.settingsForm(request,
                         "Choose an existing image from the media library for the site logo.", "",

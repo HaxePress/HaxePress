@@ -1,5 +1,6 @@
 package hx.press.routes;
 
+import hx.press.ai.AdminMcpPolicy;
 import hx.well.route.Route;
 import hx.well.route.RouteGroup;
 import hx.press.AdminController;
@@ -123,7 +124,12 @@ class AdminRoutes extends RouteGroup {
                     exact: false
                 });
             Route.post("/media/{id}/save", new SaveMediaHandler()).whereNumber("id");
-            Route.post("/media/{id}/delete", MediaController.delete).whereNumber("id");
+            Route.post("/media/{id}/trash", MediaController.trash).whereNumber("id");
+            Route.post("/media/{id}/restore", MediaController.restore).whereNumber("id");
+            Route.post("/media/{id}/permanent-delete", MediaController.delete)
+                .whereNumber("id")
+                .attribute(AdminMcpPolicy.PEOPLE_ONLY, true);
+            Route.get("/media/{id}/trashed", MediaController.trashed).whereNumber("id");
             Route.get("/media/{id}/references", MediaController.references).whereNumber("id");
             Route.get("/categories", new ListCategoriesHandler()).attribute("cms.navigation", {
                 group: "Organization",

@@ -6,6 +6,10 @@ Incoming foreign keys to `media_assets` are inspected through Schema metadata an
 
 No dependency result is cached to authorize deletion. Missing dependency connections/columns or failed queries block deletion. A removed table contains no data and does not block by itself. Failed/blocked deletion leaves both the original catalog record and file unchanged. The catalog deletion connection enables native foreign-key enforcement as an additional integrity check.
 
+## Trash
+
+Deleting an unused image moves it to the Media Library trash. Its file moves to the hidden `media/.trash` folder, so its public URL returns 404, and the public file server refuses every path segment that starts with a dot. People who manage media preview trashed images through `GET /admin/media/{id}/trashed`. **Restore** moves the file back; **Delete permanently** removes the file and catalog record, and requires the image to be in the trash first. An hourly job deletes images that have been in the trash for 30 days, rechecking their references first, and records each deletion as the system's activity. Backups store trashed images under `media/trash/` in the archive and restore them to the hidden folder.
+
 ## Library controls and reference details
 
 The Media Library prepares live `can_delete` and `references_verified` flags for its bounded page of images. Referenced images have a disabled delete control and a **References** button. Unverifiable dependencies keep deletion locked. These presentation flags are calculated after retrieving cached image records; the deletion service still rechecks current dependencies under the media lock.

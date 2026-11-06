@@ -348,8 +348,8 @@ def run():
                 "media_assets", ["id"], [("filename", "=", Path(image["url"]).name)]
             )[0]["id"]
             check(
-                owner.request(f"/admin/media/{str(media_id)}/delete", "POST", {})[0] == 422,
-                "A referenced custom image was deleted",
+                owner.request(f"/admin/media/{str(media_id)}/trash", "POST", {})[0] == 422,
+                "A referenced custom image was moved to the trash",
             )
             history = json.loads(owner.request(f"{base}/{str(identifier)}/history")[2])["revisions"]
             snapshot = json.loads(

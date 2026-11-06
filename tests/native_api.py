@@ -93,7 +93,7 @@ if (!pattern.test(url) || pattern.test(url + '?unmanaged=1') || pattern.test('ht
                 "Native Storage MIME handling changed GIF responses",
             )
         finally:
-            owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
+            owner.delete_media(image["id"])
     owner.request("/admin/logout", "POST", {})
     print(
         "PASS Native CMS APIs: facade conversion/flash, remaining handlers, input-source isolation and Storage MIME responses",

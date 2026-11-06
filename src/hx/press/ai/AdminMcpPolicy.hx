@@ -10,6 +10,13 @@ import hx.well.route.RouteElement;
 import hx.well.type.AttributeType;
 
 class AdminMcpPolicy {
+    /**
+        A route attribute for actions only people may take, such as permanent
+        deletes. MCP clients can move content and images to the trash, but
+        cannot empty it.
+    **/
+    public static inline var PEOPLE_ONLY = "cms.mcp.peopleOnly";
+
     public static function allows(path:String, method:String):Bool {
         path = normalize(path);
         if (method != "GET" && method != "POST" && method != "DELETE") {
@@ -53,6 +60,9 @@ class AdminMcpPolicy {
             return false;
         }
         var route:RouteElement = request.getAttribute(AttributeType.RouteElement);
+        if (peopleOnly(route)) {
+            return false;
+        }
         var metadata = pluginMetadata(route);
         if (metadata != null && !Roles.can(admin.role, metadata.capability)) {
             return false;
@@ -77,6 +87,7 @@ class AdminMcpPolicy {
         for (route in Route.routes) {
             var definition = pluginMetadata(route);
             if (definition == null
+                || peopleOnly(route)
                 || route.value.indexOf("{") >= 0
                 || !route.getMethods().contains(definition.method)
                 || !allows(route.value, definition.method)
@@ -97,6 +108,10 @@ class AdminMcpPolicy {
             }
         }
         return tools;
+    }
+
+    static function peopleOnly(route:Null<RouteElement>):Bool {
+        return route != null && route.getAttribute(PEOPLE_ONLY, false) == true;
     }
 
     static function pluginMetadata(route:Null<RouteElement>):Dynamic {
@@ -135,7 +150,8 @@ class AdminMcpPolicy {
     public static function routes():Array<{path:String, methods:Array<String>}> {
         var result:Array<{path:String, methods:Array<String>}> = [];
         for (route in Route.routes) {
-            if (route.getWsHandler() != null || route.value == "/admin/ai/routes") {
+            if (route.getWsHandler() != null || route.value == "/admin/ai/routes"
+                || peopleOnly(route)) {
                 continue;
             }
             var methods:Array<String> = [];

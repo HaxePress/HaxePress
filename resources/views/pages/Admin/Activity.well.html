@@ -35,6 +35,9 @@
           <p>
             <strong>{{ entry.actor }}</strong> {{ t(entry.actionKey) }}
             <span class="activity-kind">{{ t(entry.entity) }}</span>
+            <span :if="entry.mcp" class="featured-text"
+              >{{ icon('sparkles') }} {{ t('Via MCP') }}</span
+            >
           </p>
           <span>{{ entry.label ? entry.label : t('Untitled') }}</span>
         </div>

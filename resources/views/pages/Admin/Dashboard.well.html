@@ -87,7 +87,12 @@
       <div class="dashboard-activity">
         <div :for="entry in activity">
           <strong>{{ entry.actor }}</strong>
-          <p>{{ t(entry.action) }} · {{ entry.label }}</p>
+          <p>
+            {{ t(entry.action) }} · {{ entry.label }}
+            <span :if="entry.mcp" class="featured-text"
+              >{{ icon('sparkles') }} {{ t('Via MCP') }}</span
+            >
+          </p>
           <small>{{ entry.created_at }}</small>
         </div>
         <p :empty class="empty-state">{{ t('No activity yet.') }}</p>

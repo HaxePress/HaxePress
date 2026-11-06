@@ -180,14 +180,14 @@ export function registerContentTools(
     );
   }
 
+  // Only people can delete content permanently; the CMS refuses it for MCP clients.
   for (const [tool, operation, description] of [
-    ['trash_content', 'trash', 'Move a content item to the trash.'],
-    ['restore_content', 'restore', 'Restore a trashed content item.'],
     [
-      'permanently_delete_content',
-      'permanent-delete',
-      'Permanently delete a trashed item through the CMS validation.',
+      'trash_content',
+      'trash',
+      'Move a content item to the trash. A person can restore it or delete it permanently.',
     ],
+    ['restore_content', 'restore', 'Restore a trashed content item.'],
   ] as const) {
     addTool(server, tool, description, documentKey, false, async ({ collection, id }) =>
       adminResult(await request(`${collectionPath(collection)}/${id}/${operation}`, 'POST')),
