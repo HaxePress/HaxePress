@@ -42,7 +42,7 @@ class MediaCatalog {
         if (existing != null) {
             return existing.id;
         }
-        var record = MediaAsset.query.create([
+        var id = MediaAsset.query.insert([
             "filename" => image.filename,
             "title" => label == "" ? image.filename : label.substr(0, 180),
             "alt" => alt.substr(0, 500),
@@ -54,11 +54,11 @@ class MediaCatalog {
             "updated_at" => SiteSettingsStore.timestamp()
         ]);
         ContentCache.changed("media");
-        return record.id;
+        return id;
     }
 
     public static function importExisting():Void {
-        if (Setting.query.find("cms_media_v1") != null) {
+        if (Setting.query.where("key", "cms_media_v1").exists()) {
             return;
         }
         Storage.disk("media").makeDirectory("");
@@ -94,14 +94,14 @@ class MediaCatalog {
                 size: size
             }, label, alt);
         }
-        Setting.query.create(["key" => "cms_media_v1", "value" => "1"]);
+        Setting.query.insert(["key" => "cms_media_v1", "value" => "1"]);
     }
 
     static function filter(query:QueryBuilder<MediaAsset>, search:String):Void {
         if (search != "") {
             var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search, "!",
                 "!!"), "%", "!%"), "_", "!_");
-            var pattern = "%" + escaped + "%";
+            var pattern = '%${escaped}%';
             query.where(matches -> {
                 matches.whereLike("title", pattern)
                     .orWhereLike("alt", pattern)
@@ -155,7 +155,7 @@ class MediaCatalog {
             }
             var disk = Storage.disk("media");
             var path = image.filename;
-            var quarantine = "." + image.filename + ".deleting";
+            var quarantine = '.${image.filename}.deleting';
             var moved = disk.fileExists(path);
             if (moved) {
                 disk.move(path, quarantine);

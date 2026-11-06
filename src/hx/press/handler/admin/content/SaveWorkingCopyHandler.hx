@@ -31,7 +31,7 @@ class SaveWorkingCopyHandler extends AbstractHandler implements ValidationRespon
     public override function validate():Bool {
         var current = request();
         var kind = resolve(current);
-        if (ContentTypes.find(kind) == null || !CmsAccess.canCollection(kind)) {
+        if (!CmsAccess.canCollection(kind)) {
             return true;
         }
         var rawId = AdminController.input(current, "id", 16);
@@ -40,14 +40,8 @@ class SaveWorkingCopyHandler extends AbstractHandler implements ValidationRespon
         }
         var id = Std.parseInt(rawId) ?? 0;
         if (id > 0) {
-            var item = ContentItem.query.select(["author_id", "content_type", "version"])
-                .where("id", id)
-                .first();
             var expected = Std.parseInt(AdminController.input(current, "version", 16)) ?? 1;
-            if (item == null
-                || item.content_type != kind
-                || !CmsAccess.canEdit(item.author_id)
-                || item.version != expected) {
+            if (!ContentController.owned(id, kind, expected)) {
                 return true;
             }
         }
@@ -76,7 +70,7 @@ class SaveWorkingCopyHandler extends AbstractHandler implements ValidationRespon
 
     public function execute(request:Request):AbstractResponse {
         var kind = resolve(request);
-        if (ContentTypes.find(kind) == null) {
+        if (!ContentTypes.exists(kind)) {
             return SiteController.notFound(request);
         }
         if (!CmsAccess.canCollection(kind)) {
@@ -87,13 +81,13 @@ class SaveWorkingCopyHandler extends AbstractHandler implements ValidationRespon
             return ResponseBuilder.asJson({error: "Invalid content identifier."}, 422);
         }
         var id = Std.parseInt(idInput) ?? 0;
-        var lockKey = id > 0 ? "document-" + id : "new-" + CmsAccess.current().id + "-" + kind;
-        return ContentLocks.run("type-" + kind,
+        var lockKey = id > 0 ? 'document-${id}' : 'new-${CmsAccess.current().id}-${kind}';
+        return ContentLocks.run('type-${kind}',
             () -> ContentLocks.run(lockKey, () -> saveWorkingLocked(request, kind)));
     }
 
     static function saveWorkingLocked(request:Request, kind:String):AbstractResponse {
-        if (ContentTypes.find(kind) == null) {
+        if (!ContentTypes.exists(kind)) {
             return SiteController.notFound(request);
         }
         var id = Std.parseInt(AdminController.input(request, "id", 16)) ?? 0;
@@ -104,8 +98,10 @@ class SaveWorkingCopyHandler extends AbstractHandler implements ValidationRespon
         }
         var baseVersion = Std.parseInt(AdminController.input(request, "version", 16)) ?? 1;
         if (id > 0) {
-            var current = ContentItem.query.select(["version"]).where("id", id).limit(1).first();
-            if (current == null || current.version != baseVersion) {
+            var current = ContentItem.query.where("id", id)
+                .where("content_type", kind)
+                .where("version", baseVersion);
+            if (!current.exists()) {
                 return
                     ResponseBuilder.asJson({error: "The saved version changed. Reload it before continuing."},
                         409);

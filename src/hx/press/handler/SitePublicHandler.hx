@@ -29,15 +29,16 @@ class SitePublicHandler extends PublicHandler {
             return ResponseBuilder.asString("Method not allowed.", 405)
                 .header("Allow", "GET, HEAD");
         }
-        if (type.publicBase != "/" + prefix) {
+        if (type.publicBase != '/${prefix}') {
             var query = [
                 for (key => value in request.queries)
-                    StringTools.urlEncode(key) + "=" + StringTools.urlEncode(value)
+                    '${StringTools.urlEncode(key)}=${StringTools.urlEncode(value)}'
             ];
             var previewBase:String = request.getAttribute("hx.press.preview.base", "");
-            var location = previewBase + type.publicBase + (slug == "" ? "" : "/" + slug);
+            var slugPath = slug == "" ? "" : '/${slug}';
+            var location = '${previewBase}${type.publicBase}${slugPath}';
             if (query.length > 0) {
-                location += "?" + query.join("&");
+                location += '?${query.join("&")}';
             }
             return ResponseBuilder.asRedirect(location, 301);
         }

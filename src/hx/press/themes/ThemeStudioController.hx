@@ -58,7 +58,7 @@ class ThemeStudioController {
                 version: design.version,
                 publishedVersion: design.published_version,
                 session: session,
-                frameUrl: "/admin/themes/" + id + "/design/frame?studioSession=" + session
+                frameUrl: '/admin/themes/${id}/design/frame?studioSession=${session}'
             }
         };
         return Inertia.render("Admin/ThemeBuilder", props);

@@ -45,9 +45,7 @@ class SaveContentTypeHandler extends AbstractHandler implements ValidationRespon
             var owner = existing == null ? "" : existing.owner;
             var key = ContentTypes.save(input, owner, creating);
             Activity.record("saved", "content_type", 0, key);
-            return ResponseBuilder.asRedirect("/admin/content-types/"
-                + key
-                + "/edit?notice=saved", 303);
+            return ResponseBuilder.asRedirect('/admin/content-types/${key}/edit?notice=saved', 303);
         } catch (error:Dynamic) {
             return ContentTypeController.editor(request, creating, Std.string(error), 422);
         }

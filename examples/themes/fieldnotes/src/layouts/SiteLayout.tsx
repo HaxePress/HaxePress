@@ -45,7 +45,7 @@ export function createSiteLayout(runtime: ThemeRuntime) {
     }
     const width = Number(theme?.settings.width || 1180);
     themeStyle['--content-width'] =
-      (Number.isFinite(width) ? Math.max(960, Math.min(1440, width)) : 1180) + 'px';
+      `${Number.isFinite(width) ? Math.max(960, Math.min(1440, width)) : 1180}px`;
     if (theme?.settings.typeface === 'modern')
       themeStyle['--serif'] = "'DM Sans', Arial, sans-serif";
     const { url } = usePage();
@@ -99,7 +99,7 @@ export function createSiteLayout(runtime: ThemeRuntime) {
           {t('Skip to content')}
         </a>
         <header className="site-header wrap">
-          <Link className="brand" href="/" aria-label={site.site_name + ' home'}>
+          <Link className="brand" href="/" aria-label={`${site.site_name} home`}>
             {site.site_logo ? (
               <img className="site-brand-logo" src={site.site_logo} alt={site.site_name} />
             ) : (

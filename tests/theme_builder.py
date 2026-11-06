@@ -30,15 +30,15 @@ def run():
 
 def verify(owner, public, fixtures):
     previous = props(public, "/")["theme"]["id"]
-    name = "Visual theme " + secrets.token_hex(5)
+    name = f"Visual theme {secrets.token_hex(5)}"
     status, headers, body = owner.request(
         "/admin/themes/create", "POST", {"name": name, "starter": "content"}
     )
-    check(status == 303, "Theme creation failed: " + body[:200])
+    check(status == 303, f"Theme creation failed: {body[:200]}")
     editor_url = headers["location"]
     studio = props(owner, editor_url)["studio"]
     identifier = studio["id"]
-    base = "/admin/themes/" + identifier
+    base = f"/admin/themes/{identifier}"
     design = studio["document"]
     check(
         studio["version"] == 1 and studio["publishedVersion"] == 0,
@@ -48,7 +48,7 @@ def verify(owner, public, fixtures):
         props(public, "/")["theme"]["id"] == previous, "Creating a theme changed the live website"
     )
     check(
-        owner.request(base + "/enable", "POST", {})[0] == 422,
+        owner.request(f"{base}/enable", "POST", {})[0] == 422,
         "An unpublished theme could be activated",
     )
     check(
@@ -88,11 +88,11 @@ def verify(owner, public, fixtures):
     image_id = None
     try:
         for template in ["Home", "ContentIndex", "ContentDetail", "Page", "About", "NotFound"]:
-            frame = props(owner, studio["frameUrl"] + "&template=" + template)
+            frame = props(owner, f"{studio['frameUrl']}&template={template}")
             check(
                 frame["theme"]["studioSession"] == studio["session"]
                 and frame["templateFallback"] == template,
-                "Wrong studio template context: " + template,
+                f"Wrong studio template context: {template}",
             )
             check(frame["theme"]["design"]["schema"] == 2, "Design missing from iframe")
             check(
@@ -149,13 +149,13 @@ def verify(owner, public, fixtures):
             props(public, "/")["theme"]["id"] == previous, "Saving a draft changed the active theme"
         )
         check(
-            owner.request("/admin/media/" + str(image_id) + "/delete", "POST", {})[0] == 422,
+            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})[0] == 422,
             "An image referenced by a theme draft was deleted",
         )
         check(save(design, 1)[0] == 422, "An outdated editor overwrote a newer design")
         check(save(design, 2, "publish")[0] == 200, "Publishing theme failed")
         check(
-            owner.request(base + "/enable", "POST", {})[0] == 303,
+            owner.request(f"{base}/enable", "POST", {})[0] == 303,
             "Published theme activation failed",
         )
         active = props(public, "/")["theme"]
@@ -183,7 +183,7 @@ def verify(owner, public, fixtures):
             "An active theme leaked an unpublished draft",
         )
         check(
-            owner.request("/admin/media/" + str(image_id) + "/delete", "POST", {})[0] == 422,
+            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})[0] == 422,
             "A published design image lost protection after editing the draft",
         )
         check(save(draft, 4, "publish")[0] == 200, "Republishing active theme failed")
@@ -192,7 +192,7 @@ def verify(owner, public, fixtures):
             "Republishing did not invalidate the rendered design",
         )
         check(
-            owner.request("/admin/media/" + str(image_id) + "/delete", "POST", {})[0] == 303,
+            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})[0] == 303,
             "Unreferenced design image remained locked",
         )
         image_id = None
@@ -201,7 +201,7 @@ def verify(owner, public, fixtures):
             public.request(studio["frameUrl"])[0] == 303,
             "Public access to theme draft iframe was accepted",
         )
-        email = "studio-editor-" + secrets.token_hex(5) + "@example.test"
+        email = f"studio-editor-{secrets.token_hex(5)}@example.test"
         password = secrets.token_urlsafe(20)
         check(
             owner.request(
@@ -235,9 +235,9 @@ def verify(owner, public, fixtures):
         )
         fixtures.delete("admins", [("email", "=", email)])
     finally:
-        owner.request("/admin/themes/" + previous + "/enable", "POST", {})
-        status, _, body = owner.request(base + "/uninstall", "POST", {})
-        check(status == 303, "Visual theme uninstall failed: " + body[:150])
+        owner.request(f"/admin/themes/{previous}/enable", "POST", {})
+        status, _, body = owner.request(f"{base}/uninstall", "POST", {})
+        check(status == 303, f"Visual theme uninstall failed: {body[:150]}")
         check(
             fixtures.count("theme_designs", [("id", "=", identifier)]) == 0,
             "Uninstall left a design record",
@@ -247,7 +247,7 @@ def verify(owner, public, fixtures):
             "Uninstall left theme media dependencies",
         )
         if image_id is not None:
-            owner.request("/admin/media/" + str(image_id) + "/delete", "POST", {})
+            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})
 
 
 if __name__ == "__main__":

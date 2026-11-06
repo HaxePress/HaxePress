@@ -26,7 +26,7 @@ export default function CategoryInput({
     const timer = setTimeout(async () => {
       try {
         const parameters = new URLSearchParams({ q: value.trim() });
-        const response = await fetch('/categories/options?' + parameters, {
+        const response = await fetch(`/categories/options?${parameters}`, {
           signal: controller.signal,
           headers: { Accept: 'application/json' },
         });
@@ -48,7 +48,7 @@ export default function CategoryInput({
       <input
         id={id}
         name={name}
-        list={id + '-options'}
+        list={`${id}-options`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete="off"
@@ -57,7 +57,7 @@ export default function CategoryInput({
         disabled={disabled}
         placeholder={placeholder}
       />
-      <datalist id={id + '-options'}>
+      <datalist id={`${id}-options`}>
         {options.map((option) => (
           <option key={option} value={option} />
         ))}

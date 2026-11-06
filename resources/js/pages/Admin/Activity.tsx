@@ -54,7 +54,7 @@ export default function Activity({
               'member',
             ].map((kind) => (
               <option key={kind} value={kind}>
-                {t(kind.charAt(0).toUpperCase() + kind.slice(1))}
+                {t(`${kind.charAt(0).toUpperCase()}${kind.slice(1)}`)}
               </option>
             ))}
           </select>
@@ -75,7 +75,7 @@ export default function Activity({
                 </span>
                 <div>
                   <p>
-                    <strong>{entry.actor}</strong> {t('activity.' + entry.action)}{' '}
+                    <strong>{entry.actor}</strong> {t(`activity.${entry.action}`)}{' '}
                     <span className="activity-kind">{t(entry.entity)}</span>
                   </p>
                   <span>{entry.label || t('Untitled')}</span>

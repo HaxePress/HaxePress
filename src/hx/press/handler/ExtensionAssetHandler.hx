@@ -32,7 +32,7 @@ class ExtensionAssetHandler extends PublicHandler {
             abort(404);
         }
         var disk = Storage.disk("extensions");
-        var path = "installed/" + item.directory + "/public/" + asset;
+        var path = 'installed/${item.directory}/public/${asset}';
         var headers = [
             "Cache-Control" => preview ? "private, no-store" : "public, max-age=31536000, immutable"
         ];

@@ -11,12 +11,12 @@ class InstallationTrustFixture {
     static function verify(allowed:Array<String>, denied:Array<String>):Void {
         for (address in allowed) {
             if (!InstallationState.trusted(address)) {
-                throw new Exception("Installation rejected an allowed peer: " + address);
+                throw new Exception('Installation rejected an allowed peer: ${address}');
             }
         }
         for (address in denied) {
             if (InstallationState.trusted(address)) {
-                throw new Exception("Installation trusted a disallowed peer: " + address);
+                throw new Exception('Installation trusted a disallowed peer: ${address}');
             }
         }
     }

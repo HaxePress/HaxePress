@@ -15,11 +15,11 @@ interface NavigationLink {
 }
 function isCurrent(link: NavigationLink, path: string) {
   const alias = link.activePaths?.some(
-    (prefix) => path === prefix || path.startsWith(prefix + '/'),
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
   );
   return (
     Boolean(alias) ||
-    (link.exact ? path === link.href : path === link.href || path.startsWith(link.href + '/'))
+    (link.exact ? path === link.href : path === link.href || path.startsWith(`${link.href}/`))
   );
 }
 

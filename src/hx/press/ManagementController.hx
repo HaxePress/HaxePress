@@ -88,9 +88,9 @@ class ManagementController {
                 Activity.record("deleted", "navigation", link.id, link.label);
             });
             ContentCache.changed("navigation");
-            return ResponseBuilder.asRedirect("/admin/navigation?location="
-                + link.location
-                + "&notice=saved", 303);
+            return
+                ResponseBuilder.asRedirect('/admin/navigation?location=${link.location}&notice=saved',
+                    303);
         });
     }
 
@@ -112,8 +112,7 @@ class ManagementController {
                 "!!"), "%", "!%"), "_", "!_");
             for (builder in [query, counter]) {
                 builder.where(matches -> {
-                    matches.whereLike("name", "%" + escaped + "%")
-                        .orWhereLike("email", "%" + escaped + "%");
+                    matches.whereLike("name", '%${escaped}%').orWhereLike("email", '%${escaped}%');
                 });
             }
         }

@@ -40,7 +40,7 @@ class PhpModuleDefinition {
         for (name in names) {
             var file = PackageManifest.text(source, name, 240, true);
             var qualifiedName = name.split("\\").join(".");
-            if (!StringTools.startsWith(name, namespace + "\\")
+            if (!StringTools.startsWith(name, '${namespace}\\')
                 || !~/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$/.match(qualifiedName)
                 || !PackageManifest.safePath(file)
                 || !StringTools.endsWith(file, ".php")
@@ -55,7 +55,8 @@ class PhpModuleDefinition {
             seen.set(name.toLowerCase(), true);
             classes.set(name, modulePath);
         }
-        var nativeEntrypoint = namespace + "\\" + entrypoint.split(".").join("\\");
+        var className = entrypoint.split(".").join("\\");
+        var nativeEntrypoint = '${namespace}\\${className}';
         if (!classes.exists(nativeEntrypoint)) {
             throw new Exception("The PHP module is missing its entrypoint class.");
         }

@@ -72,7 +72,7 @@ export async function uploadManagedImage(file: File, csrfToken: string | null, r
   if (width < 1 || height < 1 || width > 10000 || height > 10000 || width * height > 20000000) {
     throw new Error('Choose an image under 20 megapixels and 10,000 pixels per dimension.');
   }
-  const response = await fetch(rules.uploadUrl + '/verify', {
+  const response = await fetch(`${rules.uploadUrl}/verify`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {

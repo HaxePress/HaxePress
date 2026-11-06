@@ -73,7 +73,7 @@ export default function useDesignSaving({
     if (!automatic) setNotice('');
     const operation = (async () => {
       try {
-        const response = await fetch('/admin/themes/' + id + '/design', {
+        const response = await fetch(`/admin/themes/${id}/design`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

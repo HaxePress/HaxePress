@@ -32,7 +32,7 @@ def run():
             status, _, body = post_json(owner, path, values)
             check(
                 status == 422,
-                path + " accepted malformed fields: " + str(status) + " " + body[:100],
+                f"{path} accepted malformed fields: {str(status)} {body[:100]}",
             )
         check(
             before == {entity: fixtures.count(entity) for entity in entities},
@@ -58,8 +58,8 @@ def run():
                 "/admin/pages/working-copy?title=Unvalidated-query-title",
                 {"draft_key": draft_key, "draft_version": "1", "content": "A working copy."},
             )
-            check(status == 200, "Native working-copy map conversion failed: " + body[:100])
-            working = props(owner, "/admin/pages/new?draft=" + draft_key)["workingCopy"]
+            check(status == 200, f"Native working-copy map conversion failed: {body[:100]}")
+            working = props(owner, f"/admin/pages/new?draft={draft_key}")["workingCopy"]
             check(
                 working["data"].get("title") is None
                 and working["data"]["content"] == "A working copy.",
@@ -70,7 +70,7 @@ def run():
 
         content = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
         status, _, body = owner.upload_image("/admin/media/upload", content, "image/gif", (1, 1))
-        check(status == 201, "GIF upload failed: " + body[:100])
+        check(status == 201, f"GIF upload failed: {body[:100]}")
         image = json.loads(body)
         try:
             script = """
@@ -93,7 +93,7 @@ if (!pattern.test(url) || pattern.test(url + '?unmanaged=1') || pattern.test('ht
                 "Native Storage MIME handling changed GIF responses",
             )
         finally:
-            owner.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})
+            owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
     owner.request("/admin/logout", "POST", {})
     print(
         "PASS Native CMS APIs: facade conversion/flash, remaining handlers, input-source isolation and Storage MIME responses",

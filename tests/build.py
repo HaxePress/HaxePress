@@ -11,7 +11,7 @@ def build():
     compiler = Path(os.environ.get("HXWELL_HAXE", str(ROOT / ".tools/haxe/haxe"))).resolve()
     environment = {
         **os.environ,
-        "PATH": str(compiler.parent) + os.pathsep + os.environ["PATH"],
+        "PATH": f"{str(compiler.parent)}{os.pathsep}{os.environ['PATH']}",
         "HAXE_STD_PATH": str(ROOT / ".tools/haxe/std"),
     }
     command = [

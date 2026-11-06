@@ -48,9 +48,7 @@ export function createHome(
                 <div className="featured-topline">
                   <Link
                     className="category-pill living"
-                    href={
-                      featured.archiveUrl + '?category=' + encodeURIComponent(featured.category)
-                    }
+                    href={`${featured.archiveUrl}?category=${encodeURIComponent(featured.category)}`}
                   >
                     {featured.category}
                   </Link>
@@ -109,9 +107,7 @@ export function createHome(
                 <Link
                   className="filter"
                   key={category}
-                  href={
-                    (collection?.publicBase || '/') + '?category=' + encodeURIComponent(category)
-                  }
+                  href={`${collection?.publicBase || '/'}?category=${encodeURIComponent(category)}`}
                 >
                   {category}
                 </Link>

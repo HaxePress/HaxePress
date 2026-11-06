@@ -46,18 +46,39 @@ class Roles {
         return key != null && ~/^[a-z][a-z0-9_]{0,31}$/.match(key);
     }
 
+    static function byKey(key:String, activeOnly:Bool):QueryBuilder<Role> {
+        var query = Role.query.where("key", key);
+        return activeOnly ? active(query) : query;
+    }
+
+    public static function exists(key:String, activeOnly:Bool = true):Bool {
+        if (!validKey(key)) {
+            return false;
+        }
+        return ContentCache.remember("access", "role-exists",
+            [key, activeOnly, ContentCache.revision("extensions")],
+            () -> byKey(key, activeOnly).exists());
+    }
+
     public static function find(key:String, activeOnly:Bool = true):Null<RoleRecord> {
         if (!validKey(key)) {
             return null;
         }
         return ContentCache.remember("access", "role",
             [key, activeOnly, ContentCache.revision("extensions")], () -> {
-                var query = Role.query.select(columns).where("key", key);
-                if (activeOnly) {
-                    active(query);
-                }
-                var role = query.first();
+                var role = byKey(key, activeOnly).select(columns).first();
                 return role == null ? null : cast role.toObject();
+            });
+    }
+
+    public static function label(key:String):String {
+        if (!validKey(key)) {
+            return key;
+        }
+        return ContentCache.remember("access", "role-label",
+            [key, ContentCache.revision("extensions")], () -> {
+                var row = byKey(key, true).select(["name"]).first();
+                return row == null ? key : row.name;
             });
     }
 
@@ -78,7 +99,7 @@ class Roles {
     }
 
     public static function can(role:String, capability:String):Bool {
-        if (find(role) == null) {
+        if (!exists(role)) {
             return false;
         }
         var allowed = grants(role);
@@ -96,15 +117,18 @@ class Roles {
     }
 
     public static function canAssign(actorRole:String, targetRole:String):Bool {
-        return find(targetRole) != null && canManage(actorRole, targetRole);
+        return canManageTarget(actorRole, targetRole, true);
     }
 
     public static function canManage(actorRole:String, targetRole:String):Bool {
-        if (find(actorRole) == null || find(targetRole, false) == null) {
+        return canManageTarget(actorRole, targetRole, false);
+    }
+
+    static function canManageTarget(actorRole:String, targetRole:String, activeOnly:Bool):Bool {
+        if (!validKey(targetRole) || !exists(actorRole)) {
             return false;
         }
-        return assignable(Role.query.select(["key"]).where("key", targetRole),
-            grants(actorRole)).exists();
+        return assignable(byKey(targetRole, activeOnly), grants(actorRole)).exists();
     }
 
     public static function options(actorGrants:Array<String>,
@@ -156,11 +180,9 @@ class Roles {
     static function filtered(search:String):QueryBuilder<Role> {
         var query = Role.query.select(columns);
         if (search != "") {
-            var pattern = "%"
-                + StringTools.replace(StringTools.replace(StringTools.replace(search, "!", "!!"),
-                    "%", "!%"), "_",
-                    "!_")
-                + "%";
+            var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search, "!",
+                "!!"), "%", "!%"), "_", "!_");
+            var pattern = '%${escaped}%';
             query.where(matches -> matches.whereLike("name", pattern).orWhereLike("key", pattern));
         }
         return query;
@@ -177,11 +199,10 @@ class Roles {
             [search, 30], () -> {
                 var query = Capability.query.select(["key", "name", "group_name", "owner"]);
                 if (search != "") {
-                    var pattern = "%"
-                        + StringTools.replace(StringTools.replace(StringTools.replace(search, "!",
-                            "!!"), "%", "!%"),
-                            "_", "!_")
-                        + "%";
+                    var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search,
+                        "!", "!!"), "%", "!%"),
+                        "_", "!_");
+                    var pattern = '%${escaped}%';
                     query.where(matches -> matches.whereLike("name", pattern)
                         .orWhereLike("key", pattern));
                 }
@@ -225,7 +246,7 @@ class Roles {
             }
             return;
         }
-        Capability.query.create(["key" => key, "name" => name, "group_name" => group, "owner" => owner]);
+        Capability.query.insert(["key" => key, "name" => name, "group_name" => group, "owner" => owner]);
         ContentCache.changed("access");
     }
 
@@ -239,8 +260,9 @@ class Roles {
             throw new Exception("Check the role key, label and permission limits.");
         }
         ContentLocks.run("roles", () -> {
-            var existing = Role.query.where("key", key).limit(1).first();
-            if ((creating && existing != null) || (!creating && existing == null)) {
+            var role = Role.query.where("key", key);
+            var roleExists = role.exists();
+            if (creating == roleExists) {
                 throw new Exception("Choose an existing role or a new unique key.");
             }
             if (key == "owner" && (!enabled || capabilities.length != 1 || capabilities[0] != "*")) {
@@ -265,17 +287,17 @@ class Roles {
             DBStatic.transaction(() -> {
                 var values:Map<String,
                     Dynamic> = ["name" => name, "description" => description, "enabled" => enabled ? 1 : 0];
-                if (existing == null) {
+                if (creating) {
                     values.set("key", key);
                     values.set("system", 0);
                     values.set("owner", "");
-                    Role.query.create(values);
+                    Role.query.insert(values);
                 } else {
-                    existing.update(values);
+                    role.update(values);
                 }
                 RoleGrant.query.where("role_key", key).delete();
                 for (capability in requested) {
-                    RoleGrant.query.create(["role_key" => key, "capability" => capability]);
+                    RoleGrant.query.insert(["role_key" => key, "capability" => capability]);
                 }
             });
             ContentCache.changed("access");
@@ -285,16 +307,13 @@ class Roles {
 
     public static function remove(key:String):Void {
         ContentLocks.run("roles", () -> {
-            var role = find(key, false);
-            if (role == null
-                || role.system == 1
-                || role.owner != ""
-                || Admin.query.where("role", key).exists()) {
+            var role = Role.query.where("key", key).where("system", "!=", 1).where("owner", "");
+            if (!validKey(key) || !role.exists() || Admin.query.where("role", key).exists()) {
                 throw new Exception("Only unused site-owned custom roles can be removed.");
             }
             DBStatic.transaction(() -> {
                 RoleGrant.query.where("role_key", key).delete();
-                Role.query.where("key", key).delete();
+                role.delete();
             });
             ContentCache.changed("access");
             return true;

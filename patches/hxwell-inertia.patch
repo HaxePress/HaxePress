@@ -55,7 +55,7 @@ diff --git a/src/hx/well/inertia/InertiaResponse.hx b/src/hx/well/inertia/Inerti
  			Reflect.setField(context, "page", pageData);
 -			Reflect.setField(context, "pageJson", pageJson);
 +			Reflect.setField(context, "ssrHead", "<title>Fieldnotes</title>");
-+			Reflect.setField(context, "ssrBody", '<div id="app" data-page="' + StringTools.htmlEscape(pageJson, true) + '"></div>');
++			Reflect.setField(context, "ssrBody", '<div id="app" data-page="${StringTools.htmlEscape(pageJson, true)}"></div>');
 +			Reflect.setField(context, "pageJson", StringTools.htmlEscape(pageJson, true));
  
  			// Add Vite assets
@@ -197,7 +197,7 @@ new file mode 100644
 +            var status = connection.getResponseCode();
 +            onStatus(status);
 +            if (status >= 400) {
-+                onError("HTTP " + status);
++                onError('HTTP ${status}');
 +            } else {
 +                var input = connection.getInputStream();
 +                var response = new ByteArrayOutputStream();

@@ -22,7 +22,7 @@ export function ExtensionSlot({ name }: { name: string }) {
   const blocks = extensions?.blocks.filter((block) => block.slot === name) || [];
   return (
     <div
-      className={'extension-slot extension-slot-' + name.replace('.', '-')}
+      className={`extension-slot extension-slot-${name.replace('.', '-')}`}
       data-extension-slot={name}
       inert={theme?.studioSession ? true : undefined}
     >
@@ -69,7 +69,7 @@ export default function PublicExtensions() {
           if (cancelled) cleanup();
           else cleanups.push(cleanup);
         } catch (error) {
-          console.error('Extension could not be mounted: ' + asset.id, error);
+          console.error(`Extension could not be mounted: ${asset.id}`, error);
         }
       }
     }
@@ -86,7 +86,7 @@ export default function PublicExtensions() {
         .map((asset) => (
           <link
             key={asset.id}
-            head-key={'extension-' + asset.id}
+            head-key={`extension-${asset.id}`}
             rel="stylesheet"
             href={asset.stylesheet}
           />

@@ -28,7 +28,7 @@ class ContentItemData {
 
         try {
             var date = Date.fromString(text);
-            var month = I18n.t("month." + (date.getMonth() + 1));
+            var month = I18n.t('month.${(date.getMonth() + 1)}');
             var fields:Map<String,
                 Dynamic> = ["month" => month, "day" => date.getDate(), "year" => date.getFullYear()];
             return I18n.t("date.short", fields);
@@ -55,11 +55,12 @@ class ContentItemData {
         return data;
     }
 
-    public static function adminSummary(item:ContentSummaryRecord):Dynamic {
-        var type = ContentTypes.find(item.content_type, false);
+    public static function adminSummary(item:ContentSummaryRecord,
+            ?type:ContentTypeDefinition):Dynamic {
+        type = type ?? ContentTypes.find(item.content_type, false);
         var data = presentation(item, type);
         data.fields = type == null ? {} : ContentFields.listValues(item, type, false);
-        data.adminBase = ContentTypes.adminBase(item.content_type);
+        data.adminBase = type == null ? ContentTypes.adminBase(item.content_type) : type.adminBase;
         return data;
     }
 
@@ -75,8 +76,7 @@ class ContentItemData {
                     name: tag.name,
                     slug: tag.slug,
                     description: tag.description,
-                    url: "/tags/" + StringTools.urlEncode(tag.slug) + "?type=" +
-                    StringTools.urlEncode(item.content_type)
+                    url: '/tags/${StringTools.urlEncode(tag.slug)}?type=${StringTools.urlEncode(item.content_type)}'
                 }
         ];
         data.fields = type == null ? {} : ContentFields.values(item.id, type, publicOnly);
@@ -101,7 +101,7 @@ class ContentItemData {
         var data:Dynamic = Reflect.copy(item);
         ContentFields.clearListAliases(data);
         data.url = type == null || !type.publicVisible
-            || !type.enabled ? "" : type.publicBase + "/" + StringTools.urlEncode(item.slug);
+            || !type.enabled ? "" : '${type.publicBase}/${StringTools.urlEncode(item.slug)}';
         data.archiveUrl = type != null && type.hasArchive ? type.publicBase : "/";
         data.typeLabel = type == null ? item.content_type : type.singular;
         data.image = MediaReferences.imageUrl(item.image) ? item.image : "";

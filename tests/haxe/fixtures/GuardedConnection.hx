@@ -37,6 +37,14 @@ class GuardedConnection implements Connection {
 
         var result = delegate.request(statement);
         var fields = result.getFieldsNames();
+        if (fields != null && policy.rejectFields != null) {
+            var rejected:Array<String> = policy.rejectFields;
+            for (field in rejected) {
+                if (fields.contains(field)) {
+                    throw new Exception('Test guard rejected result column ${field}');
+                }
+            }
+        }
         if (policy.bodyPaths != null && fields != null && fields.contains("content")) {
             var request = RequestStatic.request();
             var requestPath = request == null ? "" : request.path;

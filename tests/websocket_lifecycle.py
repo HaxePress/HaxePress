@@ -22,19 +22,11 @@ class WebSocket:
         self.socket.settimeout(5)
         key = base64.b64encode(secrets.token_bytes(16)).decode()
         path += query
-        extra_headers = "".join(
-            name + ": " + value + "\r\n" for name, value in (headers or {}).items()
-        )
+        extra_headers = "".join(f"{name}: {value}\r\n" for name, value in (headers or {}).items())
         request = (
-            "GET "
-            + path
-            + " HTTP/1.1\r\nHost: "
-            + self.address.netloc
-            + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: "
-            + key
-            + "\r\nSec-WebSocket-Version: 13\r\n"
-            + extra_headers
-            + "\r\n"
+            f"GET {path} HTTP/1.1\r\nHost: {self.address.netloc}"
+            f"\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}"
+            f"\r\nSec-WebSocket-Version: 13\r\n{extra_headers}\r\n"
         )
         self.socket.sendall(request.encode())
         self.buffer = b""
@@ -128,7 +120,7 @@ def wait_registered(base, expected, timeout=3):
             return last
         time.sleep(0.02)
     raise AssertionError(
-        "getSessions() should contain " + str(expected) + " connections; actual " + str(last)
+        f"getSessions() should contain {str(expected)} connections; actual {str(last)}"
     )
 
 
@@ -173,8 +165,7 @@ def run(base=None, blocked=True):
     result = wait_registered(base, 0)
     assert result["opened"] == result["closed"], result
     print(
-        "PASS WebSocket lifecycle: normal/reset/server/error closes, 20 reconnects, zero retained sessions"
-        + (" and blocked-callback detachment" if blocked else ""),
+        f"PASS WebSocket lifecycle: normal/reset/server/error closes, 20 reconnects, zero retained sessions{(' and blocked-callback detachment' if blocked else '')}",
         flush=True,
     )
     return result

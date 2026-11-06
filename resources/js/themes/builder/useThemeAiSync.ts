@@ -45,7 +45,7 @@ export default function useThemeAiSync({
     setError('');
     const before = JSON.stringify(latest.current.snapshot);
     try {
-      const response = await fetch('/admin/themes/' + id + '/design/snapshot', {
+      const response = await fetch(`/admin/themes/${id}/design/snapshot`, {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(15000),
       });
@@ -109,7 +109,7 @@ export default function useThemeAiSync({
       }
       if (event.type === 'state' && socket.status === 'connected') {
         // One bounded status read after reconnect catches changes missed while offline.
-        void fetch('/admin/themes/' + id + '/design/status', {
+        void fetch(`/admin/themes/${id}/design/status`, {
           headers: { Accept: 'application/json' },
         })
           .then(async (response) => {

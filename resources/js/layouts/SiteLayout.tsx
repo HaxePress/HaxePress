@@ -31,7 +31,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
   }
   const width = Number(theme?.settings.width || 760);
   style['--content-width'] =
-    Math.max(640, Math.min(960, Number.isFinite(width) ? width : 760)) + 'px';
+    `${Math.max(640, Math.min(960, Number.isFinite(width) ? width : 760))}px`;
   const stylesheet = theme?.layout === 'simple' ? theme.stylesheet : '';
   const path = url.split('?')[0];
   return (

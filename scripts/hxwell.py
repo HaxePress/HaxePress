@@ -12,7 +12,7 @@ compiler = Path(os.environ.get("HXWELL_HAXE", str(root / ".tools/haxe/haxe"))).r
 if not compiler.exists():
     raise SystemExit("Haxe 4.3.7 is required. Run python3 scripts/setup.py first.")
 env = os.environ.copy()
-env["PATH"] = str(compiler.parent) + os.pathsep + env.get("PATH", "")
+env["PATH"] = f"{str(compiler.parent)}{os.pathsep}{env.get('PATH', '')}"
 env["HAXE_STD_PATH"] = str(root / ".tools/haxe/std")
 if subprocess.check_output([str(compiler), "--version"], env=env, text=True).strip() != "4.3.7":
     raise SystemExit("The Crossbyte driver requires the pinned Haxe 4.3.7 compiler.")

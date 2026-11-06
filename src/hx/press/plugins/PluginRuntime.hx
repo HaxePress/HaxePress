@@ -55,7 +55,7 @@ class PluginRuntime {
     public static var ready(default, null):Bool = false;
 
     static function key(record:PackageRecord):String {
-        return record.id + ":" + record.directory;
+        return '${record.id}:${record.directory}';
     }
 
     static function context(record:PackageRecord, data:Dynamic):Dynamic {
@@ -94,7 +94,7 @@ class PluginRuntime {
                 try {
                     start(record);
                 } catch (error:Dynamic) {
-                    trace("Plugin could not start: " + record.id + ": " + Std.string(error));
+                    trace('Plugin could not start: ${record.id}: ${Std.string(error)}');
                 }
             }
             after = batch[batch.length - 1].id;
@@ -125,7 +125,7 @@ class PluginRuntime {
             var artifact = PackageManifest.serverArtifact(manifest);
             var routes = Route.batch(() -> {
                 var path = Storage.disk("extensions")
-                    .path(PackageStorage.installed(record.directory) + "/" + artifact);
+                    .path('${PackageStorage.installed(record.directory)}/${artifact}');
                 module = new PluginModule(path, manifest.entrypoint);
                 module.create(host, context(record, {}));
             }, route -> {
@@ -195,21 +195,18 @@ class PluginRuntime {
             try {
                 stop(live.record);
             } catch (error:Dynamic) {
-                trace("Plugin shutdown failed: " + Std.string(error));
+                trace('Plugin shutdown failed: ${Std.string(error)}');
             }
         }
         Connection.free();
     }
 
     static function withRoute<T>(id:String, directory:String, callback:Void->T, missing:Void->T):T {
-        var moduleKey = id + ":" + directory;
+        var moduleKey = '${id}:${directory}';
         locks.acquire(moduleKey);
         try {
-            var current = PackageData.one(id);
-            var active = current != null
-                && current.enabled == 1
-                && current.directory == directory
-                && modules.exists(moduleKey);
+            var active = directory != null && modules.exists(moduleKey)
+                && PackageData.activeDirectory(id) == directory;
             var result = active ? callback() : missing();
             locks.release(moduleKey);
             return result;
@@ -247,12 +244,9 @@ class PluginRuntime {
         var moduleKey = key(record);
         locks.acquire(moduleKey);
         try {
-            var current = PackageData.one(record.id);
             var live = modules.get(moduleKey);
-            if (live == null
-                || current == null
-                || current.enabled != 1
-                || current.directory != record.directory) {
+            if (live == null || record.directory == null
+                || PackageData.activeDirectory(record.id) != record.directory) {
                 locks.release(moduleKey);
                 return {};
             }
@@ -294,7 +288,7 @@ class PluginRuntime {
                     && entry.href.indexOf("\\") < 0
                     && !~/[\x00-\x20]/.match(entry.href)) {
                     items.push({
-                        id: record.id + "-" + items.length,
+                        id: '${record.id}-${items.length}',
                         label: entry.label,
                         href: entry.href,
                         icon: Std.isOfType(entry.icon, String) ? entry.icon : "file"
@@ -344,7 +338,7 @@ class PluginRuntime {
                     && slots.contains(block.slot) && Std.isOfType(block.content, String)
                     && block.content.length <= 10000) {
                     result.push({
-                        id: record.id + "-" + index,
+                        id: '${record.id}-${index}',
                         slot: block.slot,
                         content: block.content
                     });

@@ -33,7 +33,7 @@ export default function useWorkingCopy<T extends { id: string }>({
       values.set('draft_key', draftKey);
       values.set('draft_version', String(version.current));
       try {
-        const response = await fetch(base + '/working-copy', {
+        const response = await fetch(`${base}/working-copy`, {
           method: 'POST',
           body: values,
           signal: controller.signal,
@@ -48,7 +48,7 @@ export default function useWorkingCopy<T extends { id: string }>({
           if (url.searchParams.get('draft') !== result.key) {
             url.searchParams.set('draft', result.key);
             router.replace({
-              url: url.pathname + url.search,
+              url: `${url.pathname}${url.search}`,
               preserveState: true,
               preserveScroll: true,
             });

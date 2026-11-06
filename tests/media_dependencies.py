@@ -36,14 +36,14 @@ def run():
     public = Client()
 
     def references(image, client=owner):
-        path = "/admin/media/" + str(image["id"]) + "/references"
+        path = f"/admin/media/{str(image['id'])}/references"
         items = []
         seen = set()
         while path:
             check(path not in seen, "Reference pagination repeated a cursor")
             seen.add(path)
             status, headers, body = client.request(path)
-            check(status == 200, "Reference list: " + str(status) + " " + body[:200])
+            check(status == 200, f"Reference list: {str(status)} {body[:200]}")
             check(
                 headers.get("cache-control") == "private, no-store",
                 "Reference details were cacheable",
@@ -60,7 +60,7 @@ def run():
         return items, page
 
     def library_state(image):
-        page = props(owner, "/admin/media?q=" + image["filename"])
+        page = props(owner, f"/admin/media?q={image['filename']}")
         return next(item for item in page["images"] if item["id"] == image["id"])
 
     def upload():
@@ -77,10 +77,8 @@ def run():
         check(report["canDelete"] is False, "Reference details authorized deleting an in-use image")
         check(locations or not report["verified"], "The report did not explain the deletion lock")
         before = fixtures.rows("media_assets", ["id", "filename"], [("id", "=", image["id"])])
-        status, _, body = owner.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})
-        check(
-            status == 422, "Referenced media deletion returned " + str(status) + ": " + body[:200]
-        )
+        status, _, body = owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
+        check(status == 422, f"Referenced media deletion returned {str(status)}: {body[:200]}")
         check(
             fixtures.rows("media_assets", ["id", "filename"], [("id", "=", image["id"])]) == before,
             "Blocked deletion changed the catalog",
@@ -100,8 +98,8 @@ def run():
             not locations and report["canDelete"] and report["verified"],
             "Unused reference report was incorrect",
         )
-        status, _, body = owner.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})
-        check(status == 303, "Unused media could not be deleted: " + str(status) + " " + body[:300])
+        status, _, body = owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
+        check(status == 303, f"Unused media could not be deleted: {str(status)} {body[:300]}")
         check(public.request(image["url"])[0] == 404, "Deleted media file is still served")
 
     package = build_plugin(
@@ -117,8 +115,8 @@ def run():
             "items",
             [
                 {
-                    "title": "Dependency " + suffix,
-                    "slug": "dependency-" + suffix,
+                    "title": f"Dependency {suffix}",
+                    "slug": f"dependency-{suffix}",
                     "excerpt": "A reference in a text field",
                     "content": "An ordinary content body.",
                     "category": "",
@@ -134,12 +132,12 @@ def run():
         cases = [
             (
                 "items",
-                {"excerpt": "Download https://example.test" + image["url"] + "?size=large"},
+                {"excerpt": f"Download https://example.test{image['url']}?size=large"},
                 [("id", "=", content_id)],
             ),
             (
                 "items",
-                {"content": "[An attachment](" + image["url"] + "#photo)"},
+                {"content": f"[An attachment]({image['url']}#photo)"},
                 [("id", "=", content_id)],
             ),
         ]
@@ -162,7 +160,7 @@ def run():
         )[0]
         blocked(image)
         fixtures.delete("content_values", [("id", "=", value_id)])
-        setting = "dependency-" + suffix
+        setting = f"dependency-{suffix}"
         fixtures.create("settings", [{"key": setting, "value": image["url"]}])
         blocked(image)
         fixtures.delete("settings", [("key", "=", setting)])
@@ -174,9 +172,9 @@ def run():
             "items",
             [
                 {
-                    "title": "Private media reference " + str(index),
-                    "slug": "private-media-" + suffix + "-" + str(index),
-                    "content": "![Image](" + paged["url"] + ")",
+                    "title": f"Private media reference {str(index)}",
+                    "slug": f"private-media-{suffix}-{str(index)}",
+                    "content": f"![Image]({paged['url']})",
                     "excerpt": "",
                     "category": "",
                     "image": "",
@@ -197,7 +195,7 @@ def run():
             all(item["href"].endswith("/edit") for item in content_locations),
             "Content references did not link to the editor",
         )
-        email = "media-viewer-" + suffix + "@example.test"
+        email = f"media-viewer-{suffix}@example.test"
         password = secrets.token_urlsafe(18)
         check(
             owner.request(
@@ -278,7 +276,7 @@ def run():
             owner.request(
                 "/admin/media-test",
                 "POST",
-                {"action": "json", "key": "nested", "url": nested["url"] + "?download=1"},
+                {"action": "json", "key": "nested", "url": f"{nested['url']}?download=1"},
             )[0]
             == 200,
             "Plugin nested JSON reference",

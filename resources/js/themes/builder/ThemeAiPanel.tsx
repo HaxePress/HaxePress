@@ -43,7 +43,7 @@ export default function ThemeAiPanel({
     setError('');
     setNotice('');
     try {
-      const response = await fetch('/admin/themes/' + id + '/ai', {
+      const response = await fetch(`/admin/themes/${id}/ai`, {
         method,
         headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken || '' },
       });
@@ -66,7 +66,7 @@ export default function ThemeAiPanel({
     setError('');
     setNotice('');
     try {
-      const response = await fetch('/admin/themes/' + id + '/ai/permissions', {
+      const response = await fetch(`/admin/themes/${id}/ai/permissions`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -110,7 +110,7 @@ export default function ThemeAiPanel({
         JSON.stringify(
           {
             url: endpoint(),
-            headers: { Authorization: 'Bearer ' + connection.token },
+            headers: { Authorization: `Bearer ${connection.token}` },
             themeId: id,
           },
           null,

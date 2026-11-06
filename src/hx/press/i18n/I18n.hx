@@ -34,9 +34,9 @@ class I18n {
     static function loadCore():Map<String, Map<String, Dynamic>> {
         var catalogues:Map<String, Map<String, Dynamic>> = [];
         for (choice in locales) {
-            var source = Resource.getString("lang." + choice.code);
+            var source = Resource.getString('lang.${choice.code}');
             var messages = source == null ? new Map() : TranslationCatalogue.parse(source);
-            var editor = Resource.getString("lang.editor." + choice.code);
+            var editor = Resource.getString('lang.editor.${choice.code}');
             if (editor != null) {
                 messages = merge(messages, TranslationCatalogue.parse(editor));
             }
@@ -93,7 +93,7 @@ class I18n {
                     return new Map();
                 }
                 var disk = Storage.disk("extensions");
-                var filename = "installed/" + record.directory + "/" + path;
+                var filename = 'installed/${record.directory}/${path}';
                 if (!disk.fileExists(filename)
                     || disk.size(filename) > TranslationCatalogue.MAX_BYTES) {
                     return new Map();

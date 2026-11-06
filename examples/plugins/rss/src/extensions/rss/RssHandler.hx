@@ -44,7 +44,7 @@ class RssHandler extends AbstractHandler {
         add(channel, "description", settings.get("description"));
         for (item in items) {
             var feedItem = Xml.createElement("item");
-            var url = baseUrl + type.publicBase + "/" + StringTools.urlEncode(item.slug);
+            var url = '${baseUrl}${type.publicBase}/${StringTools.urlEncode(item.slug)}';
             add(feedItem, "title", item.title);
             add(feedItem, "link", url);
             add(feedItem, "guid", url);

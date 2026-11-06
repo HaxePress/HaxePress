@@ -14,11 +14,11 @@ import hx.press.model.ContentType;
 
 class ContentWorkflow {
     public static function change(request:Request, kind:String, restore:Bool):AbstractResponse {
-        if (ContentTypes.find(kind) == null) {
+        if (!ContentTypes.exists(kind)) {
             return SiteController.notFound(request);
         }
         var id = Std.parseInt(request.route("id"));
-        return ContentLocks.run("document-" + id, () -> {
+        return ContentLocks.run('document-${id}', () -> {
             var document = ContentItem.query.select([
                 "id",
                 "author_id",
@@ -43,7 +43,7 @@ class ContentWorkflow {
                 return CmsController.forbidden(request);
             }
             if (!restore && document.status == "trash") {
-                return ResponseBuilder.asRedirect(ContentController.base(kind) + "?status=trash",
+                return ResponseBuilder.asRedirect('${ContentController.base(kind)}?status=trash',
                     303);
             }
             var status = "trash";
@@ -69,9 +69,8 @@ class ContentWorkflow {
                 Activity.record(restore ? "restored" : "trashed", kind, id, document.title);
             });
             ContentCache.contentChanged();
-            return ResponseBuilder.asRedirect(ContentController.base(kind)
-                + "?notice="
-                + (restore ? "restored" : "trashed"),
+            var notice = restore ? "restored" : "trashed";
+            return ResponseBuilder.asRedirect('${ContentController.base(kind)}?notice=${notice}',
                 303);
         });
     }
@@ -97,7 +96,7 @@ class ContentWorkflow {
         var rows = due.get();
         var count = 0;
         for (item in rows) {
-            var published = ContentLocks.run("document-" + item.id, () -> {
+            var published = ContentLocks.run('document-${item.id}', () -> {
                 var document = ContentItem.query.select(["id", "content_type", "title", "version", "featured"])
                     .where("id", item.id)
                     .where("status", "scheduled")

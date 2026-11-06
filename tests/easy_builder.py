@@ -49,14 +49,12 @@ def verify(owner, public, store, fixtures):
                 owner,
                 "/admin/themes/create",
                 {
-                    "name": "Easy " + kind + " " + suffix,
+                    "name": f"Easy {kind} {suffix}",
                     "starter": "blank",
                     "design": json.dumps(document),
                 },
             )
-            check(
-                status == 303, "Starter did not pass native validation: " + kind + ": " + body[:200]
-            )
+            check(status == 303, f"Starter did not pass native validation: {kind}: {body[:200]}")
             url = headers["location"]
             studio = props(owner, url)["studio"]
             created.append((url, studio))
@@ -78,7 +76,7 @@ def verify(owner, public, store, fixtures):
         status, _, _ = post_json(
             owner,
             "/admin/themes/create",
-            {"name": "Invalid " + suffix, "starter": "blank", "design": "{}"},
+            {"name": f"Invalid {suffix}", "starter": "blank", "design": "{}"},
         )
         check(
             status == 422 and store.count("theme_designs") == count_before,
@@ -99,7 +97,7 @@ def verify(owner, public, store, fixtures):
             "Website publication bypassed CSRF",
         )
         status, _, body = post_json(owner, url, payload)
-        check(status == 200, "One-step publication failed: " + body[:200])
+        check(status == 200, f"One-step publication failed: {body[:200]}")
         result = json.loads(body)
         check(
             result["active"] is True and result["version"] == result["publishedVersion"] == 2,
@@ -140,9 +138,9 @@ def verify(owner, public, store, fixtures):
             "An outdated editor overwrote the current website",
         )
     finally:
-        owner.request("/admin/themes/" + previous + "/enable", "POST", {})
+        owner.request(f"/admin/themes/{previous}/enable", "POST", {})
         for _, studio in created:
-            owner.request("/admin/themes/" + studio["id"] + "/uninstall", "POST", {})
+            owner.request(f"/admin/themes/{studio['id']}/uninstall", "POST", {})
 
 
 if __name__ == "__main__":

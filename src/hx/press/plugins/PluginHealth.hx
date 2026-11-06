@@ -16,7 +16,7 @@ class PluginHealth {
 
     public static function failed(id:String, directory:String, phase:String, error:Dynamic):Void {
         restartRequired = true;
-        var message = "Plugin " + phase + " failed: " + Std.string(error);
+        var message = 'Plugin ${phase} failed: ${Std.string(error)}';
         InstalledPackage.query.where("id", id)
             .where("directory", directory)
             .update(["enabled" => 0, "restart_required" => 1, "last_error" => message.substr(0,

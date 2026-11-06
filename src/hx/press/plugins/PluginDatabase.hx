@@ -46,16 +46,16 @@ class PluginDatabase {
         validateSlug(slug);
         var namespace = StringTools.replace(slug, "-", "_");
         if (namespace.length > 24) {
-            namespace = namespace.substr(0, 15) + "_" + Md5.encode(slug).substr(0, 8);
+            namespace = '${namespace.substr(0, 15)}_${Md5.encode(slug).substr(0, 8)}';
         }
-        return "plugin_" + namespace + "_";
+        return 'plugin_${namespace}_';
     }
 
     public static function table(slug:String, name:String):String {
         if (name == null || !~/^[a-z][a-z0-9_]{0,31}$/.match(name)) {
             throw new Exception("Plugin table names must contain at most 32 lowercase letters, digits or underscores.");
         }
-        return prefix(slug) + name;
+        return '${prefix(slug)}${name}';
     }
 
     public function tableName(name:String):String {
@@ -68,7 +68,7 @@ class PluginDatabase {
 
     /** Call once at startup when using a connection other than the application's default. */
     public function initialize():Void {
-        var lock = connection + ":plugin-schema";
+        var lock = '${connection}:plugin-schema';
         locks.acquire(lock);
         try {
             PluginSchema.up(connection);
@@ -81,7 +81,7 @@ class PluginDatabase {
             var model = new PluginValue();
             model.setConnection(connection);
             MediaDependencies.forPlugin(slug)
-                .watch("values-" + Md5.encode(connection), model, "value",
+                .watch('values-${Md5.encode(connection)}', model, "value",
                     MediaDependencyMode.Text, "Plugin data");
         }
     }
@@ -117,7 +117,7 @@ class PluginDatabase {
         if (migrations.length == 0) {
             return;
         }
-        var lock = connection + ":plugin-migrations:" + slug;
+        var lock = '${connection}:plugin-migrations:${slug}';
         locks.acquire(lock);
         try {
             var applied:Map<String, Bool> = [];
@@ -136,7 +136,7 @@ class PluginDatabase {
                 var apply = () -> {
                     migration.up();
                     migrationQuery().create([
-                        "id" => slug + ":" + migration.name,
+                        "id" => '${slug}:${migration.name}',
                         "plugin_id" => slug,
                         "name" => migration.name,
                         "applied_at" => SiteSettingsStore.timestamp()
@@ -183,10 +183,10 @@ class PluginDatabase {
         if (connection != "default") {
             var model = new PluginValue();
             model.setConnection(connection);
-            dependencies.watch("values-" + Md5.encode(connection), model, "value",
+            dependencies.watch('values-${Md5.encode(connection)}', model, "value",
                 MediaDependencyMode.Text, "Plugin data");
         }
-        var reference = "value-" + Md5.encode(Json.stringify([connection, scope, key]));
+        var reference = 'value-${Md5.encode(Json.stringify([connection, scope, key]))}';
         dependencies.withValue(reference, value, () -> {
             valueQuery().upsert([
                 "plugin_id" => slug,
@@ -206,7 +206,7 @@ class PluginDatabase {
     public function forget(key:String, scope:String = ""):Void {
         MediaLocks.run(() -> {
             valueLookup(key, scope).delete();
-            var reference = "value-" + Md5.encode(Json.stringify([connection, scope, key]));
+            var reference = 'value-${Md5.encode(Json.stringify([connection, scope, key]))}';
             MediaDependencies.forPlugin(slug).forget(reference);
             return true;
         });

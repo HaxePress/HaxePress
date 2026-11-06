@@ -22,7 +22,7 @@ from plugin_build import (
 
 def build_php_plugin(plugin, folder, manifest):
     namespace = manifest["server"]["entrypoint"].rsplit(".", 1)[0]
-    prefix = "CmsPlugin_" + secrets.token_hex(16)
+    prefix = f"CmsPlugin_{secrets.token_hex(16)}"
     generated = folder / "php-build"
     if generated.exists():
         shutil.rmtree(generated)
@@ -33,9 +33,9 @@ def build_php_plugin(plugin, folder, manifest):
             "-cp",
             str(plugin / "src"),
             "--macro",
-            'include("' + namespace + '")',
+            f'include("{namespace}")',
             "--macro",
-            'hx.press.plugins.PhpPluginBuild.configure("' + namespace + '","' + prefix + '")',
+            f'hx.press.plugins.PhpPluginBuild.configure("{namespace}","{prefix}")',
             *external_host_options(),
             "--php",
             str(generated),
@@ -58,7 +58,7 @@ def build_php_plugin(plugin, folder, manifest):
         )
         if native_namespace is None or declaration is None:
             raise RuntimeError("The generated PHP module has an unsupported class declaration")
-        name = native_namespace[1] + "\\" + declaration[1]
+        name = f"{native_namespace[1]}\\{declaration[1]}"
         relative = source.relative_to(generated)
         destination = target / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -71,7 +71,7 @@ def build_php_plugin(plugin, folder, manifest):
         "entrypoint": manifest["server"]["entrypoint"],
         "classes": classes,
     }
-    artifact.write_text(json.dumps(definition, indent=2) + "\n")
+    artifact.write_text(f"{json.dumps(definition, indent=2)}\n")
     return target
 
 
@@ -86,7 +86,7 @@ def build_plugin(plugin, output, api_info, application=None):
         "-cp",
         str(plugin / "src"),
         "--macro",
-        'include("' + namespace + '")',
+        f'include("{namespace}")',
     ]
     jar = folder / "server.jar"
     jvm = [
@@ -99,7 +99,7 @@ def build_plugin(plugin, output, api_info, application=None):
         "-cp",
         str(plugin / "src"),
         "--macro",
-        'include("' + namespace + '")',
+        f'include("{namespace}")',
         "--jvm",
         str(jar),
     ]
@@ -125,7 +125,7 @@ def build_plugin(plugin, output, api_info, application=None):
             *source,
             *external_host_options(),
             "-D",
-            "dll_import=" + str(api_info),
+            f"dll_import={str(api_info)}",
             "--cppia",
             str(cppia),
         ],
@@ -134,7 +134,7 @@ def build_plugin(plugin, output, api_info, application=None):
         check=True,
     )
     php = build_php_plugin(plugin, folder, manifest)
-    package = output / (manifest["slug"] + "-" + manifest["version"] + ".zip")
+    package = output / (f"{manifest['slug']}-{manifest['version']}.zip")
     with ZipFile(package, "w", compression=ZIP_DEFLATED) as archive:
         archive.write(plugin / "cms-package.json", "cms-package.json")
         archive.write(jar, manifest["server"]["jar"])
@@ -155,17 +155,17 @@ def build(application, public_root=None):
     output = ROOT / "Export/packages"
     output.mkdir(parents=True, exist_ok=True)
     release = json.loads((ROOT / "cms.json").read_text())
-    sdk_name = "cms-plugin-api-" + str(release["pluginApiVersion"])
-    sdk = output / (sdk_name + ".jar")
+    sdk_name = f"cms-plugin-api-{str(release['pluginApiVersion'])}"
+    sdk = output / (f"{sdk_name}.jar")
     contracts = ["PluginEntrypoint", "PluginHost"]
     with ZipFile(application) as source, ZipFile(sdk, "w", compression=ZIP_DEFLATED) as target:
         target.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n\n")
         for contract in contracts:
-            name = "hx/press/plugins/" + contract + ".class"
+            name = f"hx/press/plugins/{contract}.class"
             target.writestr(name, source.read(name))
         response_contract = "hx/press/validation/ValidationResponder.class"
         target.writestr(response_contract, source.read(response_contract))
-    api_info = output / (sdk_name + ".info")
+    api_info = output / (f"{sdk_name}.info")
     base = [str(compiler()), *host_options()]
     export = base + [
         "--cpp",
@@ -175,18 +175,18 @@ def build(application, public_root=None):
         "-dce",
         "no",
         "-D",
-        "dll_export=" + str(api_info),
+        f"dll_export={str(api_info)}",
     ]
     export.extend(host_exports())
     subprocess.run(export, cwd=ROOT, env=environment(), check=True)
     info = api_info.read_text()
     for contract in contracts:
-        if "interface hx.press.plugins." + contract not in info:
-            raise RuntimeError("The SDK export is missing " + contract)
-    source_sdk = output / (sdk_name + ".zip")
+        if f"interface hx.press.plugins.{contract}" not in info:
+            raise RuntimeError(f"The SDK export is missing {contract}")
+    source_sdk = output / (f"{sdk_name}.zip")
     with ZipFile(source_sdk, "w", compression=ZIP_DEFLATED) as archive:
         for contract in [*contracts, "PhpPluginBuild", "PluginDatabase", "PluginMigration"]:
-            path = Path("src/hx/press/plugins") / (contract + ".hx")
+            path = Path("src/hx/press/plugins") / (f"{contract}.hx")
             archive.write(ROOT / path, path)
         public_sources = [
             "src/hx/press/validation/ValidationResponder.hx",
@@ -216,7 +216,7 @@ def build(application, public_root=None):
             manifest["cmsVersion"] != release["version"]
             or manifest["apiVersion"] != release["pluginApiVersion"]
         ):
-            raise RuntimeError("Rebuild " + manifest["slug"] + " for this exact CMS release")
+            raise RuntimeError(f"Rebuild {manifest['slug']} for this exact CMS release")
         package = build_plugin(plugin, output, api_info, application)
         packages.append(package)
     public_packages = public_root / "packages"
@@ -234,7 +234,7 @@ def build(application, public_root=None):
             continue
         theme = ROOT / "Export/themes" / source.name
         theme_manifest = json.loads((theme / "cms-package.json").read_text())
-        package = output / (theme.name + "-" + theme_manifest["version"] + ".zip")
+        package = output / (f"{theme.name}-{theme_manifest['version']}.zip")
         with ZipFile(package, "w", compression=ZIP_DEFLATED) as archive:
             for asset in sorted(theme.rglob("*")):
                 if asset.is_file():
@@ -250,14 +250,13 @@ def build(application, public_root=None):
                 public_root / "themes", ROOT / "Export/jvm/public/themes", dirs_exist_ok=True
             )
     print(
-        "Built CMS "
-        + release["version"]
-        + " native plugin SDK and "
-        + str(len(packages))
-        + " JVM/CPPIA/PHP plugins",
+        (
+            f"Built CMS {release['version']} native plugin SDK and {str(len(packages))}"
+            " JVM/CPPIA/PHP plugins"
+        ),
         flush=True,
     )
-    return output / ("reading-companion-" + release["version"] + ".zip")
+    return output / (f"reading-companion-{release['version']}.zip")
 
 
 if __name__ == "__main__":

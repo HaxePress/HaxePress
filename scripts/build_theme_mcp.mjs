@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const release = JSON.parse(await readFile(new URL('../cms.json', import.meta.url), 'utf8'));
 const root = new URL('../', import.meta.url);
 const publicRoot = process.env.CMS_PUBLIC_PATH
-  ? pathToFileURL(resolve(process.env.CMS_PUBLIC_PATH) + sep)
+  ? pathToFileURL(`${resolve(process.env.CMS_PUBLIC_PATH)}${sep}`)
   : new URL('public/', root);
 await mkdir(new URL('mcp/', publicRoot), { recursive: true });
 await build({

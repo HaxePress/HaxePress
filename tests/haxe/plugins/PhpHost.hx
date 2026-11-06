@@ -30,10 +30,10 @@ class PhpHost {
     }
 
     static function install(disk:StorageDisk, filename:String, directory:String):PackageRecord {
-        var target = "installed/" + directory;
+        var target = 'installed/${directory}';
         var inspected = SafePackageArchive.extract(disk.getBytes(filename), target);
         var manifest = inspected.manifest;
-        var id = "plugin-" + manifest.slug;
+        var id = 'plugin-${manifest.slug}';
         InstalledPackage.query.updateOrCreate(["id" => id], [
             "id" => id,
             "kind" => "plugin",
@@ -44,7 +44,7 @@ class PhpHost {
             "name_key" => manifest.name.toLowerCase(),
             "version" => manifest.version,
             "directory" => directory,
-            "manifest" => Storage.disk("extensions").get(target + "/cms-package.json"),
+            "manifest" => Storage.disk("extensions").get('${target}/cms-package.json'),
             "settings" => "{}",
             "enabled" => 1,
             "setting_count" => manifest.fields.length,
@@ -59,7 +59,7 @@ class PhpHost {
     static function lifecycle(record:PackageRecord, setting:String, phase:String):Void {
         PluginHealth.beginBoot();
         var disk = Storage.disk("extensions");
-        var module = load(disk, "installed/" + record.directory + "/php/module.json",
+        var module = load(disk, 'installed/${record.directory}/php/module.json',
             "extensions.lifecycle.LifecyclePlugin");
         var settings:Dynamic = {};
         Reflect.setField(settings, setting, "true");
@@ -69,7 +69,7 @@ class PhpHost {
             owned = Route.batch(() -> module.create(new PhpTestPluginHost(), {settings: settings}));
             Route.batch(() -> module.destroy());
         } catch (error:Dynamic) {
-            failed = Std.string(error).indexOf("Requested " + phase + " failure") >= 0;
+            failed = Std.string(error).indexOf('Requested ${phase} failure') >= 0;
             PluginHealth.failed(record.id, record.directory, phase, error);
         }
         Route.batch(() -> {
@@ -83,9 +83,7 @@ class PhpHost {
             && PluginHealth.restartRequired
             && current.restart_required == 1
             && current.enabled == 0,
-            "PHP "
-            + phase
-            + " warning state");
+            'PHP ${phase} warning state');
         check(Route.routes.length == 0, "PHP lifecycle failure left owned routes registered");
     }
 
@@ -113,18 +111,18 @@ class PhpHost {
         SafePackageArchive.extract(work.getBytes("streamed.zip"), "streamed", work);
         for (name in ["missing-php", "traversal", "checksum", "entry-limit"]) {
             var rejected = false;
-            var destination = "rejected-" + name;
+            var destination = 'rejected-${name}';
             try {
-                SafePackageArchive.extract(work.getBytes(name + ".zip"), destination, work);
+                SafePackageArchive.extract(work.getBytes('${name}.zip'), destination, work);
             } catch (error:Dynamic) {
                 rejected = true;
             }
-            check(rejected && !work.exists(destination), "PHP ZIP validation: " + name);
+            check(rejected && !work.exists(destination), 'PHP ZIP validation: ${name}');
         }
         check(PackageManifest.serverArtifact(inspected.manifest) == "php/module.json",
             "PHP selected another target's artifact");
         var host = new PhpTestPluginHost();
-        var original = load(work, inspected.root + "/php/module.json",
+        var original = load(work, '${inspected.root}/php/module.json',
             inspected.manifest.entrypoint);
         var context = {
             settings: {message: "PHP reading note", content_note: "true", minimum_characters: "50"},

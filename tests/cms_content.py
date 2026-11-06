@@ -16,13 +16,13 @@ HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
 
 def props(client, path):
     status, _, body = client.request(path, extra_headers=HEADERS)
-    check(status == 200, path + " returned " + str(status) + ": " + body[:200])
+    check(status == 200, f"{path} returned {str(status)}: {body[:200]}")
     return json.loads(body)["props"]
 
 
 def save(admin, kind, data):
-    status, headers, body = admin.request("/admin/" + kind + "/save", "POST", data)
-    check(status == 303, "content save returned " + str(status) + ": " + body[:300])
+    status, headers, body = admin.request(f"/admin/{kind}/save", "POST", data)
+    check(status == 303, f"content save returned {str(status)}: {body[:300]}")
     return headers["location"]
 
 
@@ -52,7 +52,7 @@ def verify(fixtures):
     data = {
         "id": "",
         "title": "A permanent CMS page",
-        "slug": "cms-page-" + suffix,
+        "slug": f"cms-page-{suffix}",
         "excerpt": "",
         "content": "## A useful page\n\nA complete page with **bold** and *italic* text.\n\n| Place | Note |\n| --- | --- |\n| Home | Calm |\n\n- [x] Published thoughtfully\n\n<script>alert('unsafe')</script>",
         "category": "",
@@ -73,7 +73,7 @@ def verify(fixtures):
         admin.request("/admin/pages/working-copy", "POST", working)[0] == 200,
         "save new-page working copy",
     )
-    restored = props(admin, "/admin/pages/new?draft=" + initial["draftKey"])
+    restored = props(admin, f"/admin/pages/new?draft={initial['draftKey']}")
     check(
         restored["workingCopy"]["data"]["content"] == data["content"],
         "new-page working copy did not restore",
@@ -86,16 +86,16 @@ def verify(fixtures):
         == 422,
         "late autosave recreated a consumed new working copy",
     )
-    check(public.request("/pages/" + data["slug"])[0] == 404, "draft page became public")
+    check(public.request(f"/pages/{data['slug']}")[0] == 404, "draft page became public")
     check(
-        public.request("/content/" + data["slug"])[0] == 404,
+        public.request(f"/content/{data['slug']}")[0] == 404,
         "page leaked into content item routing",
     )
-    editor = props(admin, "/admin/pages/" + str(page_id) + "/edit")
+    editor = props(admin, f"/admin/pages/{str(page_id)}/edit")
     data["version"] = str(editor["item"]["version"])
     data["status"] = "published"
     save(admin, "pages", data)
-    status, _, html = public.request("/pages/" + data["slug"])
+    status, _, html = public.request(f"/pages/{data['slug']}")
     check(
         status == 200
         and "<table" in html
@@ -117,7 +117,7 @@ def verify(fixtures):
         "pages entered content",
     )
 
-    history_status, _, history_body = admin.request("/admin/pages/" + str(page_id) + "/history")
+    history_status, _, history_body = admin.request(f"/admin/pages/{str(page_id)}/history")
     history = json.loads(history_body)["revisions"]
     check(
         history_status == 200 and [row["version"] for row in history] == [2, 1],
@@ -127,7 +127,7 @@ def verify(fixtures):
         admin.request("/admin/pages/save", "POST", {**data, "version": "1"})[0] == 409,
         "stale editor overwrote content",
     )
-    current = props(admin, "/admin/pages/" + str(page_id) + "/edit")["item"]
+    current = props(admin, f"/admin/pages/{str(page_id)}/edit")["item"]
     data["version"] = str(current["version"])
     data["content"] = "## An updated working copy\n\nThis should stay private until manually saved."
     check(
@@ -144,17 +144,17 @@ def verify(fixtures):
         == 200,
         "older working-copy request",
     )
-    copy = props(admin, "/admin/pages/" + str(page_id) + "/edit")["workingCopy"]
+    copy = props(admin, f"/admin/pages/{str(page_id)}/edit")["workingCopy"]
     check(
         copy["data"]["content"] == data["content"],
         "out-of-order autosave replaced a newer working copy",
     )
     check(
-        "An updated working copy" not in public.request("/pages/" + data["slug"])[2],
+        "An updated working copy" not in public.request(f"/pages/{data['slug']}")[2],
         "working copy overwrote the published page",
     )
     save(admin, "pages", data)
-    after = props(admin, "/admin/pages/" + str(page_id) + "/edit")
+    after = props(admin, f"/admin/pages/{str(page_id)}/edit")
     check(
         after["workingCopy"] is None and after["item"]["version"] == 3,
         "manual save did not clear the working copy",
@@ -162,28 +162,28 @@ def verify(fixtures):
     old_revision = history[-1]["id"]
     check(
         admin.request(
-            "/admin/pages/" + str(page_id) + "/history/" + str(old_revision) + "/restore",
+            f"/admin/pages/{str(page_id)}/history/{str(old_revision)}/restore",
             "POST",
             {},
         )[0]
         == 303,
         "restore revision",
     )
-    restored = props(admin, "/admin/pages/" + str(page_id) + "/edit")
+    restored = props(admin, f"/admin/pages/{str(page_id)}/edit")
     check(
         "A useful page" in restored["workingCopy"]["data"]["content"],
         "revision restore did not create a working copy",
     )
     check(
-        "An updated working copy" in public.request("/pages/" + data["slug"])[2],
+        "An updated working copy" in public.request(f"/pages/{data['slug']}")[2],
         "revision restore changed live content before manual save",
     )
-    admin.request("/admin/pages/" + str(page_id) + "/discard-working", "POST", {})
+    admin.request(f"/admin/pages/{str(page_id)}/discard-working", "POST", {})
     data["version"] = str(after["item"]["version"])
     data["status"] = "scheduled"
     data["scheduled_epoch"] = str(int(time.time() * 1000) + 120000)
     save(admin, "pages", data)
-    check(public.request("/pages/" + data["slug"])[0] == 404, "scheduled page was published early")
+    check(public.request(f"/pages/{data['slug']}")[0] == 404, "scheduled page was published early")
     fixtures.update(
         "items", {"scheduled_epoch": int(time.time() * 1000) - 1000}, [("id", "=", page_id)]
     )
@@ -192,31 +192,29 @@ def verify(fixtures):
         "run scheduled site",
     )
     check(
-        public.request("/pages/" + data["slug"])[0] == 200,
+        public.request(f"/pages/{data['slug']}")[0] == 200,
         "due content did not publish or its cache stayed stale",
     )
-    check(
-        admin.request("/admin/pages/" + str(page_id) + "/trash", "POST", {})[0] == 303, "trash page"
-    )
-    check(public.request("/pages/" + data["slug"])[0] == 404, "trashed page stayed public")
+    check(admin.request(f"/admin/pages/{str(page_id)}/trash", "POST", {})[0] == 303, "trash page")
+    check(public.request(f"/pages/{data['slug']}")[0] == 404, "trashed page stayed public")
     check(
         any(row["id"] == page_id for row in props(admin, "/admin/pages?status=trash")["items"]),
         "trash collection lost the page",
     )
     check(
-        admin.request("/admin/pages/" + str(page_id) + "/restore", "POST", {})[0] == 303,
+        admin.request(f"/admin/pages/{str(page_id)}/restore", "POST", {})[0] == 303,
         "restore trashed page",
     )
     check(
-        public.request("/pages/" + data["slug"])[0] == 200,
+        public.request(f"/pages/{data['slug']}")[0] == 200,
         "restoring a published page did not refresh its cache",
     )
     check(
-        admin.request("/admin/pages/" + str(page_id) + "/permanent-delete", "POST", {})[0] == 422,
+        admin.request(f"/admin/pages/{str(page_id)}/permanent-delete", "POST", {})[0] == 422,
         "active page was permanently deleted without trashing",
     )
-    admin.request("/admin/pages/" + str(page_id) + "/trash", "POST", {})
-    admin.request("/admin/pages/" + str(page_id) + "/permanent-delete", "POST", {})
+    admin.request(f"/admin/pages/{str(page_id)}/trash", "POST", {})
+    admin.request(f"/admin/pages/{str(page_id)}/permanent-delete", "POST", {})
     check(
         fixtures.count("content_revisions", [("document_id", "=", page_id)]) == 0,
         "permanent deletion left revision bodies",
@@ -237,7 +235,7 @@ def verify(fixtures):
     check(any(row["id"] == image["id"] for row in gallery["images"]), "media search is stale")
     check(
         admin.request(
-            "/admin/media/" + str(image["id"]) + "/save",
+            f"/admin/media/{str(image['id'])}/save",
             "POST",
             {"title": "A quiet coast", "alt": "Calm water at the coast"},
         )[0]
@@ -247,9 +245,9 @@ def verify(fixtures):
     content = {
         "id": "",
         "title": "A protected media content item",
-        "slug": "cms-media-" + suffix,
+        "slug": f"cms-media-{suffix}",
         "excerpt": "A content item that protects a referenced image.",
-        "content": "## At the coast\n\n![Calm water][photo]\n\n[photo]: " + image["url"],
+        "content": f"## At the coast\n\n![Calm water][photo]\n\n[photo]: {image['url']}",
         "category": props(admin, "/admin/content/new")["item"]["category"],
         "status": "published",
         "image": image["url"],
@@ -262,7 +260,7 @@ def verify(fixtures):
     location = save(admin, "content", content)
     content_id = int(re.search(r"/content/(\d+)/edit", location).group(1))
     check(
-        admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0] == 422,
+        admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 422,
         "referenced image was deleted",
     )
     content.update(
@@ -272,7 +270,7 @@ def verify(fixtures):
     )
     save(admin, "content", content)
     check(
-        admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0] == 422,
+        admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 422,
         "revision image was deleted",
     )
     invalid = {
@@ -288,9 +286,9 @@ def verify(fixtures):
         "content": "## Image syntax in code\n\n```text\n![Example](https://example.com/a.jpg)\n```",
     }
     save(admin, "content", code)
-    admin.request("/admin/content/" + str(content_id) + "/delete", "POST", {})
+    admin.request(f"/admin/content/{str(content_id)}/delete", "POST", {})
     check(
-        admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0] == 303,
+        admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 303,
         "unused media could not be deleted",
     )
     check(public.request(image["url"])[0] == 404, "deleted media file is still served")

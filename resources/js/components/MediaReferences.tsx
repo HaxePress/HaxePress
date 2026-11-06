@@ -81,7 +81,7 @@ export default function MediaReferences({
       setNext(null);
       setVerified(true);
       if (!element?.open) element?.showModal();
-      void load('/admin/media/' + image.id + '/references', true, image.id);
+      void load(`/admin/media/${image.id}/references`, true, image.id);
     } else if (element?.open) {
       element.close();
     }
@@ -163,9 +163,7 @@ export default function MediaReferences({
           type="button"
           className="button button-outline"
           disabled={busy || !image}
-          onClick={() =>
-            image && void load('/admin/media/' + image.id + '/references', true, image.id)
-          }
+          onClick={() => image && void load(`/admin/media/${image.id}/references`, true, image.id)}
         >
           {t('Refresh')}
         </button>

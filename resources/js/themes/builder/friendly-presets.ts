@@ -139,9 +139,9 @@ export function friendlySection(kind: FriendlySection): DesignSection {
     grid.name = 'Highlights';
     grid.children = Array.from({ length: 3 }, (_, index) =>
       container(
-        'Highlight ' + (index + 1),
+        `Highlight ${index + 1}`,
         [
-          textBlock('heading', 'Highlight ' + (index + 1), 3),
+          textBlock('heading', `Highlight ${index + 1}`, 3),
           textBlock('text', 'Describe one thing your visitors should know.'),
         ],
         { padding: '28px', background: '#f5f7fb', 'border-radius': '12px' },
@@ -179,7 +179,7 @@ export function friendlySection(kind: FriendlySection): DesignSection {
       ...Array.from({ length: 3 }, (_, index) => {
         const details = newBlock('element');
         details.tag = 'details';
-        details.name = 'Question ' + (index + 1);
+        details.name = `Question ${index + 1}`;
         details.styles = {
           desktop: { normal: { padding: '20px 0', 'border-bottom': '1px solid #dfe5ee' } },
         };
@@ -239,7 +239,7 @@ export function friendlyDocument(
   };
   document.templates.Home = sections[choice].map(friendlySection);
   const soft = paletteChoices.find((palette) => palette.value === accent)?.soft || '#eff3ff';
-  document.css = (document.css || '') + '\n:scope { --friendly-surface: ' + soft + '; }';
+  document.css = `${document.css || ''}\n:scope { --friendly-surface: ${soft}; }`;
   return document;
 }
 export function friendlyLabel(node: DesignBlock): string {

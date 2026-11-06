@@ -78,8 +78,8 @@ async function captureThemePreview(stylesheet?: string): Promise<void> {
       filter: (node) => !['SCRIPT', 'NOSCRIPT', 'IFRAME'].includes(node.nodeName),
       style: {
         margin: '0',
-        width: viewportWidth + 'px',
-        height: viewportHeight + 'px',
+        width: `${viewportWidth}px`,
+        height: `${viewportHeight}px`,
         overflow: 'hidden',
       },
     });

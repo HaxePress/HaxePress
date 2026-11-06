@@ -46,7 +46,7 @@ class InstallationDatabase {
             if (tables.length != 0) {
                 throw new Exception("Choose an empty database. Existing data will not be overwritten.");
             }
-            var table = "haxepress_setup_" + Md5.encode(SecureToken.generate(12)).substr(0, 12);
+            var table = 'haxepress_setup_${Md5.encode(SecureToken.generate(12)).substr(0, 12)}';
             // The schema probe verifies DDL access, not just a successful socket connection.
             schema.create(table, blueprint -> blueprint.id());
             schema.drop(table);

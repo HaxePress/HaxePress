@@ -20,7 +20,7 @@ class ThemeCss {
                 hex += source.charAt(index++);
             }
             if (hex != "") {
-                var code = Std.parseInt("0x" + hex);
+                var code = Std.parseInt('0x${hex}');
                 output.add(String.fromCharCode(code));
                 if (index < source.length && ~/\s/.match(source.charAt(index))) {
                     index++;
@@ -52,10 +52,10 @@ class ThemeCss {
 
     static function quoted(value:String, quote:String):String {
         var escaped = StringTools.replace(value, "\\", "\\\\");
-        escaped = StringTools.replace(escaped, quote, "\\" + quote);
+        escaped = StringTools.replace(escaped, quote, '\\${quote}');
         escaped = StringTools.replace(escaped, "\n", "\\a ");
         escaped = StringTools.replace(escaped, "\r", "\\d ");
-        return quote + escaped + quote;
+        return '${quote}${escaped}${quote}';
     }
 
     /** Canonical URL/string escapes keep persisted CSS references visible to the media API. */
@@ -133,7 +133,8 @@ class ThemeCss {
                         index++;
                     }
                     var url = resource(decoded(source.substring(startUrl, index)));
-                    output.add("url(" + quoted(url, "\"") + ")");
+                    var quotedUrl = quoted(url, "\"");
+                    output.add('url(${quotedUrl})');
                     index++;
                 } else {
                     output.add(word);

@@ -43,11 +43,11 @@ class PackageSettings {
     public static function validate(field:PackageField, value:String):String {
         value = StringTools.trim(value);
         if (field.required && value == "") {
-            throw new Exception(field.label + " is required.");
+            throw new Exception('${field.label} is required.');
         }
         var limit = field.kind == "textarea" || field.kind == "secret" ? 2000 : 240;
         if (value.length > limit) {
-            throw new Exception(field.label + " is too long.");
+            throw new Exception('${field.label} is too long.');
         }
         if (value == "" && !field.required) {
             return value;
@@ -55,11 +55,11 @@ class PackageSettings {
         switch (field.kind) {
             case "boolean":
                 if (value != "true" && value != "false") {
-                    throw new Exception("Choose a valid value for " + field.label + ".");
+                    throw new Exception('Choose a valid value for ${field.label}.');
                 }
             case "color":
                 if (!~/^#[0-9A-Fa-f]{6}$/.match(value)) {
-                    throw new Exception("Choose a six-digit color for " + field.label + ".");
+                    throw new Exception('Choose a six-digit color for ${field.label}.');
                 }
             case "number":
                 var number = Std.parseFloat(value);
@@ -67,14 +67,12 @@ class PackageSettings {
                     || !Math.isFinite(number)
                     || number < field.minimum
                     || number > field.maximum) {
-                    throw new Exception("Enter a number in the allowed range for "
-                        + field.label
-                        + ".");
+                    throw new Exception('Enter a number in the allowed range for ${field.label}.');
                 }
             case "select":
                 var choices = field.options.map(option -> option.value);
                 if (!choices.contains(value)) {
-                    throw new Exception("Choose a valid option for " + field.label + ".");
+                    throw new Exception('Choose a valid option for ${field.label}.');
                 }
             default:
         }

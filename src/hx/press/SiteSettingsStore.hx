@@ -31,23 +31,23 @@ class SiteSettingsStore {
             "about_site" => ""
         ];
         for (key => value in defaults)
-            if (Setting.query.find(key) == null) {
-                Setting.query.create(["key" => key, "value" => value]);
+            if (!Setting.query.where("key", key).exists()) {
+                Setting.query.insert(["key" => key, "value" => value]);
                 settingsChanged = true;
             }
-        if (Admin.query.count() == 0) {
+        if (!Admin.query.select(["id"]).exists()) {
             var email = CategoryData.key(Environment.env("ADMIN_EMAIL", ""));
             var password = Environment.env("ADMIN_PASSWORD", "");
             if (email == "" || password.length < 12)
                 throw "Set ADMIN_EMAIL and a password of at least 12 characters in .env before starting.";
-            Admin.query.create([
+            Admin.query.insert([
                 "email" => email,
                 "password" => Hash.make(password),
                 "name" => Environment.env("ADMIN_NAME", "Administrator"),
                 "created_at" => timestamp()
             ]);
         }
-        if (Setting.query.find("seeded") == null) {
+        if (!Setting.query.where("key", "seeded").exists()) {
             var seeds:Array<Dynamic> = Storage.disk("seeds").json("seed.json");
             DBStatic.transaction(() -> {
                 for (item in (Environment.env("CMS_SEED_DEMO", "true") == "true" ? seeds : [])) {
@@ -67,9 +67,9 @@ class SiteSettingsStore {
                         data.set(key, Reflect.field(item, key));
                     data.set("created_at", timestamp());
                     data.set("updated_at", timestamp());
-                    ContentItem.query.create(data);
+                    ContentItem.query.insert(data);
                 }
-                Setting.query.create(["key" => "seeded", "value" => "1"]);
+                Setting.query.insert(["key" => "seeded", "value" => "1"]);
             });
             contentChanged = true;
         }

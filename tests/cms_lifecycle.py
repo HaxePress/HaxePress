@@ -100,9 +100,9 @@ def run():
                 raw=zip_bytes(incompatible, files),
                 content_type="application/zip",
             )
-            check(status == 422, "incompatible/single-target package accepted: " + body[:150])
+            check(status == 422, f"incompatible/single-target package accepted: {body[:150]}")
         php_definition = json.loads(files["php/module.json"])
-        php_class = "php/" + next(iter(php_definition["classes"].values()))
+        php_class = f"php/{next(iter(php_definition['classes'].values()))}"
         for missing in ["server.jar", "server.cppia", "php/module.json", php_class]:
             status, _, _ = owner.request(
                 "/admin/plugins/upload",
@@ -112,7 +112,7 @@ def run():
                 ),
                 content_type="application/zip",
             )
-            check(status == 422, "ZIP missing " + missing + " was accepted")
+            check(status == 422, f"ZIP missing {missing} was accepted")
         for definition in [
             {**php_definition, "namespace": "cms"},
             {**php_definition, "entrypoint": "example.reading.OtherPlugin"},
@@ -140,12 +140,12 @@ def run():
         identifier = "plugin-lifecycle-test"
         install(owner, "plugins", package)
         owner.request(
-            "/admin/plugins/" + identifier + "/settings",
+            f"/admin/plugins/{identifier}/settings",
             "POST",
             {"fail_create": "true", "fail_destroy": "false"},
         )
         check(
-            owner.request("/admin/plugins/" + identifier + "/enable", "POST", {})[0] == 422,
+            owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})[0] == 422,
             "creation failure was swallowed",
         )
         row = fixtures.rows(
@@ -165,11 +165,11 @@ def run():
             props(owner, "/admin/plugins")["pluginRestartRequired"],
             "creation failure did not warn about restart",
         )
-        owner.request("/admin/plugins/" + identifier + "/uninstall", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
 
         install(owner, "plugins", package)
         check(
-            owner.request("/admin/plugins/" + identifier + "/enable", "POST", {})[0] == 303,
+            owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})[0] == 303,
             "healthy creation failed",
         )
         check(
@@ -185,21 +185,21 @@ def run():
             "protected native plugin route failed",
         )
         check(
-            owner.request("/admin/plugins/" + identifier + "/disable", "POST", {})[0] == 303,
+            owner.request(f"/admin/plugins/{identifier}/disable", "POST", {})[0] == 303,
             "healthy destruction failed",
         )
         check(public.request("/plugin-lifecycle")[0] == 404, "onDestroy did not remove the route")
         check(
-            owner.request("/admin/plugins/" + identifier + "/enable", "POST", {})[0] == 303,
+            owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})[0] == 303,
             "route/name could not be registered again",
         )
         owner.request(
-            "/admin/plugins/" + identifier + "/settings",
+            f"/admin/plugins/{identifier}/settings",
             "POST",
             {"fail_create": "false", "fail_destroy": "true"},
         )
         check(
-            owner.request("/admin/plugins/" + identifier + "/disable", "POST", {})[0] == 422,
+            owner.request(f"/admin/plugins/{identifier}/disable", "POST", {})[0] == 422,
             "destruction failure was swallowed",
         )
         row = fixtures.rows(
@@ -217,10 +217,10 @@ def run():
             "destruction failure left managed routes live",
         )
         check(
-            owner.request("/admin/plugins/" + identifier + "/enable", "POST", {})[0] == 422,
+            owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})[0] == 422,
             "dirty plugin reactivated without restart",
         )
-        owner.request("/admin/plugins/" + identifier + "/uninstall", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
         check(
             props(owner, "/admin")["pluginRestartRequired"],
             "uninstall hid the process restart warning",

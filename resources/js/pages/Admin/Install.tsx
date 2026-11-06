@@ -460,13 +460,8 @@ export default function Install({ setup, csrfToken }: { setup: Setup; csrfToken:
                       <dt>Database</dt>
                       <dd>
                         {database?.driver === 'sqlite'
-                          ? 'SQLite · ' + database.file
-                          : 'MySQL · ' +
-                            database?.host +
-                            ':' +
-                            database?.port +
-                            ' / ' +
-                            database?.database}
+                          ? `SQLite · ${database.file}`
+                          : `MySQL · ${database?.host}:${database?.port} / ${database?.database}`}
                       </dd>
                     </div>
                     <div>

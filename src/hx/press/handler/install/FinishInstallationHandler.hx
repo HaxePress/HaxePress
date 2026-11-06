@@ -116,7 +116,7 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
             return ResponseBuilder.asJson({installed: true, redirect: "/admin"})
                 .header("Cache-Control", "private, no-store");
         } catch (failure:Dynamic) {
-            trace("Installation did not complete during " + phase + ".");
+            trace('Installation did not complete during ${phase}.');
             Connection.free();
             try {
                 InstallationEnv.discard(prepared);

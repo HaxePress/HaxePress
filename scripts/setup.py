@@ -52,11 +52,11 @@ def prepare_environment(project_root):
         lines = []
         for line in content.splitlines():
             if "=" in line and line.split("=", 1)[0].strip() == "APP_KEY":
-                line = "APP_KEY=" + generated_key
+                line = f"APP_KEY={generated_key}"
             lines.append(line)
         if "APP_KEY" not in values:
-            lines.append("APP_KEY=" + generated_key)
-        content = "\n".join(lines) + "\n"
+            lines.append(f"APP_KEY={generated_key}")
+        content = f"{'\n'.join(lines)}\n"
 
     defaults = {
         "VITE_USE_BUILD": "true",
@@ -68,7 +68,7 @@ def prepare_environment(project_root):
         if key not in values:
             if content and not content.endswith("\n"):
                 content += "\n"
-            content += key + "=" + value + "\n"
+            content += f"{key}={value}\n"
     if not created and content == config.read_text():
         config.chmod(0o600)
         return False
@@ -83,9 +83,9 @@ def prepare_environment(project_root):
 
 
 def download_archive(url, dest):
-    archive = ROOT / ".tools" / ("download-" + dest.name + ".tar.gz")
+    archive = ROOT / ".tools" / (f"download-{dest.name}.tar.gz")
     archive.parent.mkdir(parents=True, exist_ok=True)
-    print("Downloading " + dest.name + "…", flush=True)
+    print(f"Downloading {dest.name}…", flush=True)
     urllib.request.urlretrieve(url, archive)
     dest.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive) as tar:
@@ -100,12 +100,12 @@ def download_archive(url, dest):
 
 def locked_source(name):
     entry = LOCK[name]
-    destination = ROOT / ".deps" / (name + "-" + entry["commit"])
+    destination = ROOT / ".deps" / (f"{name}-{entry['commit']}")
     if not (destination / "haxelib.json").is_file():
         repository = entry["repository"].replace(
             "https://github.com/", "https://codeload.github.com/"
         )
-        download_archive(repository + "/tar.gz/" + entry["commit"], destination)
+        download_archive(f"{repository}/tar.gz/{entry['commit']}", destination)
     return destination
 
 
@@ -116,7 +116,7 @@ def refresh_source(source, destination):
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
-        prefix=destination.name + "-copy-", dir=destination.parent
+        prefix=f"{destination.name}-copy-", dir=destination.parent
     ) as directory:
         temporary = Path(directory)
         staging = temporary / "source"
@@ -160,7 +160,7 @@ def main():
             compiler.parent,
         )
     environment = os.environ.copy()
-    environment["PATH"] = str(compiler.parent) + os.pathsep + environment.get("PATH", "")
+    environment["PATH"] = f"{str(compiler.parent)}{os.pathsep}{environment.get('PATH', '')}"
     actual_version = subprocess.check_output(
         [str(compiler), "--version"], env=environment, text=True
     ).strip()
@@ -247,15 +247,15 @@ def main():
     for name, path in paths.items():
         path = path.resolve()
         if not (path / "haxelib.json").exists():
-            raise SystemExit("Missing " + name + " checkout: " + str(path))
+            raise SystemExit(f"Missing {name} checkout: {str(path)}")
         entry = repo / name
         entry.mkdir(exist_ok=True)
-        (entry / ".dev").write_text(str(path) + "\n")
+        (entry / ".dev").write_text(f"{str(path)}\n")
         version = json.loads((path / "haxelib.json").read_text())["version"]
         link = entry / version.replace(".", ",")
         if not link.exists():
             link.symlink_to(path, target_is_directory=True)
-        (entry / ".current").write_text(version + "\n")
+        (entry / ".current").write_text(f"{version}\n")
     for name in ("sessions", "cache"):
         (ROOT / "storage" / name).mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -263,7 +263,7 @@ def main():
             maven,
             "--batch-mode",
             "--no-transfer-progress",
-            "-Dmaven.repo.local=" + str(ROOT / ".tools/maven-cache"),
+            f"-Dmaven.repo.local={str(ROOT / '.tools/maven-cache')}",
             "generate-resources",
         ],
         cwd=ROOT,

@@ -85,7 +85,7 @@ class NewsletterPlugin implements PluginEntrypoint {
                 blocks: [
                     {
                         slot: "dashboard",
-                        content: "### " + heading + "\n\n" + summary
+                        content: '### ${heading}\n\n${summary}'
                     }
                 ]
             });

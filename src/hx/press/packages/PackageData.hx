@@ -71,7 +71,7 @@ class PackageData {
         if (search != "") {
             var prefix = CategoryData.key(CategoryData.normalize(search));
             query.where("name_key", ">=", prefix)
-                .where("name_key", "<", prefix + String.fromCharCode(0x10FFFF));
+                .where("name_key", "<", '${prefix}${String.fromCharCode(0x10FFFF)}');
         }
     }
 
@@ -141,12 +141,22 @@ class PackageData {
         });
     }
 
+    public static function activeDirectory(id:String):Null<String> {
+        return ContentCache.remember("extensions", "active-directory", [id], () -> {
+            var row = InstalledPackage.query.select(["directory"])
+                .where("id", id)
+                .where("enabled", 1)
+                .first();
+            return row == null ? null : row.directory;
+        });
+    }
+
     public static function forEvent(event:String, kind:String = ""):Array<PackageRecord> {
         return ContentCache.remember("extensions", "event", [event, kind, MAX_ACTIVE_PLUGINS + 1],
             () -> {
                 var columns = [
                     for (column in runtimeColumns)
-                        "cms_packages." + column + " AS " + column
+                        'cms_packages.${column} AS ${column}'
                 ];
                 var query = InstalledPackage.query.select(columns)
                     .innerJoin("package_hooks", "cms_packages.id", "=", "package_hooks.package_id")

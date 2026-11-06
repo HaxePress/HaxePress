@@ -259,7 +259,7 @@ export function scopesFor(document: ThemeDocument): string[] {
     'header',
     'footer',
     ...Object.keys(document.templates),
-    ...Object.keys(document.components || {}).map((id) => '@' + id),
+    ...Object.keys(document.components || {}).map((id) => `@${id}`),
   ];
 }
 export function labelFor(document: ThemeDocument, scope: string): string {

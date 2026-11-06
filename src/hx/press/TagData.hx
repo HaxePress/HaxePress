@@ -29,7 +29,7 @@ class TagData {
         var prefix = CategoryData.key(CategoryData.normalize(search)).substr(0, 80);
         if (prefix != "") {
             query.where("name_key", ">=", prefix)
-                .where("name_key", "<", prefix + String.fromCharCode(0x10FFFF));
+                .where("name_key", "<", '${prefix}${String.fromCharCode(0x10FFFF)}');
         }
     }
 
@@ -137,7 +137,7 @@ class TagData {
     public static function assign(contentId:Int, tags:Array<TagRecord>):Void {
         ContentTag.query.where("content_id", contentId).delete();
         for (tag in tags) {
-            ContentTag.query.create(["content_id" => contentId, "tag_id" => tag.id]);
+            ContentTag.query.insert(["content_id" => contentId, "tag_id" => tag.id]);
         }
     }
 }

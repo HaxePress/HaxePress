@@ -15,14 +15,14 @@ class PhpPluginBuild {
                     default: continue;
                 };
                 var name = base.pack.concat([base.name]).join(".");
-                if (name != namespace && !StringTools.startsWith(name, namespace + ".")) {
+                if (name != namespace && !StringTools.startsWith(name, '${namespace}.')) {
                     continue;
                 }
                 if (base.meta.has(":native")) {
                     Context.error("PHP plugin types cannot override their native namespace.",
                         base.pos);
                 }
-                var nativeName = prefix + "." + name;
+                var nativeName = '${prefix}.${name}';
                 base.meta.add(":native", [macro $v{nativeName}], base.pos);
             }
         });

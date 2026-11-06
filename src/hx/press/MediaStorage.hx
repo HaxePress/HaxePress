@@ -101,9 +101,9 @@ class MediaStorage {
             dimensions:{width:Int, height:Int}, label:String = ""):StoredImage {
         var disk = Storage.disk("media");
         disk.makeDirectory("");
-        var filename = SecureToken.generate(32) + "." + format.extension;
+        var filename = '${SecureToken.generate(32)}.${format.extension}';
         while (disk.exists(filename))
-            filename = SecureToken.generate(32) + "." + format.extension;
+            filename = '${SecureToken.generate(32)}.${format.extension}';
         disk.put(filename, bytes);
         var image:StoredImage = {
             id: 0,

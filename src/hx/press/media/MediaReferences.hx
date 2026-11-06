@@ -10,7 +10,7 @@ class MediaReferences {
 
     public static function prefix():String {
         var url = Storage.disk("media").url("");
-        return StringTools.endsWith(url, "/") ? url : url + "/";
+        return StringTools.endsWith(url, "/") ? url : '${url}/';
     }
 
     public static function validFilename(filename:String):Bool {
@@ -40,7 +40,7 @@ class MediaReferences {
             maxBytes: MAX_BYTES,
             mimeTypes: uploadMimeTypes,
             extensions: ["jpg", "jpeg", "png", "gif"],
-            imagePattern: "^" + pattern.toString() + "[A-Za-z0-9_-]{32}\\.(jpg|png|webp|gif)$"
+            imagePattern: '^${pattern.toString()}[A-Za-z0-9_-]{32}\\.(jpg|png|webp|gif)$$'
         };
     }
 }

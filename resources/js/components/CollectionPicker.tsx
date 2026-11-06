@@ -20,14 +20,13 @@ export default function CollectionPicker({
     const abort = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch(
-          '/admin/content-types/options?public=1&q=' +
-            encodeURIComponent(query) +
-            '&selected=' +
-            encodeURIComponent(value) +
-            (archives ? '&archives=1' : ''),
-          { signal: abort.signal },
-        );
+        const search = encodeURIComponent(query);
+        const selected = encodeURIComponent(value);
+        const archiveParam = archives ? '&archives=1' : '';
+        const filters = `public=1&q=${search}&selected=${selected}${archiveParam}`;
+        const response = await fetch(`/admin/content-types/options?${filters}`, {
+          signal: abort.signal,
+        });
         if (!response.ok) throw new Error('Collections could not be loaded.');
         setChoices((await response.json()).types);
         setError('');
@@ -43,11 +42,11 @@ export default function CollectionPicker({
   }, [query, value, archives]);
   return (
     <div className="content-picker">
-      <label className="sr-only" htmlFor={id + '-search'}>
+      <label className="sr-only" htmlFor={`${id}-search`}>
         {t('Search collections')}
       </label>
       <input
-        id={id + '-search'}
+        id={`${id}-search`}
         type="search"
         maxLength={100}
         value={query}

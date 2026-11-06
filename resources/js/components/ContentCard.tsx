@@ -13,7 +13,7 @@ export default function ContentCard({ item }: { item: ContentItem }) {
       <div className="content-summary-meta">
         <time dateTime={item.published_at}>{item.publishedLabel}</time>
         {item.category && (
-          <Link href={item.archiveUrl + '?category=' + encodeURIComponent(item.category)}>
+          <Link href={`${item.archiveUrl}?category=${encodeURIComponent(item.category)}`}>
             {item.category}
           </Link>
         )}

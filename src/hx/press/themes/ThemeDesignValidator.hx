@@ -145,7 +145,7 @@ class ThemeDesignValidator {
             || !Reflect.isObject(value)
             || Std.isOfType(value, Array)
             || Std.isOfType(value, String)) {
-            throw new Exception(label + " must be an object.");
+            throw new Exception('${label} must be an object.');
         }
         return value;
     }
@@ -156,11 +156,11 @@ class ThemeDesignValidator {
             return fallback;
         }
         if (!Std.isOfType(input, String)) {
-            throw new Exception("Check the design field: " + key + ".");
+            throw new Exception('Check the design field: ${key}.');
         }
         var result:String = input;
         if (result.length > maximum || result.indexOf(String.fromCharCode(0)) >= 0) {
-            throw new Exception("Check the design field: " + key + ".");
+            throw new Exception('Check the design field: ${key}.');
         }
         return result;
     }
@@ -169,7 +169,7 @@ class ThemeDesignValidator {
             fallback:String):String {
         var result = text(value, key, 80, fallback);
         if (!choices.contains(result)) {
-            throw new Exception("Choose a supported value for " + key + ".");
+            throw new Exception('Choose a supported value for ${key}.');
         }
         return result;
     }
@@ -180,7 +180,7 @@ class ThemeDesignValidator {
             return fallback;
         }
         if (!Std.isOfType(input, Int) || input < minimum || input > maximum) {
-            throw new Exception("Choose a valid number for " + key + ".");
+            throw new Exception('Choose a valid number for ${key}.');
         }
         return input;
     }
@@ -188,7 +188,7 @@ class ThemeDesignValidator {
     static function color(value:Dynamic, key:String, fallback:String = ""):String {
         var result = text(value, key, 7, fallback);
         if (result != "" && !~/^#[0-9a-fA-F]{6}$/.match(result)) {
-            throw new Exception("Choose a valid color for " + key + ".");
+            throw new Exception('Choose a valid color for ${key}.');
         }
         return result;
     }
@@ -208,11 +208,11 @@ class ThemeDesignValidator {
 
     static function list(value:Dynamic, label:String, maximum:Int):Array<Dynamic> {
         if (!Std.isOfType(value, Array)) {
-            throw new Exception(label + " must be a list.");
+            throw new Exception('${label} must be a list.');
         }
         var entries:Array<Dynamic> = value;
         if (entries.length > maximum) {
-            throw new Exception(label + " contains too many entries.");
+            throw new Exception('${label} contains too many entries.');
         }
         return entries;
     }
@@ -322,7 +322,7 @@ class ThemeDesignValidator {
             }
             for (key in Reflect.fields(attributesInput)) {
                 if (!attributes.contains(key) && !~/^(aria|data)-[a-z][a-z0-9-]{0,40}$/.match(key)) {
-                    throw new Exception("This HTML attribute is not supported: " + key + ".");
+                    throw new Exception('This HTML attribute is not supported: ${key}.');
                 }
                 var attributeValue = text(attributesInput,
                     key, key == "d" || key == "points" ? 32000 : 2000);

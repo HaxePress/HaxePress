@@ -113,7 +113,7 @@ export default function Categories({
                     <button
                       type="button"
                       className="icon-button"
-                      aria-label={'Rename ' + category.name}
+                      aria-label={`Rename ${category.name}`}
                       disabled={busy}
                       onClick={() => edit(category)}
                     >
@@ -122,7 +122,7 @@ export default function Categories({
                     <button
                       type="button"
                       className="icon-button danger"
-                      aria-label={'Delete ' + category.name}
+                      aria-label={`Delete ${category.name}`}
                       disabled={busy || category.items > 0}
                       title={
                         category.items > 0
@@ -201,13 +201,13 @@ export default function Categories({
       </div>
       <ConfirmDialog
         open={pending !== null}
-        message={'Delete “' + (pending?.name || '') + '”? This category has no content.'}
+        message={`Delete “${pending?.name || ''}”? This category has no content.`}
         busy={deleting}
         onCancel={() => setPending(null)}
         onConfirm={() => {
           if (!pending) return;
           router.post(
-            '/admin/categories/' + pending.id + '/delete',
+            `/admin/categories/${pending.id}/delete`,
             { _token: csrfToken },
             {
               preserveScroll: true,

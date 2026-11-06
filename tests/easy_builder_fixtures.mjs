@@ -3,7 +3,7 @@ import ts from 'typescript';
 
 async function moduleCode(name) {
   const source = await readFile(
-    new URL('../resources/js/themes/builder/' + name + '.ts', import.meta.url),
+    new URL(`../resources/js/themes/builder/${name}.ts`, import.meta.url),
     'utf8',
   );
   return ts.transpileModule(source, {
@@ -11,16 +11,16 @@ async function moduleCode(name) {
   }).outputText;
 }
 function moduleUrl(code) {
-  return 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+  return `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
 }
 const types = moduleUrl(await moduleCode('types'));
 const presets = moduleUrl(
-  (await moduleCode('presets')).replace(/from ['"]\.\/types['"]/g, 'from ' + JSON.stringify(types)),
+  (await moduleCode('presets')).replace(/from ['"]\.\/types['"]/g, `from ${JSON.stringify(types)}`),
 );
 const friendly = moduleUrl(
   (await moduleCode('friendly-presets'))
-    .replace(/from ['"]\.\/types['"]/g, 'from ' + JSON.stringify(types))
-    .replace(/from ['"]\.\/presets['"]/g, 'from ' + JSON.stringify(presets)),
+    .replace(/from ['"]\.\/types['"]/g, `from ${JSON.stringify(types)}`)
+    .replace(/from ['"]\.\/presets['"]/g, `from ${JSON.stringify(presets)}`),
 );
 const { friendlyDocument, starterChoices, paletteChoices, sectionChoices, friendlySection } =
   await import(friendly);

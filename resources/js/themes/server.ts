@@ -15,6 +15,7 @@ export async function serverThemeModule(url: string): Promise<ThemeModule> {
   const storage = process.env.CMS_STORAGE_PATH || 'storage';
   const root = await realpath(resolve(storage, 'extensions/installed'));
   const file = await realpath(resolve(root, match[2], 'public', match[3]));
-  if (!file.startsWith(root + sep)) throw new Error('Theme renderer is outside installed storage.');
+  if (!file.startsWith(`${root}${sep}`))
+    throw new Error('Theme renderer is outside installed storage.');
   return import(/* @vite-ignore */ pathToFileURL(file).href);
 }

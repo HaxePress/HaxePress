@@ -70,7 +70,7 @@ def find_entry(folder, domain, operation, parameters):
         for key, file in content_entries(folder).items()
         if key.split(":")[4] == domain and key.split(":")[6:] == [operation, digest]
     ]
-    assert matches, "Missing specific cache: " + operation
+    assert matches, f"Missing specific cache: {operation}"
     return max(matches, key=lambda file: file.stat().st_mtime_ns)
 
 
@@ -113,9 +113,7 @@ def verify(port, fixtures, cache_folder):
         assert request(port, "/content?q=guard-cold-probe")[0] == 500, "Database guard is inactive"
         for route, expected in routes:
             status, headers, body = request(port, route)
-            assert status == expected, (
-                "Warm query accessed the database: " + route + " " + body[:150]
-            )
+            assert status == expected, f"Warm query accessed the database: {route} {body[:150]}"
             assert "set-cookie" not in headers
     assert stamps(cache_folder) == before
     print(

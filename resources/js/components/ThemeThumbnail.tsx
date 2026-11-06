@@ -19,7 +19,7 @@ export default function ThemeThumbnail({
   const viewport = useRef<HTMLDivElement>(null);
   const [image, setImage] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const preview = '/admin/themes/' + id + '/preview';
+  const preview = `/admin/themes/${id}/preview`;
   const parameters = new URLSearchParams({
     revision,
     lang: locale,
@@ -27,7 +27,7 @@ export default function ThemeThumbnail({
     assets: page.version || '',
     actor: String(page.props.auth?.admin?.id || ''),
   });
-  const source = preview + '/frame?' + parameters;
+  const source = `${preview}/frame?${parameters}`;
 
   useEffect(() => {
     const element = viewport.current;

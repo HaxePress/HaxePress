@@ -29,6 +29,7 @@ import hx.well.validator.ValidatorRule;
 import hx.well.http.RequestStatic.request;
 import hx.press.validation.ValidationResponder;
 import hx.press.content.ContentTypes;
+import hx.press.content.ContentTypeDefinition;
 import hx.press.content.ContentFields;
 import hx.press.i18n.I18n;
 
@@ -46,7 +47,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         var current = request();
         var kind = resolve(current);
         var type = ContentTypes.find(kind);
-        if (type == null || !CmsAccess.canCollection(kind)) {
+        if (type == null || !CmsAccess.can(type.capability)) {
             return true;
         }
         var rawId = AdminController.input(current, "id", 16);
@@ -58,15 +59,11 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         if (expected != "" && !~/^[1-9][0-9]*$/.match(expected)) {
             return true;
         }
-        if (id > 0) {
-            var item = ContentItem.query.select(["author_id", "version"])
-                .where("id", id)
-                .where("content_type", kind)
-                .first();
-            if (item == null || !CmsAccess.canEdit(item.author_id)
-                || (expected != "" && Std.parseInt(expected) != item.version)) {
-                return true;
-            }
+        var version = Std.parseInt(expected);
+        if (id > 0
+            && ((expected != "" && version == null) || !ContentController.owned(id, kind,
+                version))) {
+            return true;
         }
         return current.validate([
             "title" => [Required, String, Min(type.minimumTitleLength), Max(180)],
@@ -87,10 +84,11 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
 
     public function validationFailed(request:Request):AbstractResponse {
         var kind = resolve(request);
-        if (ContentTypes.find(kind) == null) {
+        var type = ContentTypes.find(kind);
+        if (type == null) {
             return SiteController.notFound(request);
         }
-        if (!CmsAccess.canCollection(kind)) {
+        if (!CmsAccess.can(type.capability)) {
             return CmsController.forbidden(request);
         }
         var id = Std.parseInt(AdminController.input(request, "id", 16)) ?? 0;
@@ -103,17 +101,17 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         if (existing != null && !CmsAccess.canEdit(existing.author_id)) {
             return CmsController.forbidden(request);
         }
-        var form = readForm(request, kind, id, existing);
+        var form = readForm(request, type, id, existing);
         return ContentController.editor(request, form.toObject(),
             "Check the content fields and their length limits before saving.", 422);
     }
 
-    function readForm(request:Request, kind:String, id:Int, existing:ContentItem):ContentItem {
-        var type = ContentTypes.find(kind);
+    function readForm(request:Request, type:ContentTypeDefinition, id:Int,
+            existing:ContentItem):ContentItem {
         var admin = CmsAccess.current();
         var form = new ContentItem();
         form.id = id;
-        form.content_type = kind;
+        form.content_type = type.key;
         form.author_id = existing == null ? admin.id : existing.author_id;
         form.version = existing == null ? 1 : existing.version;
         form.title = AdminController.input(request, "title", 500);
@@ -156,7 +154,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
 
     public function execute(request:Request):AbstractResponse {
         var kind = resolve(request);
-        if (ContentTypes.find(kind) == null) {
+        if (!ContentTypes.exists(kind)) {
             return SiteController.notFound(request);
         }
         if (!CmsAccess.canCollection(kind)) {
@@ -168,8 +166,8 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         }
         var id = Std.parseInt(rawId) ?? 0;
         var admin = CmsAccess.current();
-        var lockKey = id == 0 ? "new-" + admin.id + "-" + kind : "document-" + id;
-        return ContentLocks.run("type-" + kind,
+        var lockKey = id == 0 ? 'new-${admin.id}-${kind}' : 'document-${id}';
+        return ContentLocks.run('type-${kind}',
             () -> ContentLocks.run(lockKey, () -> save(request, id, kind)));
     }
 
@@ -190,7 +188,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         if (existing != null && !CmsAccess.canEdit(existing.author_id)) {
             return CmsController.forbidden(request);
         }
-        var form = readForm(request, kind, id, existing);
+        var form = readForm(request, type, id, existing);
 
         var error = "";
         if (form.title.length < type.minimumTitleLength) {
@@ -231,7 +229,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
             var validDate = ~/^\d{4}-\d{2}-\d{2}$/.match(date);
             try {
                 validDate = validDate
-                    && DateTools.format(Date.fromString(date + " 12:00:00"), "%Y-%m-%d") == date;
+                    && DateTools.format(Date.fromString('${date} 12:00:00'), "%Y-%m-%d") == date;
             } catch (invalidDate:Dynamic) {
                 validDate = false;
             }
@@ -287,7 +285,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
             }
         } catch (pluginError:Dynamic) {
             return ContentController.editor(request, form.toObject(),
-                "A content plugin could not validate this save: " + Std.string(pluginError), 422);
+                'A content plugin could not validate this save: ${Std.string(pluginError)}', 422);
         }
         var data = request.only("title", "slug", "excerpt", "content", "category", "image",
             "image_alt", "seo_title", "seo_description");
@@ -357,11 +355,9 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         var savedData:Dynamic = saved.toObject();
         savedData.fields = customFields;
         PluginRuntime.saved(savedData);
-        var location = request.input("stay", "0") == "1" ? ContentController.base(kind)
-            + "/"
-            + saved.id
-            + "/edit?notice=saved" : ContentController.base(kind)
-            + "?notice=saved";
+        var base = ContentController.base(kind);
+        var stay = request.input("stay", "0") == "1";
+        var location = stay ? '${base}/${saved.id}/edit?notice=saved' : '${base}?notice=saved';
         return ResponseBuilder.asRedirect(location, 303);
     }
 }

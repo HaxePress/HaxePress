@@ -62,6 +62,7 @@ class CsvExportInput extends Input {
     }
 
     static function quote(value:String):String {
-        return '"' + StringTools.replace(value, '"', '""') + '"';
+        var escaped = StringTools.replace(value, '"', '""');
+        return '"${escaped}"';
     }
 }

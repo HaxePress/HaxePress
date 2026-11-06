@@ -21,7 +21,7 @@ class ContentCache {
             read_only: true
         });
         var database = disk.path(Path.withoutDirectory(configured));
-        return "cms:content:v5:" + Md5.encode(database) + ":" + domain;
+        return 'cms:content:v5:${Md5.encode(database)}:${domain}';
     }
 
     static function locked<T>(key:String, callback:Void->T):T {
@@ -37,7 +37,7 @@ class ContentCache {
     }
 
     public static function revision(domain:String):String {
-        var key = prefix(domain) + ":revision";
+        var key = '${prefix(domain)}:revision';
         return locked(key,
             () -> Cache.store().rememberForever(key, () -> SecureToken.generate(16)));
     }
@@ -46,13 +46,13 @@ class ContentCache {
             callback:Void->T):T {
         var generation = revision(domain);
         var parameterHash = Md5.encode(Json.stringify(parameters));
-        var key = prefix(domain) + ":" + generation + ":" + operation + ":" + parameterHash;
+        var key = '${prefix(domain)}:${generation}:${operation}:${parameterHash}';
         return locked(key,
             () -> Cache.store().remember(key, ServerSettings.contentCacheTtl, callback));
     }
 
     static function invalidate(domain:String):Void {
-        var key = prefix(domain) + ":revision";
+        var key = '${prefix(domain)}:revision';
         locked(key, () -> {
             Cache.store().forever(key, SecureToken.generate(16));
             return true;

@@ -194,13 +194,12 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
   const selected = selectionFor(document, selection);
   const sections = sectionsFor(document, scope);
   const fallback = document.templateMeta?.[template]?.fallback || template;
-  const frameUrl =
-    studio.frameUrl +
-    '&template=' +
-    encodeURIComponent(template) +
-    '&fallback=' +
-    encodeURIComponent(String(fallback)) +
-    (previewCollection ? '&collection=' + encodeURIComponent(previewCollection) : '');
+  const templateParam = encodeURIComponent(template);
+  const fallbackParam = encodeURIComponent(String(fallback));
+  const collectionParam = previewCollection
+    ? `&collection=${encodeURIComponent(previewCollection)}`
+    : '';
+  const frameUrl = `${studio.frameUrl}&template=${templateParam}&fallback=${fallbackParam}${collectionParam}`;
   const frameScale = Math.min(1, canvasWidth / device.width);
 
   useEffect(() => {
@@ -328,7 +327,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
               'tablet',
               'normal',
               property,
-              Math.max(28, Math.round(size * 0.8)) + 'px',
+              `${Math.max(28, Math.round(size * 0.8))}px`,
             );
           if (!styles.mobile?.normal?.['font-size'])
             setStyle(
@@ -336,7 +335,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
               'mobile',
               'normal',
               property,
-              Math.max(24, Math.round(size * 0.6)) + 'px',
+              `${Math.max(24, Math.round(size * 0.6))}px`,
             );
         }
       });
@@ -442,7 +441,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
       node = layoutBlock(key);
     } else if (preset.startsWith('component:')) {
       const id = preset.slice(10);
-      if (!current.current.document.components?.[id] || scope === '@' + id) {
+      if (!current.current.document.components?.[id] || scope === `@${id}`) {
         setError('A component cannot contain itself.');
         return;
       }
@@ -635,7 +634,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
           target.breakpoint,
           target.interaction,
           'background-image',
-          'url("' + url + '")',
+          `url("${url}")`,
         );
       else if (found.block) Object.assign(found.block, { image: url, alt });
     });
@@ -668,7 +667,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
       sectionsFor(proposal, scope).push(section);
       proposal.css = [proposal.css, imported.css].filter(Boolean).join('\n');
       setBusy(true);
-      const response = await fetch('/admin/themes/' + studio.id + '/design/data', {
+      const response = await fetch(`/admin/themes/${studio.id}/design/data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -710,7 +709,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const snapshot = historyRef.current;
       setExporting(true);
-      const response = await fetch('/admin/themes/' + studio.id + '/export', {
+      const response = await fetch(`/admin/themes/${studio.id}/export`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -795,8 +794,8 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
               const node = point.block || point.section;
               if (node) {
                 const styles = (node.styles ||= {});
-                setStyle(styles, current.current.breakpoint, 'normal', 'width', width + 'px');
-                setStyle(styles, current.current.breakpoint, 'normal', 'height', height + 'px');
+                setStyle(styles, current.current.breakpoint, 'normal', 'width', `${width}px`);
+                setStyle(styles, current.current.breakpoint, 'normal', 'height', `${height}px`);
               }
             });
           }
@@ -817,7 +816,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
     for (const section of sectionsFor(document, scope))
       visitBlocks(section.blocks, (node) => {
         if (node.type === 'repeat' && node.source?.startsWith('feed:')) sourceIds.push(node.source);
-        if (node.type === 'component' && node.component) collect('@' + node.component);
+        if (node.type === 'component' && node.component) collect(`@${node.component}`);
       });
   }
   collect(template);
@@ -841,7 +840,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
     const timeout = setTimeout(async () => {
       setSourceStatus('Loading content…');
       try {
-        const response = await fetch('/admin/themes/' + studio.id + '/design/data', {
+        const response = await fetch(`/admin/themes/${studio.id}/design/data`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -908,7 +907,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
   const classSection: DesignSection | undefined = styleClass
     ? {
         id: 'style-class',
-        name: '.' + styleClass,
+        name: `.${styleClass}`,
         background: '',
         color: '',
         padding: 0,
@@ -944,7 +943,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
     },
     onNudge: nudge,
     onComponent: saveComponent,
-    onEditComponent: (id) => showScope('@' + id),
+    onEditComponent: (id) => showScope(`@${id}`),
     onConvertList: () => convertContentList(),
   };
   const exportAction = (
@@ -970,15 +969,12 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
       {t('Connect AI')}
     </button>
   );
+  const easyClass = mode === 'easy' ? ' theme-studio-easy' : '';
+  const addingClass = mode === 'easy' && easyPanel === 'add' ? ' is-adding' : '';
+  const selectionClass = selection || styleClass ? ' has-selection' : '';
+  const studioClass = `admin-body theme-studio theme-studio-flexible${easyClass}${addingClass}${selectionClass}`;
   return (
-    <div
-      className={
-        'admin-body theme-studio theme-studio-flexible' +
-        (mode === 'easy' ? ' theme-studio-easy' : '') +
-        (mode === 'easy' && easyPanel === 'add' ? ' is-adding' : '') +
-        (selection || styleClass ? ' has-selection' : '')
-      }
-    >
+    <div className={studioClass}>
       <PageHead title={t('Theme builder')} admin />
       <header className="studio-toolbar">
         <Link
@@ -1374,7 +1370,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
               <footer className="studio-library-footer">
                 <span>{t('{count} elements', { count })}</span>
                 {publishedVersion > 0 && !dirty && (
-                  <Link href={'/admin/themes/' + studio.id + '/preview'}>
+                  <Link href={`/admin/themes/${studio.id}/preview`}>
                     <Icon name="eye" />
                     {t(studio.enabled ? 'Preview published theme' : 'Preview and activate')}
                   </Link>
@@ -1416,7 +1412,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
               </>
               <span>
                 {t(device.label)}
-                {!ready ? ' · ' + t('Loading…') : ''}
+                {!ready ? ` · ${t('Loading…')}` : ''}
               </span>
             </div>
           </div>
@@ -1475,18 +1471,15 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
       </div>
       <MediaPicker
         protectedUrls={protectedThemeImages}
-        libraryUrl={'/admin/themes/' + studio.id + '/assets'}
+        libraryUrl={`/admin/themes/${studio.id}/assets`}
         title="Theme images"
         description="These images belong to this theme and are included in its export."
         emptyMessage="No theme images yet. Upload an image to get started."
         onRemove={async (image) => {
-          const response = await fetch(
-            '/admin/themes/' + studio.id + '/assets/' + image.id + '/delete',
-            {
-              method: 'POST',
-              headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken || '' },
-            },
-          );
+          const response = await fetch(`/admin/themes/${studio.id}/assets/${image.id}/delete`, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken || '' },
+          });
           if (!response.ok) {
             const result = await response.json();
             throw new Error(result.error || 'The image could not be deleted.');

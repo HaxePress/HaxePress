@@ -96,9 +96,7 @@ export default function PluginPage({ pluginPage: page }: { pluginPage: PluginTab
                             <input type="hidden" name="_token" value={csrfToken || ''} />
                             <button
                               className="icon-button danger"
-                              aria-label={
-                                t(page.rowAction.label) + ' ' + String(row[page.columns[0].key])
-                              }
+                              aria-label={`${t(page.rowAction.label)} ${String(row[page.columns[0].key])}`}
                             >
                               <Icon name="trash" />
                             </button>

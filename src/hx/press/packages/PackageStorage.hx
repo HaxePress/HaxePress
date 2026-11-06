@@ -18,7 +18,7 @@ class PackageStorage {
         if (!PackageManifest.safePath(directory) || directory.indexOf("/") >= 0) {
             throw new Exception("Invalid installed package directory.");
         }
-        return "installed/" + directory;
+        return 'installed/${directory}';
     }
 
     public static function assetUrl(record:PackageRecord, asset:String,
@@ -26,12 +26,12 @@ class PackageStorage {
         if (asset == "") {
             return "";
         }
-        return assetBase(record, preview) + asset;
+        return '${assetBase(record, preview)}${asset}';
     }
 
     public static function assetBase(record:PackageRecord, preview:Bool = false):String {
         var prefix = preview ? "/admin/extension-assets/" : "/extension-assets/";
-        return prefix + record.id + "/" + record.directory + "/";
+        return '${prefix}${record.id}/${record.directory}/';
     }
 
     public static function remove(path:String):Void {
@@ -47,9 +47,10 @@ class PackageStorage {
     /** Accept legacy staged-upload paths while keeping all operations disk-relative. */
     public static function relative(path:String):String {
         var normalized = Path.normalize(path);
-        var legacy = Path.normalize(Environment.env("STORAGE_PATH", "storage") + "/extensions")
-            + "/";
-        var absolute = root() + "/";
+        var storage = Environment.env("STORAGE_PATH", "storage");
+        var extensions = Path.normalize('${storage}/extensions');
+        var legacy = '${extensions}/';
+        var absolute = '${root()}/';
         if (StringTools.startsWith(normalized, absolute)) {
             normalized = normalized.substr(absolute.length);
         } else if (StringTools.startsWith(normalized, legacy)) {
@@ -71,7 +72,7 @@ class PackageStorage {
         // Inspected package trees contain at most SafePackageArchive.MAX_FILES entries.
         for (file in disk.files(directory, true)) {
             var suffix = file.substr(directory.length + 1);
-            disk.move(file, destination + "/" + suffix);
+            disk.move(file, '${destination}/${suffix}');
         }
         disk.deleteDirectory(directory);
     }

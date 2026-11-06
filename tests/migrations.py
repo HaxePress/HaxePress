@@ -19,11 +19,11 @@ def prepare(fixtures):
     contents = ["", "word " * 199, "word " * 200, "a  b", "word " * 600]
     inputs = [
         {
-            "title": "Migration fixture " + str(index),
-            "slug": "migration-fixture-" + str(index),
+            "title": f"Migration fixture {str(index)}",
+            "slug": f"migration-fixture-{str(index)}",
             "excerpt": "",
             "content": contents[index % len(contents)],
-            "category": "Migration category " + str(index % 105).zfill(3),
+            "category": f"Migration category {str(index % 105).zfill(3)}",
             "image": "",
             "image_alt": "",
             "status": "draft",
@@ -78,4 +78,4 @@ def verify(fixtures, expected):
     for marker in ("query_metadata_v1", "managed_categories_v1"):
         values = fixtures.rows("settings", ["key", "value"], [("key", "=", marker)], limit=1)
         if not values or values[0]["value"] != "1":
-            raise AssertionError("Migration completion marker is missing: " + marker)
+            raise AssertionError(f"Migration completion marker is missing: {marker}")

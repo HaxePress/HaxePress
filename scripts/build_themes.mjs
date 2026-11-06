@@ -19,7 +19,7 @@ function scopedStyles(css) {
     rule.selectors = postcss.list.comma(rule.selector).map((selector) => {
       if (selector.startsWith('.cms-site')) return selector;
       if ([':root', 'html', 'body'].includes(selector)) return '.cms-site';
-      return '.cms-site ' + selector;
+      return `.cms-site ${selector}`;
     });
   });
   return sheet.toString();
@@ -61,7 +61,7 @@ for (const entry of await readdir(source, { withFileTypes: true })) {
     if (embeddedRuntime) throw new Error('Themes must use the host React/Inertia runtime.');
     let css = await readFile(join(source, 'fieldnotes/public/theme.css'), 'utf8');
     if (entry.name !== 'fieldnotes') {
-      css += '\n' + (await readFile(join(directory, 'public/theme.css'), 'utf8'));
+      css += `\n${await readFile(join(directory, 'public/theme.css'), 'utf8')}`;
       for (const folder of ['fonts', 'images']) {
         await cp(join(source, 'fieldnotes/public', folder), join(destination, 'public', folder), {
           recursive: true,

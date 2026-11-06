@@ -37,7 +37,7 @@ class ThemeAiPermissions {
 
     public static function save(themeId:String, adminId:Int, permissions:AiPermissions):Void {
         ThemeAiPermission.query.upsert([
-            "id" => Md5.encode(themeId + ":" + adminId),
+            "id" => Md5.encode('${themeId}:${adminId}'),
             "theme_id" => themeId,
             "admin_id" => adminId,
             "allow_read" => permissions.read ? 1 : 0,

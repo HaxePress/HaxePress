@@ -26,7 +26,7 @@ class BuiltInTheme {
     }
 
     public static function translations(locale:String):Null<String> {
-        return Resource.getString(RESOURCE + ".lang." + locale);
+        return Resource.getString('${RESOURCE}.lang.${locale}');
     }
 
     public static function ensure():Void {
@@ -36,7 +36,17 @@ class BuiltInTheme {
         }
         var manifest = PackageManifest.parse(source);
         PackageManifest.requireCompatible(manifest);
-        var current = InstalledPackage.query.find(ID);
+        var packageQuery = InstalledPackage.query.where("id", ID);
+        var current = packageQuery.select([
+            "kind",
+            "manifest",
+            "directory",
+            "last_error",
+            "restart_required",
+            "settings",
+            "enabled",
+            "installed_at"
+        ]).first();
         if (current != null && current.kind == "theme" && current.manifest == source
             && current.directory == "" && current.last_error == "" && current.restart_required == 0) {
             return;
@@ -75,10 +85,15 @@ class BuiltInTheme {
             "updated_at" => now
         ];
         DBStatic.transaction(() -> {
-            InstalledPackage.query.updateOrCreate(["id" => ID], values);
+            if (packageQuery.exists()) {
+                packageQuery.update(values);
+            } else {
+                values.set("id", ID);
+                InstalledPackage.query.insert(values);
+            }
             PackageHook.query.where("package_id", ID).delete();
             for (event in manifest.hooks) {
-                PackageHook.query.create(["package_id" => ID, "event" => event]);
+                PackageHook.query.insert(["package_id" => ID, "event" => event]);
             }
         });
         ContentCache.changed("extensions");

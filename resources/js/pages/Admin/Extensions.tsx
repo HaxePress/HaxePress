@@ -48,7 +48,7 @@ export default function Extensions({
 }) {
   const { t } = useTranslation();
   const { csrfToken, errors, i18n } = usePage<SharedProps>().props;
-  const base = '/admin/' + (kind === 'theme' ? 'themes' : 'plugins');
+  const base = `/admin/${kind === 'theme' ? 'themes' : 'plugins'}`;
   const title = kind === 'theme' ? t('Themes') : t('Plugins');
   const localizedPackages = packages.map((item) => {
     const translate = createTranslator(i18n, item.id);
@@ -75,13 +75,13 @@ export default function Extensions({
     setUploadError('');
     if (file.size > uploadLimit || !file.name.toLowerCase().endsWith('.zip')) {
       setUploadError(
-        'Choose a ZIP package smaller than ' + Math.floor(uploadLimit / 1024 / 1024) + ' MB.',
+        `Choose a ZIP package smaller than ${Math.floor(uploadLimit / 1024 / 1024)} MB.`,
       );
       return;
     }
     setUploading(true);
     try {
-      const response = await fetch(base + '/upload', {
+      const response = await fetch(`${base}/upload`, {
         method: 'POST',
         body: file,
         headers: {
@@ -105,7 +105,7 @@ export default function Extensions({
 
   function action(item: ExtensionSummary, command: string) {
     router.post(
-      base + '/' + item.id + '/' + command,
+      `${base}/${item.id}/${command}`,
       { _token: csrfToken },
       { preserveScroll: true, onStart: () => setBusy(true), onFinish: () => setBusy(false) },
     );
@@ -177,7 +177,7 @@ export default function Extensions({
               disabled={form.processing}
               onClick={() => {
                 form.transform((values) => ({ ...values, _token: csrfToken }));
-                form.post(base + '/install', {
+                form.post(`${base}/install`, {
                   onSuccess: () => setInspection(null),
                   preserveScroll: true,
                 });
@@ -193,7 +193,7 @@ export default function Extensions({
               className="button button-outline"
               disabled={form.processing}
               onClick={async () => {
-                await fetch(base + '/discard', {
+                await fetch(`${base}/discard`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -222,7 +222,7 @@ export default function Extensions({
         <input
           id="extension-search"
           type="search"
-          placeholder={'Find a ' + kind + '…'}
+          placeholder={`Find a ${kind}…`}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           maxLength={80}
@@ -232,12 +232,12 @@ export default function Extensions({
       <div className="extension-grid">
         {localizedPackages.map((item) => (
           <section
-            className={'admin-card extension-card ' + (item.enabled ? 'extension-active' : '')}
+            className={`admin-card extension-card ${item.enabled ? 'extension-active' : ''}`}
             key={item.id}
           >
             {kind === 'theme' && (
               <ThemeThumbnail
-                key={item.id + ':' + item.updated_at}
+                key={`${item.id}:${item.updated_at}`}
                 id={item.id}
                 name={item.name}
                 revision={item.updated_at}
@@ -246,7 +246,7 @@ export default function Extensions({
             <div className="extension-card-body">
               <div className="extension-card-title">
                 <h2>{item.name}</h2>
-                <span className={'status-badge ' + (item.enabled ? 'published' : 'draft')}>
+                <span className={`status-badge ${item.enabled ? 'published' : 'draft'}`}>
                   {item.enabled ? t('Active') : t('Inactive')}
                 </span>
               </div>
@@ -271,13 +271,13 @@ export default function Extensions({
               <div className="package-actions">
                 {item.designed && (
                   <>
-                    <Link className="button button-outline" href={base + '/' + item.id + '/design'}>
+                    <Link className="button button-outline" href={`${base}/${item.id}/design`}>
                       <Icon name="edit" />
                       {t('Edit design')}
                     </Link>
                     <a
                       className="button button-outline"
-                      href={base + '/' + item.id + '/export'}
+                      href={`${base}/${item.id}/export`}
                       title={t('Export saved design')}
                     >
                       <Icon name="download" />
@@ -286,7 +286,7 @@ export default function Extensions({
                   </>
                 )}
                 {kind === 'theme' && (
-                  <Link className="button button-outline" href={base + '/' + item.id + '/preview'}>
+                  <Link className="button button-outline" href={`${base}/${item.id}/preview`}>
                     {t('Preview')}
                   </Link>
                 )}
@@ -309,14 +309,14 @@ export default function Extensions({
                   </button>
                 )}
                 {item.setting_count > 0 && (
-                  <Link className="button button-outline" href={base + '/' + item.id + '/settings'}>
+                  <Link className="button button-outline" href={`${base}/${item.id}/settings`}>
                     {t('Settings')}
                   </Link>
                 )}
                 {!item.built_in && (
                   <button
                     className="icon-button danger"
-                    aria-label={'Uninstall ' + item.name}
+                    aria-label={`Uninstall ${item.name}`}
                     disabled={busy || (kind === 'theme' && item.enabled === 1)}
                     onClick={() => setPending(item)}
                   >
@@ -343,15 +343,13 @@ export default function Extensions({
         noun={kind === 'theme' ? t('themes') : t('plugins')}
       />
       <p className="field-help">
-        {total} {t('installed')} {total === 1 ? kind : kind + 's'}
+        {total} {t('installed')} {total === 1 ? kind : `${kind}s`}
         {t('. ZIP uploads up to')} {Math.floor(uploadLimit / 1024 / 1024)} {t('MB.')}
       </p>
       <ConfirmDialog
         open={pending !== null}
         busy={busy}
-        message={
-          'Uninstall “' + (pending?.name || '') + '”? Its files and settings will be removed.'
-        }
+        message={`Uninstall “${pending?.name || ''}”? Its files and settings will be removed.`}
         onCancel={() => setPending(null)}
         onConfirm={() => {
           if (!pending) return;

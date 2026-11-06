@@ -42,7 +42,7 @@ class MediaUsage {
     public static function pattern(filename:String):String {
         var escaped = StringTools.replace(StringTools.replace(StringTools.replace(filename, "!",
             "!!"), "%", "!%"), "_", "!_");
-        return "%" + escaped + "%";
+        return '%${escaped}%';
     }
 
     public static function contentQuery(filename:String):QueryBuilder<ContentItem> {
@@ -192,7 +192,7 @@ class MediaUsage {
                     query.where(reference.columns[index], value);
                 }
                 if (!nullable) {
-                    sources.push({key: table + ":" + reference.name, table: table, query: query});
+                    sources.push({key: '${table}:${reference.name}', table: table, query: query});
                 }
             }
         }

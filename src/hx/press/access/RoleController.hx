@@ -45,7 +45,7 @@ class RoleController {
             return CmsController.forbidden(request);
         }
         var redirect = AdminController.validationRedirect(request, "role", error,
-            creating ? "/admin/roles/new" : "/admin/roles/" + role.key + "/edit");
+            creating ? "/admin/roles/new" : '/admin/roles/${role.key}/edit');
         if (redirect != null) {
             return redirect;
         }

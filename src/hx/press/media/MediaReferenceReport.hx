@@ -138,7 +138,7 @@ class MediaReferenceReport {
     static function reference(source:String, key:String, type:String, title:String,
             detail:String = "", href:String = null, permitted:Bool = true):MediaReference {
         return {
-            id: source + ":" + key,
+            id: '${source}:${key}',
             type: type,
             title: permitted ? title : I18n.t("Restricted reference"),
             detail: permitted ? detail : I18n.t("Your account cannot view this record."),
@@ -161,7 +161,7 @@ class MediaReferenceReport {
         }
         var permitted = CmsAccess.canCollection(item.content_type)
             && CmsAccess.canEdit(item.author_id);
-        var href = ContentTypes.adminBase(item.content_type) + "/" + item.id + "/edit";
+        var href = '${ContentTypes.adminBase(item.content_type)}/${item.id}/edit';
         return reference(source, key, type, item.title, detail, href, permitted);
     }
 
@@ -175,9 +175,9 @@ class MediaReferenceReport {
                 return installed == null ? null : cast installed.toObject();
             });
         var title = item == null ? owner : item.name;
-        var href = item == null ? null : "/admin/" + (item.kind == "theme" ? "themes" : "plugins");
+        var href = item == null ? null : '/admin/${(item.kind == "theme" ? "themes" : "plugins")}';
         if (item != null && type == "Theme design") {
-            href += "/" + item.id + "/design";
+            href += '/${item.id}/design';
         }
         return reference(source, key, type, title, detail, href, CmsAccess.can("extensions"));
     }
@@ -195,20 +195,16 @@ class MediaReferenceReport {
             case "working":
                 var own = row.user_id == CmsAccess.current().id
                     && CmsAccess.canCollection(row.kind);
-                var href = row.document_id > 0 ? ContentTypes.adminBase(row.kind)
-                    + "/"
-                    + row.document_id
-                    + "/edit" : ContentTypes.adminBase(row.kind)
-                    + "/new?draft="
-                    + StringTools.urlEncode(row.key);
+                var base = ContentTypes.adminBase(row.kind);
+                var href = row.document_id > 0 ? '${base}/${row.document_id}/edit' : '${base}/new?draft=${StringTools.urlEncode(row.key)}';
                 reference(source, key, "Working copy", row.title, "", href, own);
             case "settings":
                 var title = row.key == "site_logo" ? I18n.t("Site logo") : row.key;
                 reference(source, key, "Site settings", title, "", "/admin/settings",
                     CmsAccess.can("settings"));
             case "plugin-values":
-                packageReference(source, key, "plugin-" + row.plugin_id, "Plugin data",
-                    row.scope + " / " + row.key);
+                packageReference(source, key, 'plugin-${row.plugin_id}', "Plugin data",
+                    '${row.scope} / ${row.key}');
             case "packages", "private-packages":
                 if (source == "private-packages") {
                     var manifest = PackageManifest.parse(row.manifest);
@@ -218,26 +214,22 @@ class MediaReferenceReport {
                     }
                 }
                 reference(source, key, "Package settings", row.name, "",
-                    "/admin/"
-                    + (row.kind == "theme" ? "themes" : "plugins")
-                    + "/"
-                    + row.id
-                    + "/settings",
+                    '/admin/${(row.kind == "theme" ? "themes" : "plugins")}/${row.id}/settings',
                     CmsAccess.can("extensions"));
             case "collections":
                 reference(source, key, "Collection", row.name, "",
-                    "/admin/content-types/" + StringTools.urlEncode(row.key) + "/edit",
+                    '/admin/content-types/${StringTools.urlEncode(row.key)}/edit',
                     CmsAccess.can("settings"));
             case "navigation":
                 reference(source, key, "Navigation", row.label, "", "/admin/navigation",
                     CmsAccess.can("navigation"));
             case "tags":
                 reference(source, key, "Tag", row.name, "",
-                    "/admin/tags?q=" + StringTools.urlEncode(row.name), CmsAccess.can("taxonomy"));
+                    '/admin/tags?q=${StringTools.urlEncode(row.name)}', CmsAccess.can("taxonomy"));
             case "retained":
                 var detail:String = row.label;
                 if (!~/^value-[a-f0-9]{32}$/.match(row.reference_key)) {
-                    detail = detail == "" ? row.reference_key : detail + " · " + row.reference_key;
+                    detail = detail == "" ? row.reference_key : '${detail} · ${row.reference_key}';
                 }
                 var type = StringTools.startsWith(row.owner, "theme-")
                     && ["design-draft", "design-published"].contains(row.reference_key) ? "Theme design" : "Plugin dependency";
@@ -281,12 +273,8 @@ class MediaReferenceReport {
                         continue;
                     }
                     if (items.length == PAGE_SIZE) {
-                        var next = "/admin/media/"
-                            + mediaId
-                            + "/references?source="
-                            + resumeSource
-                            + "&after="
-                            + StringTools.urlEncode(resumeKey);
+                        var encodedKey = StringTools.urlEncode(resumeKey);
+                        var next = '/admin/media/${mediaId}/references?source=${resumeSource}&after=${encodedKey}';
                         return {items: items, next: next, verified: true};
                     }
                     items.push(item);

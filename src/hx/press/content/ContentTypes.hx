@@ -113,11 +113,24 @@ class ContentTypes {
     }
 
     public static function revision():String {
-        return ContentCache.revision("structure") + ":" + packageRevision();
+        return '${ContentCache.revision("structure")}:${packageRevision()}';
     }
 
     static function packageRevision():String {
         return ContentCache.revision("extensions");
+    }
+
+    static function byKey(key:String, activeOnly:Bool):QueryBuilder<ContentType> {
+        var query = ContentType.query.where("key", key);
+        return activeOnly ? available(query) : query;
+    }
+
+    public static function exists(key:String, activeOnly:Bool = true):Bool {
+        if (!validKey(key)) {
+            return false;
+        }
+        return ContentCache.remember("structure", "type-exists",
+            [key, activeOnly, packageRevision()], () -> byKey(key, activeOnly).exists());
     }
 
     public static function record(key:String, activeOnly:Bool = true):Null<ContentTypeRecord> {
@@ -126,11 +139,7 @@ class ContentTypes {
         }
         return ContentCache.remember("structure", "type", [key, activeOnly, packageRevision()],
             () -> {
-                var query = ContentType.query.select(columns).where("key", key);
-                if (activeOnly) {
-                    available(query);
-                }
-                var row = query.first();
+                var row = byKey(key, activeOnly).select(columns).first();
                 return row == null ? null : cast row.toObject();
             });
     }
@@ -176,8 +185,8 @@ class ContentTypes {
             singular: row.singular,
             description: row.description,
             icon: row.icon,
-            adminBase: "/admin/" + row.admin_path,
-            publicBase: "/" + row.public_path,
+            adminBase: '/admin/${row.admin_path}',
+            publicBase: '/${row.public_path}',
             publicVisible: row.public_visible == 1,
             hasArchive: row.has_archive == 1,
             enabled: row.enabled == 1,
@@ -214,14 +223,29 @@ class ContentTypes {
     }
 
     public static function adminBase(key:String):String {
-        var type = find(key, false);
-        return type == null ? "/admin/collections/" + StringTools.urlEncode(key) : type.adminBase;
+        if (validKey(key)) {
+            var base = ContentCache.remember("structure", "admin-base", [key], () -> {
+                var row = byKey(key, false).select(["admin_path"]).first();
+                return row == null ? null : '/admin/${row.admin_path}';
+            });
+            if (base != null) {
+                return base;
+            }
+        }
+        return '/admin/collections/${StringTools.urlEncode(key)}';
     }
 
     public static function url(key:String, slug:String):String {
-        var type = find(key);
-        return type == null
-            || !type.publicVisible ? "" : type.publicBase + "/" + StringTools.urlEncode(slug);
+        if (!validKey(key)) {
+            return "";
+        }
+        var base = ContentCache.remember("structure", "public-base", [key, packageRevision()],
+            () -> {
+                var row = byKey(key,
+                    true).where("public_visible", 1).select(["public_path"]).first();
+                return row == null ? null : '/${row.public_path}';
+            });
+        return base == null ? "" : '${base}/${StringTools.urlEncode(slug)}';
     }
 
     public static function navigation(selected:String = "",
@@ -273,11 +297,9 @@ class ContentTypes {
         query.selectSub(owner, "owner_active").selectSub(items, "items");
         if (search != "") {
             var prefix = CategoryData.key(search);
-            var pattern = "%"
-                + StringTools.replace(StringTools.replace(StringTools.replace(prefix, "!", "!!"),
-                    "%", "!%"), "_",
-                    "!_")
-                + "%";
+            var escaped = StringTools.replace(StringTools.replace(StringTools.replace(prefix, "!",
+                "!!"), "%", "!%"), "_", "!_");
+            var pattern = '%${escaped}%';
             query.where(matches -> matches.whereLike("name", pattern).orWhereLike("key", pattern));
         }
         return query;
@@ -338,7 +360,7 @@ class ContentTypes {
             return fallback;
         }
         if (!(value is String) || StringTools.trim(value).length > maximum) {
-            throw new Exception("Invalid content type field: " + key);
+            throw new Exception('Invalid content type field: ${key}');
         }
         return StringTools.trim(value);
     }
@@ -450,7 +472,7 @@ class ContentTypes {
         if (!validKey(key)) {
             throw new Exception("Use a stable lowercase content type key, with letters, numbers or underscores.");
         }
-        return ContentLocks.run("type-" + key, () -> saveLocked(input, key, owner, creating));
+        return ContentLocks.run('type-${key}', () -> saveLocked(input, key, owner, creating));
     }
 
     static function saveLocked(input:Dynamic, key:String, owner:String, creating:Bool):String {
@@ -513,9 +535,9 @@ class ContentTypes {
         var enabled = flag(input, "enabled", true);
         var dedicated = flag(input,
             "dedicatedAccess", existing != null && existing.capability != "content");
-        var capability = dedicated ? "content." + key : "content";
+        var capability = dedicated ? 'content.${key}' : "content";
         if (dedicated) {
-            Roles.ensureCapability(capability, (name + " access").substr(0, 120), "Collections",
+            Roles.ensureCapability(capability, ('${name} access').substr(0, 120), "Collections",
                 owner);
         }
         if (existing != null && existing.system == 1 && !enabled) {
@@ -527,7 +549,7 @@ class ContentTypes {
             "singular" => singular,
             "description" => text(input, "description", 500),
             "icon" => icon,
-            "admin_path" => existing == null ? "collections/" + key : existing.admin_path,
+            "admin_path" => existing == null ? 'collections/${key}' : existing.admin_path,
             "public_path" => path,
             "public_visible" => flag(input, "publicVisible", true) ? 1 : 0,
             "has_archive" => flag(input, "hasArchive", true) ? 1 : 0,
@@ -550,11 +572,12 @@ class ContentTypes {
         DBStatic.transaction(() -> {
             if (existing == null) {
                 values.set("created_at", SiteSettingsStore.timestamp());
-                ContentType.query.create(values);
+                ContentType.query.insert(values);
             } else {
                 if (existing.public_path != path) {
-                    ContentTypePath.query.updateOrCreate(["path" => existing.public_path],
-                        ["type_key" => key]);
+                    ContentTypePath.query.upsert(["path" => existing.public_path, "type_key" => key],
+                        ["path"],
+                        ["type_key"]);
                 }
                 existing.update(values);
             }
@@ -566,7 +589,7 @@ class ContentTypes {
 
     /** Native modules call this during creation; existing site customizations are retained. */
     public static function register(pluginSlug:String, input:Dynamic):String {
-        var owner = "plugin-" + pluginSlug;
+        var owner = 'plugin-${pluginSlug}';
         if (!InstalledPackage.query.where("id", owner).where("kind", "plugin").exists()) {
             throw new Exception("Install the owning plugin before registering its content type.");
         }
@@ -582,7 +605,7 @@ class ContentTypes {
     }
 
     public static function remove(key:String):Void {
-        ContentLocks.run("type-" + key, () -> {
+        ContentLocks.run('type-${key}', () -> {
             removeLocked(key);
             return true;
         });

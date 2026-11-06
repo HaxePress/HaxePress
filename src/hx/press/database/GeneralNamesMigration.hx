@@ -64,7 +64,7 @@ class GeneralNamesMigration {
     }
 
     public static function up():Void {
-        if (Setting.query.find(MARKER) != null) {
+        if (Setting.query.where("key", MARKER).exists()) {
             return;
         }
         ContentItem.query.where("content_type", "post").update(["content_type" => "entry"]);
@@ -74,11 +74,12 @@ class GeneralNamesMigration {
         migrateNavigation();
         migrateFactorySettings();
         migrateBundledSettings();
-        var previous = Setting.query.find("managed_post_images_v1");
-        if (previous != null && Setting.query.find("managed_content_images_v1") == null) {
+        var previous = Setting.query.where("key", "managed_post_images_v1");
+        if (previous.exists() && !Setting.query.where("key", "managed_content_images_v1")
+            .exists()) {
             previous.update(["key" => "managed_content_images_v1"]);
         }
-        Setting.query.create(["key" => MARKER, "value" => "2.0.0"]);
+        Setting.query.insert(["key" => MARKER, "value" => "2.0.0"]);
     }
 
     static function migrateWorkingCopies():Void {
@@ -141,13 +142,13 @@ class GeneralNamesMigration {
             for (row in rows) {
                 var values:Map<String, Dynamic> = [];
                 if (row.url == "/journal" || StringTools.startsWith(row.url, "/journal?")) {
-                    values.set("url", "/content" + row.url.substr(8));
+                    values.set("url", '/content${row.url.substr(8)}');
                 } else if (StringTools.startsWith(row.url, "/story/")) {
-                    values.set("url", "/content/" + row.url.substr(7));
+                    values.set("url", '/content/${row.url.substr(7)}');
                 } else if (StringTools.startsWith(row.url, "/p/")) {
-                    values.set("url", "/pages/" + row.url.substr(3));
+                    values.set("url", '/pages/${row.url.substr(3)}');
                 } else if (StringTools.startsWith(row.url, "/tag/")) {
-                    values.set("url", "/tags/" + row.url.substr(5));
+                    values.set("url", '/tags/${row.url.substr(5)}');
                 }
                 if (row.label == "The journal") {
                     values.set("label", "Content");

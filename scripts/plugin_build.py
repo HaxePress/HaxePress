@@ -41,7 +41,7 @@ HOST_API_TYPES = [
 def host_exports():
     options = []
     for name in HOST_API_TYPES:
-        options.extend(["--macro", 'haxe.macro.Context.getType("' + name + '")'])
+        options.extend(["--macro", f'haxe.macro.Context.getType("{name}")'])
     return options
 
 
@@ -53,7 +53,7 @@ def environment():
     binary = compiler()
     return {
         **os.environ,
-        "PATH": str(binary.parent) + os.pathsep + os.environ["PATH"],
+        "PATH": f"{str(binary.parent)}{os.pathsep}{os.environ['PATH']}",
         "HAXE_STD_PATH": str(ROOT / ".tools/haxe/std"),
     }
 
@@ -80,7 +80,7 @@ def host_options():
             continue
         argument = line.split(None, 1)[1]
         filename, name = argument.rsplit("@", 1)
-        options.extend(["-resource", str(ROOT / filename) + "@" + name])
+        options.extend(["-resource", f"{str(ROOT / filename)}@{name}"])
     for line in (ROOT / ".deps/hxwell/extraParams.hxml").read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):

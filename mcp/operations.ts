@@ -70,7 +70,7 @@ const tokenFields = new Set(['background', 'text', 'accent', 'font', 'width', 'r
 const reserved = new Set(['__proto__', 'prototype', 'constructor']);
 function assign(target: object, values: Record<string, unknown>, allowed: Set<string>) {
   for (const [key, value] of Object.entries(values)) {
-    if (!allowed.has(key) || reserved.has(key)) throw new Error('Unsupported field: ' + key);
+    if (!allowed.has(key) || reserved.has(key)) throw new Error(`Unsupported field: ${key}`);
     Object.defineProperty(target, key, {
       value,
       configurable: true,

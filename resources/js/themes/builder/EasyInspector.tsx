@@ -189,9 +189,9 @@ export default function EasyInspector(props: EasyInspectorProps) {
                     type="button"
                     key={option.value}
                     aria-pressed={
-                      (values['padding-block'] || section.padding + 'px') === option.value + 'px'
+                      (values['padding-block'] || `${section.padding}px`) === `${option.value}px`
                     }
-                    onClick={() => onStyle('padding-block', option.value + 'px')}
+                    onClick={() => onStyle('padding-block', `${option.value}px`)}
                   >
                     {t(option.name)}
                   </button>
@@ -476,7 +476,7 @@ export default function EasyInspector(props: EasyInspectorProps) {
         />
         {optionPanels.map((option) => (
           <Options
-            key={option.panel + '-' + (block?.id || section.id)}
+            key={`${option.panel}-${block?.id || section.id}`}
             title={option.title}
             icon={option.icon}
           >

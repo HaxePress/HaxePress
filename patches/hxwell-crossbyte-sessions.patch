@@ -15,7 +15,7 @@
  import hx.well.http.Request;
  import hx.well.http.RequestStatic;
  import hx.well.http.Response;
-@@ -41,43 +49,75 @@
+@@ -41,43 +49,74 @@
      var head:{bytes:Bytes, protocol:String};
  
      /** Validate before releasing the HTTP context, so refusals are HTTP errors. */
@@ -68,14 +68,13 @@
 +                    .contains(protocol)))
              throw new Exception("Selected WebSocket subprotocol was not offered");
 -        var accept = Base64.encode(Sha1.make(Bytes.ofString(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
-+        var accept = Base64.encode(Sha1.make(Bytes.ofString(key
-+            + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
++        var acceptSource = '${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
++        var accept = Base64.encode(Sha1.make(Bytes.ofString(acceptSource)));
          var wire = new StringBuf();
 -        wire.add("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n");
 -        for(name => value in response.headers) {
-+        wire.add("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: "
-+            + accept
-+            + "\r\n");
++        wire.add("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n");
++        wire.add('Sec-WebSocket-Accept: ${accept}\r\n');
 +        for (name => value in response.headers) {
              var lower = HttpSyntax.lowerAscii(name);
 -            if(["connection", "upgrade", "content-length", "transfer-encoding", "content-type", "content-encoding", "sec-websocket-accept", "sec-websocket-extensions"].contains(lower)) continue;
@@ -94,7 +93,7 @@
          }
 -        for(cookie in response.cookies) wire.add("Set-Cookie: " + cookie.toString() + "\r\n");
 +        for (cookie in response.cookies)
-+            wire.add("Set-Cookie: " + cookie.toString() + "\r\n");
++            wire.add('Set-Cookie: ${cookie.toString()}\r\n');
          wire.add("\r\n");
 -        return {bytes:Bytes.ofString(wire.toString()), protocol:protocol};
 +        return {bytes: Bytes.ofString(wire.toString()), protocol: protocol};
@@ -111,7 +110,7 @@
          this.request = request;
          this.handler = handler;
          this.config = config;
-@@ -96,18 +136,25 @@
+@@ -96,18 +135,25 @@
          native.__onMessage = (bytes, text) -> {
              var size = bytes.length;
              mutex.acquire();
@@ -142,7 +141,7 @@
  
      public function open():Void {
          UpstreamWebSocket.open(native, head.bytes, head.protocol, tail);
-@@ -117,8 +164,12 @@
+@@ -117,8 +163,12 @@
  
      function reserveOutput(size:Int):Bool {
          mutex.acquire();
@@ -157,7 +156,7 @@
          mutex.release();
          return accept;
      }
-@@ -128,7 +179,10 @@
+@@ -128,7 +178,10 @@
          var first = !closed;
          closed = true;
          mutex.release();
@@ -169,7 +168,7 @@
          cleanup();
          session.shutdown();
          inbox.add(Closed(code, reason));
-@@ -141,7 +195,8 @@
+@@ -141,7 +194,8 @@
  
      /** Started only after HTTP middleware disposal and thread-local cleanup. */
      public function start():Void {
@@ -179,7 +178,7 @@
          launched = true;
          worker(receiveLoop);
          worker(sendLoop);
-@@ -149,79 +204,125 @@
+@@ -149,79 +203,125 @@
  
      static function worker(work:Void->Void):Void {
          #if jvm
@@ -337,7 +336,7 @@
          RequestStatic.reset();
          ResponseStatic.clear();
          return success;
-@@ -239,15 +340,25 @@
+@@ -239,15 +339,25 @@
  private class LimitedSession extends WebSocketSession {
      var reserve:Int->Bool;
      var overflow:Void->Void;

@@ -86,20 +86,20 @@ export default function Roles({
                 <tr key={role.key}>
                   <td>
                     <strong>
-                      <Link href={'/admin/roles/' + role.key + '/edit'}>{t(role.name)}</Link>
+                      <Link href={`/admin/roles/${role.key}/edit`}>{t(role.name)}</Link>
                     </strong>
                     <small className="field-help"> {role.key}</small>
                   </td>
                   <td>{role.description}</td>
                   <td>
-                    <span className={'status ' + (role.enabled ? 'published' : 'draft')}>
+                    <span className={`status ${role.enabled ? 'published' : 'draft'}`}>
                       {t(role.enabled ? 'Enabled' : 'Disabled')}
                     </span>
                   </td>
                   <td>
                     <Link
                       className="icon-button"
-                      href={'/admin/roles/' + role.key + '/edit'}
+                      href={`/admin/roles/${role.key}/edit`}
                       aria-label={t('Edit {name}', { name: role.name })}
                     >
                       <Icon name="edit" />

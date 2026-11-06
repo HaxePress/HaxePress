@@ -91,10 +91,7 @@ export default function DesignLayers({
           {zone({ ...target, position: 'before' }, 'Insert before element')}
           <button
             type="button"
-            className={
-              'studio-layer studio-layer-block' +
-              (selection?.block === block.id ? ' is-selected' : '')
-            }
+            className={`studio-layer studio-layer-block${selection?.block === block.id ? ' is-selected' : ''}`}
             style={{ paddingInlineStart: 18 + depth * 14 }}
             draggable={!disabled}
             disabled={disabled}
@@ -171,10 +168,7 @@ export default function DesignLayers({
           {zone({ scope, section: section.id, position: 'before' }, 'Insert before section')}
           <button
             type="button"
-            className={
-              'studio-layer' +
-              (selection?.section === section.id && !selection.block ? ' is-selected' : '')
-            }
+            className={`studio-layer${selection?.section === section.id && !selection.block ? ' is-selected' : ''}`}
             draggable={!disabled}
             disabled={disabled}
             onDragStart={(event) => start(event, { scope, section: section.id })}

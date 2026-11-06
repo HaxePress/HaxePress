@@ -87,8 +87,8 @@ def verify(fixtures):
     image_ids.append(image["id"])
     package_filename = (
         "ta_"
-        + hashlib.sha256(("theme-asset:" + image["filename"]).encode()).hexdigest()[:32]
-        + image["filename"][32:]
+        f"""{hashlib.sha256(f"theme-asset:{image['filename']}".encode()).hexdigest()[:32]}"""
+        f"{image['filename'][32:]}"
     )
     fixtures.update(
         "media_assets",
@@ -135,7 +135,7 @@ def verify(fixtures):
             "desktop": {
                 "normal": {
                     "border-radius": "16px",
-                    "background-image": 'url("' + image["url"] + '")',
+                    "background-image": f"""url("{image['url']}")""",
                 }
             },
             "mobile": {"normal": {"width": "100%"}},
@@ -143,17 +143,17 @@ def verify(fixtures):
     }
     document["templates"]["SpecialOffers"] = []
     document["templateMeta"] = {"SpecialOffers": {"label": "Special offers", "fallback": "Home"}}
-    document["css"] = ':scope { --illustration: url("' + image["url"] + '"); }'
+    document["css"] = f""":scope {{ --illustration: url("{image['url']}"); }}"""
     status, headers, body = post_json(
         owner,
         "/admin/themes/create",
-        {"name": "Export " + suffix, "starter": "blank", "design": json.dumps(document)},
+        {"name": f"Export {suffix}", "starter": "blank", "design": json.dumps(document)},
     )
-    check(status == 303, "Export design creation failed: " + body[:200])
+    check(status == 303, f"Export design creation failed: {body[:200]}")
     editor_url = headers["location"]
     identifier = props(owner, editor_url)["studio"]["id"]
     packages.append(identifier)
-    url = "/admin/themes/" + identifier + "/export"
+    url = f"/admin/themes/{identifier}/export"
     exports = Path(os.environ["TEST_DB_PATH"]).parent / "exports"
     try:
         check(public.request(url)[0] == 303, "Public request exported a private theme")
@@ -167,7 +167,7 @@ def verify(fixtures):
         status, headers, data = export(owner, url)
         check(
             status == 200 and headers["content-type"] == "application/zip",
-            "Saved design export failed: " + data[:400].decode("utf-8", errors="replace"),
+            f"Saved design export failed: {data[:400].decode('utf-8', errors='replace')}",
         )
         check(
             "attachment" in headers["content-disposition"]
@@ -187,11 +187,11 @@ def verify(fixtures):
                 "cms-package.json",
                 "theme-design.json",
                 "theme-media.json",
-                "media/" + package_filename,
+                f"media/{package_filename}",
             },
             "Export included unrelated site data",
         )
-        check(files["media/" + package_filename] == source_bytes, "Export changed its media bytes")
+        check(files[f"media/{package_filename}"] == source_bytes, "Export changed its media bytes")
         media = json.loads(files["theme-media.json"])
         check(
             media[0]["title"] == "Portable illustration"
@@ -209,7 +209,7 @@ def verify(fixtures):
         with zipfile.ZipFile(io.BytesIO(snapshot)) as archive:
             files = {name: archive.read(name) for name in archive.namelist()}
         manifest = json.loads(files["cms-package.json"])
-        manifest["slug"] = "portable-" + suffix
+        manifest["slug"] = f"portable-{suffix}"
         original_prefix = manifest["design"]["mediaPrefix"]
         manifest["design"]["mediaPrefix"] = "https://previous-site.test/uploads/"
         files["cms-package.json"] = json.dumps(manifest).encode()
@@ -217,17 +217,16 @@ def verify(fixtures):
         files["theme-design.json"] = (
             json.dumps(design).replace(original_prefix, manifest["design"]["mediaPrefix"]).encode()
         )
-        files["media/" + package_filename] = png()
+        files[f"media/{package_filename}"] = png()
         package = zip_files(files)
-        imported = "theme-" + manifest["slug"]
+        imported = f"theme-{manifest['slug']}"
         install(owner, "themes", package)
         packages.append(imported)
-        imported_studio = props(owner, "/admin/themes/" + imported + "/design")["studio"]
+        imported_studio = props(owner, f"/admin/themes/{imported}/design")["studio"]
         imported_document = imported_studio["document"]
         imported_url = imported_document["templates"]["Home"][0]["blocks"][1]["image"]
         check(
-            imported_url != image["url"]
-            and imported_url.startswith("/theme-assets/" + imported + "/"),
+            imported_url != image["url"] and imported_url.startswith(f"/theme-assets/{imported}/"),
             "An existing different image was overwritten",
         )
         check(
@@ -262,7 +261,7 @@ def verify(fixtures):
         )
         check(
             owner.request(
-                "/admin/themes/" + imported + "/assets/" + str(new_image["id"]) + "/delete",
+                f"/admin/themes/{imported}/assets/{str(new_image['id'])}/delete",
                 "POST",
                 {},
             )[0]
@@ -285,13 +284,13 @@ def verify(fixtures):
             "Explicit visual theme replacement failed",
         )
         check(
-            props(owner, "/admin/themes/" + imported + "/design")["studio"]["version"] == 2,
+            props(owner, f"/admin/themes/{imported}/design")["studio"]["version"] == 2,
             "Replacement did not invalidate stale editors",
         )
         check(
             post_json(
                 owner,
-                "/admin/themes/" + imported + "/design",
+                f"/admin/themes/{imported}/design",
                 {
                     "name": "Stale",
                     "design": json.dumps(imported_document),
@@ -303,7 +302,7 @@ def verify(fixtures):
             "An old editor overwrote an imported design",
         )
         check(
-            owner.request("/admin/themes/" + imported + "/enable", "POST", {})[0] == 303,
+            owner.request(f"/admin/themes/{imported}/enable", "POST", {})[0] == 303,
             "Imported design activation failed",
         )
         check(
@@ -311,7 +310,7 @@ def verify(fixtures):
             "Imported theme did not render through SSR",
         )
         invalid = dict(files)
-        invalid.pop("media/" + package_filename)
+        invalid.pop(f"media/{package_filename}")
         count_before = fixtures.count("theme_designs")
         check(
             owner.request(
@@ -377,17 +376,12 @@ def verify(fixtures):
             == 200,
             "Streaming export fixture save failed",
         )
-        cookie = "; ".join(name + "=" + value for name, value in owner.cookies.items())
+        cookie = "; ".join(f"{name}={value}" for name, value in owner.cookies.items())
         for after_headers in (False, True):
             connection = socket.create_connection((BASE.hostname, BASE.port), timeout=10)
             request = (
-                "GET "
-                + url
-                + " HTTP/1.1\r\nHost: "
-                + BASE.netloc
-                + "\r\nCookie: "
-                + cookie
-                + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
+                f"GET {url} HTTP/1.1\r\nHost: {BASE.netloc}\r\nCookie: {cookie}"
+                "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
             )
             connection.sendall(request.encode())
             if after_headers:
@@ -405,13 +399,13 @@ def verify(fixtures):
                 not list(exports.glob("*.zip")), "Disconnected theme download left a temporary ZIP"
             )
     finally:
-        owner.request("/admin/themes/" + previous + "/enable", "POST", {})
+        owner.request(f"/admin/themes/{previous}/enable", "POST", {})
         for package in reversed(packages):
-            owner.request("/admin/themes/" + package + "/uninstall", "POST", {})
+            owner.request(f"/admin/themes/{package}/uninstall", "POST", {})
         for row in fixtures.scan("media_assets", ["id"], [("id", ">", image["id"])]):
             image_ids.append(row["id"])
         for image_id in set(image_ids):
-            owner.request("/admin/media/" + str(image_id) + "/delete", "POST", {})
+            owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})
 
 
 if __name__ == "__main__":

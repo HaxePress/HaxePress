@@ -97,14 +97,14 @@ export default function Team({
                   <span>{member.email}</span>
                   <span>
                     <b className="role-label">
-                      {t(member.role.charAt(0).toUpperCase() + member.role.slice(1))}
+                      {t(`${member.role.charAt(0).toUpperCase()}${member.role.slice(1)}`)}
                     </b>{' '}
                     · {member.active ? t('Active') : t('Deactivated')}
                   </span>
                 </div>
                 <button
                   className="icon-button"
-                  aria-label={'Edit ' + member.name}
+                  aria-label={`Edit ${member.name}`}
                   onClick={() => {
                     form.setData({
                       id: String(member.id),

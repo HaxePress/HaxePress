@@ -12,7 +12,7 @@ class Activity {
 
     public static function append(userId:Int, actor:String, action:String, entity:String, id:Int,
             label:String):Void {
-        ActivityLog.query.create([
+        ActivityLog.query.insert([
             "user_id" => userId,
             "actor" => actor,
             "action" => action,

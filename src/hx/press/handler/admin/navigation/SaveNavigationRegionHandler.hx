@@ -40,9 +40,9 @@ class SaveNavigationRegionHandler extends AbstractHandler implements ValidationR
             var maximum = Std.parseInt(AdminController.input(request, "max_links", 3));
             NavigationRegions.save(key, AdminController.input(request, "name", 101), maximum,
                 request.input("enabled", "0") == "1");
-            return ResponseBuilder.asRedirect("/admin/navigation?location="
-                + StringTools.urlEncode(key)
-                + "&notice=saved", 303);
+            return
+                ResponseBuilder.asRedirect('/admin/navigation?location=${StringTools.urlEncode(key)}&notice=saved',
+                    303);
         } catch (error:Dynamic) {
             return ManagementController.navigation(request, Std.string(error), 422);
         }

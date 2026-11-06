@@ -35,8 +35,8 @@ def run():
                 check(status == 303, "Theme creation failed")
                 packages.append(props(owner, headers["location"])["studio"]["id"])
             identifier, other = packages
-            base = "/admin/themes/" + identifier
-            upload = base + "/assets"
+            base = f"/admin/themes/{identifier}"
+            upload = f"{base}/assets"
             image_bytes = (ROOT / "tests/fixtures/media/logo-transparent.png").read_bytes()
             check(
                 public.request(upload, "POST", raw=image_bytes, content_type="image/png")[0]
@@ -76,17 +76,17 @@ def run():
             pending_id = headers["x-upload-id"]
             digest = hashlib.sha256(staged).hexdigest()
             check(
-                owner.verify_image(
-                    "/admin/themes/" + other + "/assets", pending_id, digest, (120, 40)
-                )[0]
+                owner.verify_image(f"/admin/themes/{other}/assets", pending_id, digest, (120, 40))[
+                    0
+                ]
                 == 404,
                 "An upload was confirmed for another theme",
             )
             status, _, body = owner.verify_image(upload, pending_id, digest, (120, 40))
-            check(status == 201, "Theme image upload failed: " + body[:150])
+            check(status == 201, f"Theme image upload failed: {body[:150]}")
             image = json.loads(body)
             check(
-                image["url"].startswith("/theme-assets/" + identifier + "/"),
+                image["url"].startswith(f"/theme-assets/{identifier}/"),
                 "Theme image used the global media route",
             )
             file = store.work / "storage/themes" / identifier / image["filename"]
@@ -110,10 +110,10 @@ def run():
                 "Public theme image response failed",
             )
             check(
-                public.request("/theme-assets/" + other + "/" + image["filename"])[0] == 404,
+                public.request(f"/theme-assets/{other}/{image['filename']}")[0] == 404,
                 "Image bytes crossed the owning theme",
             )
-            document = props(owner, base + "/design")["studio"]["document"]
+            document = props(owner, f"{base}/design")["studio"]["document"]
             document["templates"]["Home"] = [
                 {
                     "id": "asset-section",
@@ -128,28 +128,28 @@ def run():
                     ],
                 }
             ]
-            document["css"] = ':scope { --theme-illustration: url("' + image["url"] + '"); }'
+            document["css"] = f""":scope {{ --theme-illustration: url("{image['url']}"); }}"""
             payload = {
                 "name": "Theme image test",
                 "design": json.dumps(document),
                 "version": "1",
                 "action": "publish",
             }
-            status, _, body = post_json(owner, base + "/design", payload)
-            check(status == 200, "Owned image design failed native validation: " + body[:200])
+            status, _, body = post_json(owner, f"{base}/design", payload)
+            check(status == 200, f"Owned image design failed native validation: {body[:200]}")
             used = json.loads(owner.request(upload)[2])["images"][0]
             check(used["in_use"], "Theme image dependency was not reported")
             check(
-                owner.request(upload + "/" + str(image["id"]) + "/delete", "POST", {})[0] == 422,
+                owner.request(f"{upload}/{str(image['id'])}/delete", "POST", {})[0] == 422,
                 "A referenced theme image was deleted",
             )
             cross = {**payload, "version": "1", "name": "Other image scope"}
             check(
-                post_json(owner, "/admin/themes/" + other + "/design", cross)[0] == 422,
+                post_json(owner, f"/admin/themes/{other}/design", cross)[0] == 422,
                 "A design referenced another theme's image",
             )
             check(
-                json.loads(owner.request("/admin/themes/" + other + "/assets")[2])["images"] == [],
+                json.loads(owner.request(f"/admin/themes/{other}/assets")[2])["images"] == [],
                 "Theme asset library leaked another theme's files",
             )
             # An unrelated theme's storage does not affect this theme's aggregate budget.
@@ -160,7 +160,7 @@ def run():
             )
             check(
                 owner.upload_image(
-                    "/admin/themes/" + other + "/assets",
+                    f"/admin/themes/{other}/assets",
                     image_bytes,
                     "image/png",
                     (120, 40),
@@ -176,7 +176,7 @@ def run():
                     owner.upload_image(upload, large, "image/png", (1024, 768))[0] == 201,
                     "Unused theme image upload failed",
                 )
-            status, _, archive = owner.request(base + "/export", binary=True)
+            status, _, archive = owner.request(f"{base}/export", binary=True)
             check(
                 status == 200 and len(archive) > 10 * 1024 * 1024,
                 "A larger theme export was not created",
@@ -186,20 +186,20 @@ def run():
             metadata = json.loads(files["theme-media.json"])
             check(len(metadata) == 6, "Unused theme images were omitted from export")
             check(
-                files["media/" + image["filename"]] == image_bytes,
+                files[f"media/{image['filename']}"] == image_bytes,
                 "Export changed owned image bytes",
             )
             manifest = json.loads(files["cms-package.json"])
-            manifest["slug"] = "owned-image-copy-" + secrets.token_hex(5)
-            copied = "theme-" + manifest["slug"]
+            manifest["slug"] = f"owned-image-copy-{secrets.token_hex(5)}"
+            copied = f"theme-{manifest['slug']}"
             files["cms-package.json"] = json.dumps(manifest).encode()
             install(owner, "themes", zip_files(files))
             packages.append(copied)
-            copied_base = "/admin/themes/" + copied
-            copied_doc = props(owner, copied_base + "/design")["studio"]["document"]
+            copied_base = f"/admin/themes/{copied}"
+            copied_doc = props(owner, f"{copied_base}/design")["studio"]["document"]
             copied_url = copied_doc["templates"]["Home"][0]["blocks"][0]["image"]
             check(
-                copied_url == "/theme-assets/" + copied + "/" + image["filename"],
+                copied_url == f"/theme-assets/{copied}/{image['filename']}",
                 "Import did not rebase image ownership",
             )
             check(copied_url in copied_doc["css"], "Import did not rebase CSS backgrounds")
@@ -215,7 +215,7 @@ def run():
                 "Imported theme image failed",
             )
             check(
-                owner.request(copied_base + "/enable", "POST", {})[0] == 303,
+                owner.request(f"{copied_base}/enable", "POST", {})[0] == 303,
                 "Imported theme activation failed",
             )
             check(
@@ -223,11 +223,11 @@ def run():
                 "Published renderer filtered out the owned image",
             )
             # Same-name/different-byte updates must retain the prior immutable asset URL.
-            files["media/" + image["filename"]] = png()
+            files[f"media/{image['filename']}"] = png()
             manifest["version"] = "1.0.1"
             files["cms-package.json"] = json.dumps(manifest).encode()
             install(owner, "themes", zip_files(files), replace=True)
-            updated = props(owner, copied_base + "/design")["studio"]["document"]
+            updated = props(owner, f"{copied_base}/design")["studio"]["document"]
             new_url = updated["templates"]["Home"][0]["blocks"][0]["image"]
             check(
                 new_url != copied_url and public.request(new_url, binary=True)[2] == png(),
@@ -238,7 +238,7 @@ def run():
                 "An immutable theme image was overwritten",
             )
             check(
-                owner.request(base + "/uninstall", "POST", {})[0] == 303, "Theme uninstall failed"
+                owner.request(f"{base}/uninstall", "POST", {})[0] == 303, "Theme uninstall failed"
             )
             check(not file.parent.exists(), "Theme uninstall left its owned files behind")
             check(
@@ -254,9 +254,9 @@ def run():
                 "Theme lifecycle modified site media records",
             )
         finally:
-            owner.request("/admin/themes/" + previous + "/enable", "POST", {})
+            owner.request(f"/admin/themes/{previous}/enable", "POST", {})
             for identifier in reversed(packages):
-                owner.request("/admin/themes/" + identifier + "/uninstall", "POST", {})
+                owner.request(f"/admin/themes/{identifier}/uninstall", "POST", {})
     print(
         "PASS Theme assets: isolated Storage/ORM, auth/CSRF, native image validation, scoped cache and SQL budgets, CSS/rendering, used-image protection, all-image export above 10 MB, import rebasing/collisions and complete uninstall",
         flush=True,

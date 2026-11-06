@@ -116,7 +116,7 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
                 var savedId = id;
                 if (existing == null) {
                     values.set("created_at", SiteSettingsStore.timestamp());
-                    savedId = MenuLink.query.create(values).id;
+                    savedId = MenuLink.query.insert(values);
                 } else {
                     existing.update(values);
                 }
@@ -125,9 +125,8 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
             return true;
         });
         ContentCache.changed("navigation");
-        return ResponseBuilder.asRedirect("/admin/navigation?location="
-            + location
-            + "&notice=saved", 303);
+        return ResponseBuilder.asRedirect('/admin/navigation?location=${location}&notice=saved',
+            303);
     }
 
     static function safeUrl(value:String):Bool {

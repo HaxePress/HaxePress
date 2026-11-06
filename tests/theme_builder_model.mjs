@@ -4,7 +4,7 @@ import ts from 'typescript';
 
 async function compiled(name) {
   const source = await readFile(
-    new URL('../resources/js/themes/builder/' + name + '.ts', import.meta.url),
+    new URL(`../resources/js/themes/builder/${name}.ts`, import.meta.url),
     'utf8',
   );
   return ts.transpileModule(source, {
@@ -12,7 +12,7 @@ async function compiled(name) {
   }).outputText;
 }
 const typesCode = await compiled('types');
-const typesUrl = 'data:text/javascript;base64,' + Buffer.from(typesCode).toString('base64');
+const typesUrl = `data:text/javascript;base64,${Buffer.from(typesCode).toString('base64')}`;
 const {
   moveDesignEntry,
   templateNames,
@@ -25,21 +25,21 @@ const {
 } = await import(typesUrl);
 const stylesCode = (await compiled('styles')).replace(
   /from ['"]\.\/types['"]/g,
-  'from ' + JSON.stringify(typesUrl),
+  `from ${JSON.stringify(typesUrl)}`,
 );
 const { designStyles } = await import(
-  'data:text/javascript;base64,' + Buffer.from(stylesCode).toString('base64')
+  `data:text/javascript;base64,${Buffer.from(stylesCode).toString('base64')}`
 );
 const controlsCode = (await compiled('easy-controls')).replace(
   /from ['"]\.\/types['"]/g,
-  'from ' + JSON.stringify(typesUrl),
+  `from ${JSON.stringify(typesUrl)}`,
 );
 const { templateIdentifier, effectiveStyles } = await import(
-  'data:text/javascript;base64,' + Buffer.from(controlsCode).toString('base64')
+  `data:text/javascript;base64,${Buffer.from(controlsCode).toString('base64')}`
 );
 const bindingCode = await compiled('bindings');
 const { bindingValue, isVisible, linkValue, imageValue } = await import(
-  'data:text/javascript;base64,' + Buffer.from(bindingCode).toString('base64')
+  `data:text/javascript;base64,${Buffer.from(bindingCode).toString('base64')}`
 );
 function node(id, children = []) {
   return { id, type: 'container', text: '', href: '', image: '', alt: '', level: 2, children };

@@ -28,10 +28,7 @@ export default function ContentPicker({
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(
-          '/admin/content-options?q=' +
-            encodeURIComponent(query) +
-            '&selected=' +
-            encodeURIComponent(value),
+          `/admin/content-options?q=${encodeURIComponent(query)}&selected=${encodeURIComponent(value)}`,
           { signal: abort.signal },
         );
         if (!response.ok) throw new Error('Published content could not be loaded.');
@@ -51,11 +48,11 @@ export default function ContentPicker({
   }, [query, value]);
   return (
     <div className="content-picker">
-      <label className="sr-only" htmlFor={id + '-search'}>
+      <label className="sr-only" htmlFor={`${id}-search`}>
         {t('Search published content')}
       </label>
       <input
-        id={id + '-search'}
+        id={`${id}-search`}
         type="search"
         value={query}
         maxLength={100}

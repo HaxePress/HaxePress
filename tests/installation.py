@@ -41,7 +41,7 @@ class SetupClient:
     def request(self, path, values=None, headers=None, csrf=True, inertia=False):
         fields = {"Accept": "application/json"}
         if self.cookies:
-            fields["Cookie"] = "; ".join(key + "=" + value for key, value in self.cookies.items())
+            fields["Cookie"] = "; ".join(f"{key}={value}" for key, value in self.cookies.items())
         if inertia:
             fields["X-Inertia"] = "true"
         body = None
@@ -85,7 +85,7 @@ class SetupServer:
         self.work = work
         self.port = port()
         self.ssr_port = port()
-        self.url = "http://127.0.0.1:" + str(self.port)
+        self.url = f"http://127.0.0.1:{str(self.port)}"
         work.chmod(0o700)
         (work / "storage").mkdir()
         (work / "public").symlink_to(PUBLIC, target_is_directory=True)
@@ -111,15 +111,13 @@ class SetupServer:
             "VITE_USE_BUILD": "true",
             "VITE_INCLUDE_PAGE_ENTRY": "false",
             "INERTIA_SSR_ENABLED": "true",
-            "INERTIA_SSR_URL": "http://127.0.0.1:" + str(self.ssr_port) + "/render",
+            "INERTIA_SSR_URL": f"http://127.0.0.1:{str(self.ssr_port)}/render",
             "INERTIA_SSR_TIMEOUT": "3",
             "UNRELATED_SETTING": "preserved",
         }
         if trusted is not None:
             values["INSTALL_TRUSTED_IPS"] = trusted
-        (work / ".env").write_text(
-            "".join(key + "=" + value + "\n" for key, value in values.items())
-        )
+        (work / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         (work / ".env").chmod(0o600)
         self.log = (work / "runtime.log").open("w+")
         self.renderer = subprocess.Popen(
@@ -174,7 +172,7 @@ class SetupServer:
             time.sleep(0.1)
         self.log.flush()
         raise RuntimeError(
-            "Installer did not start: " + (self.work / "runtime.log").read_text()[-3000:]
+            f"Installer did not start: {(self.work / 'runtime.log').read_text()[-3000:]}"
         )
 
     @staticmethod
@@ -199,8 +197,8 @@ class SetupServer:
 
 
 def verify_mysql(mysql_port, mysql_work):
-    name = "haxepress_install_" + secrets.token_hex(5)
-    classpath = str(TEST_BINARY) + os.pathsep + str(TEST_BINARY.parent / "lib/*")
+    name = f"haxepress_install_{secrets.token_hex(5)}"
+    classpath = f"{str(TEST_BINARY)}{os.pathsep}{str(TEST_BINARY.parent / 'lib/*')}"
     command = ["java", "-cp", classpath, "fixtures.MysqlSetupFixture", str(mysql_port), name]
     subprocess.run(command, cwd=mysql_work, check=True, capture_output=True)
     try:
@@ -220,7 +218,7 @@ def verify_mysql(mysql_port, mysql_work):
                 status, _, result = client.request("/admin/install/database", fields)
                 check(
                     status == 200 and result["verified"],
-                    "Native MySQL DDL check failed: " + str(status) + " " + str(result),
+                    f"Native MySQL DDL check failed: {str(status)} {str(result)}",
                 )
                 password = "MySQL $literal 'quote' # 42!"
                 inputs = {
@@ -234,7 +232,7 @@ def verify_mysql(mysql_port, mysql_work):
                 status, _, result = client.request("/admin/install/finish", inputs)
                 check(
                     status == 200 and result["installed"],
-                    "MySQL schema/bootstrap failed: " + str(result),
+                    f"MySQL schema/bootstrap failed: {str(result)}",
                 )
                 check(
                     client.request("/admin", inertia=True)[0] == 200,
@@ -242,7 +240,7 @@ def verify_mysql(mysql_port, mysql_work):
                 )
                 config = (server.work / ".env").read_text()
                 check(
-                    "DB_DRIVER='mysql'" in config and "DB_DATABASE='" + name + "'" in config,
+                    "DB_DRIVER='mysql'" in config and f"DB_DATABASE='{name}'" in config,
                     "MySQL config was not saved",
                 )
                 SetupServer.stop(server.process)
@@ -271,9 +269,9 @@ def verify_trust_rules():
         work = Path(directory)
         work.chmod(0o700)
         key = base64.b64encode(secrets.token_bytes(32)).decode()
-        (work / ".env").write_text("APP_NAME=haxepress_test\nAPP_KEY=" + key + "\n")
+        (work / ".env").write_text(f"APP_NAME=haxepress_test\nAPP_KEY={key}\n")
         (work / ".env").chmod(0o600)
-        classpath = str(TEST_BINARY) + os.pathsep + str(TEST_BINARY.parent / "lib/*")
+        classpath = f"{str(TEST_BINARY)}{os.pathsep}{str(TEST_BINARY.parent / 'lib/*')}"
         result = subprocess.run(
             ["java", "-cp", classpath, "fixtures.InstallationTrustFixture"],
             cwd=work,
@@ -324,11 +322,11 @@ def verify_environment_bootstrap():
             line for line in native_source.splitlines() if line.startswith("APP_KEY=")
         )
         check(
-            native_key != "APP_KEY=" and native_key != "APP_KEY=" + key,
+            native_key != "APP_KEY=" and native_key != f"APP_KEY={key}",
             "Native project bootstrap reused an application key",
         )
         (native / ".env").write_text(
-            native_source + "APP_INSTALLED=true\n# Keep the framework environment\n"
+            f"{native_source}APP_INSTALLED=true\n# Keep the framework environment\n"
         )
         preserved = (native / ".env").read_bytes()
         prepare_environment(native)
@@ -490,7 +488,7 @@ def run():
             environment.chmod(0o600)
             status, _, result = client.request("/admin/install/finish", inputs)
             check(
-                status == 200 and result["installed"], "First installation failed: " + str(result)
+                status == 200 and result["installed"], f"First installation failed: {str(result)}"
             )
             config = (server.work / ".env").read_text()
             check(

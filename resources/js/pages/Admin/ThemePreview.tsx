@@ -118,7 +118,7 @@ export default function ThemePreview({
             title={form.isDirty ? t('Save or discard changes before activating.') : undefined}
             onClick={() =>
               router.post(
-                '/admin/themes/' + preview.id + '/enable',
+                `/admin/themes/${preview.id}/enable`,
                 { _token: csrfToken },
                 { onStart: () => setActivating(true), onFinish: () => setActivating(false) },
               )
@@ -129,9 +129,7 @@ export default function ThemePreview({
         </div>
       </aside>
       <div
-        className={
-          'theme-preview-workspace' + (customizing && customization ? ' has-customizer' : '')
-        }
+        className={`theme-preview-workspace${customizing && customization ? ' has-customizer' : ''}`}
       >
         {customizing && customization && (
           <aside
@@ -148,7 +146,7 @@ export default function ThemePreview({
                   _context: 'preview',
                   _token: csrfToken || '',
                 }));
-                form.post('/admin/themes/' + preview.id + '/settings', { preserveScroll: true });
+                form.post(`/admin/themes/${preview.id}/settings`, { preserveScroll: true });
               }}
             >
               <header className="theme-customizer-heading">

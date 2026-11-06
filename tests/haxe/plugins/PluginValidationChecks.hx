@@ -37,8 +37,8 @@ class PluginValidationChecks {
         check(rejected.statusCode == 422 && Json.parse(rejected.toString()).error != null,
             "Native plugin lost its JSON validation response");
 
-        var email = "native-validation-" + Std.random(1000000000) + "@example.test";
-        current.path = "/subscribe?email=" + StringTools.urlEncode(email);
+        var email = 'native-validation-${Std.random(1000000000)}@example.test';
+        current.path = '/subscribe?email=${StringTools.urlEncode(email)}';
         check(handler.validate(), "Native plugin rejected a valid email");
         var accepted = handler.execute(current).toResponse();
         check(Json.parse(accepted.toString()).message != null,

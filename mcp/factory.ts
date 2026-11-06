@@ -45,7 +45,7 @@ export function createThemeServer(options: ThemeServerOptions) {
       !['localhost', '127.0.0.1', '[::1]'].includes(address.hostname))
   )
     throw new Error('Use an HTTPS CMS URL or a loopback HTTP URL, without credentials or a path.');
-  const endpoint = address.origin + '/api/theme-designer/' + encodeURIComponent(themeId);
+  const endpoint = `${address.origin}/api/theme-designer/${encodeURIComponent(themeId)}`;
   const selection = z.object({
     scope: z.string().min(1).max(81),
     section: z.string().max(40),
@@ -82,7 +82,7 @@ export function createThemeServer(options: ThemeServerOptions) {
     .max(100);
 
   async function api(path: string, data?: unknown) {
-    const response = await fetch(endpoint + path, {
+    const response = await fetch(`${endpoint}${path}`, {
       method: data === undefined ? 'GET' : 'POST',
       redirect: 'error',
       signal: AbortSignal.any([
@@ -90,7 +90,7 @@ export function createThemeServer(options: ThemeServerOptions) {
         ...(options.signal ? [options.signal] : []),
       ]),
       headers: {
-        Authorization: 'Bearer ' + token,
+        Authorization: `Bearer ${token}`,
         Accept: 'application/json',
         ...(data === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
@@ -135,8 +135,7 @@ export function createThemeServer(options: ThemeServerOptions) {
     const data = await api('/design');
     if (expectedVersion !== undefined && data.theme.version !== expectedVersion)
       throw new Error(
-        'The saved design changed. Read it again before editing. Current version: ' +
-          data.theme.version,
+        `The saved design changed. Read it again before editing. Current version: ${data.theme.version}`,
       );
     return data;
   }
@@ -286,7 +285,7 @@ export function createThemeServer(options: ThemeServerOptions) {
             const parameters = new URLSearchParams();
             if (query) parameters.set('q', query);
             if (cursor) parameters.set('cursor', cursor);
-            const response = await api('/media?' + parameters);
+            const response = await api(`/media?${parameters}`);
             const nextCursor = response.pagination.next
               ? new URL(response.pagination.next, address.origin).searchParams.get('cursor')
               : null;
@@ -306,7 +305,7 @@ export function createThemeServer(options: ThemeServerOptions) {
           inputSchema: z.object({ key: z.string().regex(/^[a-z][a-z0-9_]{0,31}$/) }),
           annotations: readOnly,
         },
-        async ({ key }) => safely(() => api('/collections/' + encodeURIComponent(key))),
+        async ({ key }) => safely(() => api(`/collections/${encodeURIComponent(key)}`)),
       );
     }
     if (options.permissions.media) {
@@ -320,8 +319,8 @@ export function createThemeServer(options: ThemeServerOptions) {
         },
         async ({ id }) => {
           try {
-            const response = await fetch(endpoint + '/media/' + id, {
-              headers: { Authorization: 'Bearer ' + token },
+            const response = await fetch(`${endpoint}/media/${id}`, {
+              headers: { Authorization: `Bearer ${token}` },
               redirect: 'error',
               signal: AbortSignal.any([
                 AbortSignal.timeout(20000),
@@ -374,7 +373,7 @@ export function createThemeServer(options: ThemeServerOptions) {
             const parameters = new URLSearchParams();
             if (query) parameters.set('q', query);
             if (cursor) parameters.set('cursor', cursor);
-            const response = await api('/assets?' + parameters);
+            const response = await api(`/assets?${parameters}`);
             return {
               ...response,
               nextCursor: response.pagination.next
@@ -393,8 +392,8 @@ export function createThemeServer(options: ThemeServerOptions) {
         },
         async ({ id }) => {
           try {
-            const response = await fetch(endpoint + '/assets/' + id, {
-              headers: { Authorization: 'Bearer ' + token },
+            const response = await fetch(`${endpoint}/assets/${id}`, {
+              headers: { Authorization: `Bearer ${token}` },
               redirect: 'error',
               signal: AbortSignal.any([
                 AbortSignal.timeout(20000),
@@ -448,12 +447,12 @@ export function createThemeServer(options: ThemeServerOptions) {
               bytes.toString('base64') !== data
             )
               throw new Error('Supply an image under 5 MB as canonical Base64.');
-            const response = await fetch(endpoint + '/assets', {
+            const response = await fetch(`${endpoint}/assets`, {
               method: 'POST',
               redirect: 'error',
               body: bytes,
               headers: {
-                Authorization: 'Bearer ' + token,
+                Authorization: `Bearer ${token}`,
                 Accept: 'image/*, application/json',
                 'Content-Type': 'application/octet-stream',
                 'X-File-Name': encodeURIComponent(name || 'Theme image'),

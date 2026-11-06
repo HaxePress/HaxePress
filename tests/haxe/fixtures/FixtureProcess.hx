@@ -152,7 +152,7 @@ class FixtureProcess {
             return true;
         }
         if (command.action == "inspect_package") {
-            var destination = "package-probes/" + SecureToken.generate(32);
+            var destination = 'package-probes/${SecureToken.generate(32)}';
             return SafePackageArchive.extract(Base64.decode(command.archive), destination);
         }
         if (command.action == "plugin_database_checks") {
@@ -163,16 +163,16 @@ class FixtureProcess {
                 throw_errors: true
             });
             PluginDatabaseChecks.run(new FixturePluginHost(), packages,
-                Storage.disk("extensions"), "database-probes/" + SecureToken.generate(16));
+                Storage.disk("extensions"), 'database-probes/${SecureToken.generate(16)}');
             return true;
         }
         if (command.action == "dispatch_package") {
-            var destination = "package-probes/" + SecureToken.generate(32);
+            var destination = 'package-probes/${SecureToken.generate(32)}';
             var packageData = SafePackageArchive.extract(Base64.decode(command.archive),
                 destination);
             var artifact = PackageManifest.serverArtifact(packageData.manifest);
             var module = new PluginModule(Storage.disk("extensions")
-                .path(packageData.root + "/" + artifact),
+                .path('${packageData.root}/${artifact}'),
                 packageData.manifest.entrypoint);
             try {
                 Route.batch(() -> module.create(new FixturePluginHost(), command.context));

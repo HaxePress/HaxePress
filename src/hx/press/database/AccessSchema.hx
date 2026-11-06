@@ -56,7 +56,7 @@ class AccessSchema {
         ];
         for (key => name in capabilities) {
             if (!Capability.query.where("key", key).exists()) {
-                Capability.query.create(["key" => key, "name" => name, "group_name" => "CMS", "owner" => ""]);
+                Capability.query.insert(["key" => key, "name" => name, "group_name" => "CMS", "owner" => ""]);
             }
         }
         seed("owner", "Owner", ["*"]);
@@ -78,7 +78,7 @@ class AccessSchema {
             return;
         }
         DBStatic.transaction(() -> {
-            Role.query.create([
+            Role.query.insert([
                 "key" => key,
                 "name" => name,
                 "description" => "",
@@ -87,7 +87,7 @@ class AccessSchema {
                 "owner" => ""
             ]);
             for (capability in grants) {
-                RoleGrant.query.create(["role_key" => key, "capability" => capability]);
+                RoleGrant.query.insert(["role_key" => key, "capability" => capability]);
             }
         });
         ContentCache.changed("access");

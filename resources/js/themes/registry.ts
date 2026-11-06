@@ -52,7 +52,7 @@ function runtime(theme: ThemeInfo): ThemeRuntime {
       ) {
         throw new Error('Invalid theme asset path.');
       }
-      return theme.assetBase + path;
+      return `${theme.assetBase}${path}`;
     },
   };
 }
@@ -88,14 +88,14 @@ export function prepareTheme(theme?: ThemeInfo | null, loader: ModuleLoader = br
       }
       for (const template of theme.templates || []) {
         if (!Object.hasOwn(definition.pages, template.name)) {
-          throw new Error('The theme does not provide its declared template: ' + template.name);
+          throw new Error(`The theme does not provide its declared template: ${template.name}`);
         }
       }
       state.definition = definition;
       return definition;
     })
     .catch((error) => {
-      console.error('Theme could not be loaded: ' + theme.id, error);
+      console.error(`Theme could not be loaded: ${theme.id}`, error);
       return null;
     })
     .finally(() => {

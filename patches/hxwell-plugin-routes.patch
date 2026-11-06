@@ -101,7 +101,7 @@ diff --git a/src/hx/well/route/Route.hx b/src/hx/well/route/Route.hx
 +        }
 +        var existing = current.names.get(name);
 +        if (existing != null && existing != route) {
-+            throw name + " named route already exists.";
++            throw '${name} named route already exists.';
 +        }
 +        if (route._name != null && current.names.get(route._name) == route) {
 +            current.names.remove(route._name);

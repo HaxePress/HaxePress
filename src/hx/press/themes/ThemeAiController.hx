@@ -40,9 +40,9 @@ class ThemeAiController {
             permissions: ThemeAiPermissions.forAdmin(id, admin.id, CmsAccess.can("media")),
             mediaAllowed: CmsAccess.can("media"),
             presence: ThemeCollaboration.presence(id),
-            browserPath: "/admin/themes/" + id + "/ai/ws",
-            mcpPath: "/mcp/themes/" + id,
-            websocketPath: "/mcp/themes/" + id + "/ws",
+            browserPath: '/admin/themes/${id}/ai/ws',
+            mcpPath: '/mcp/themes/${id}',
+            websocketPath: '/mcp/themes/${id}/ws',
             hosted: ThemeMcpHost.available()
         }).header("Cache-Control", "private, no-store");
     }

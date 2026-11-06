@@ -72,7 +72,7 @@ export default function ThemeCreate({ baseDocument }: { baseDocument: ThemeDocum
               {starterChoices.map((starter) => (
                 <label
                   key={starter.id}
-                  className={'easy-starter-card' + (choice === starter.id ? ' is-selected' : '')}
+                  className={`easy-starter-card${choice === starter.id ? ' is-selected' : ''}`}
                 >
                   <input
                     type="radio"

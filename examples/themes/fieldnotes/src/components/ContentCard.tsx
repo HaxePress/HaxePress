@@ -26,8 +26,8 @@ export function createContentCard(runtime: ThemeRuntime) {
         </Link>
         <div className="card-topline">
           <Link
-            className={'category-pill ' + item.category.toLowerCase().replaceAll(' ', '-')}
-            href={item.archiveUrl + '?category=' + encodeURIComponent(item.category)}
+            className={`category-pill ${item.category.toLowerCase().replaceAll(' ', '-')}`}
+            href={`${item.archiveUrl}?category=${encodeURIComponent(item.category)}`}
           >
             {item.category}
           </Link>

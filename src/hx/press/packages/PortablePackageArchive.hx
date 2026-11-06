@@ -45,7 +45,7 @@ class PortablePackageArchive {
             if (!entry.compressed && entry.crc32 == null) {
                 throw new Exception("Stored ZIP entries must declare their size and checksum.");
             }
-            var path = destination + "/" + name;
+            var path = '${destination}/${name}';
             var start = input.position;
             var inflater = entry.compressed ? new InflateImpl(input, false, false) : null;
             var storedRead = 0;

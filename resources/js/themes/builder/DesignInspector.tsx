@@ -674,7 +674,10 @@ export default function DesignInspector(props: DesignInspectorProps) {
                       <strong>{t(prefix === 'padding' ? 'Padding' : 'Margin')}</strong>
                       <div>
                         {['top', 'right', 'bottom', 'left'].map((side) =>
-                          field(prefix + '-' + side, side.charAt(0).toUpperCase() + side.slice(1)),
+                          field(
+                            `${prefix}-${side}`,
+                            `${side.charAt(0).toUpperCase()}${side.slice(1)}`,
+                          ),
                         )}
                       </div>
                     </div>
@@ -842,7 +845,7 @@ export default function DesignInspector(props: DesignInspectorProps) {
                     <option value="page.items">{t('Current page content')}</option>
                     <option value="page.related">{t('Related content')}</option>
                     {(document.feeds || []).map((feed) => (
-                      <option key={feed.id} value={'feed:' + feed.id}>
+                      <option key={feed.id} value={`feed:${feed.id}`}>
                         {feed.name || feed.collection}
                       </option>
                     ))}

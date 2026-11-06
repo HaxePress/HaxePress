@@ -65,7 +65,7 @@ class SavePackageSettingsHandler extends AbstractHandler implements ValidationRe
         var clear:Array<String> = [];
         for (field in manifest.fields) {
             input.set(field.key, AdminController.input(request, field.key, 2100));
-            if (request.input("clear_" + field.key, "0") == "1") {
+            if (request.input('clear_${field.key}', "0") == "1") {
                 clear.push(field.key);
             }
         }
@@ -74,12 +74,7 @@ class SavePackageSettingsHandler extends AbstractHandler implements ValidationRe
             PackageManager.configure(id, input, clear, admin.id, admin.name);
             var page = kind == "theme"
                 && request.input("_context", "") == "preview" ? "preview" : "settings";
-            var destination = PackageController.base(kind)
-                + "/"
-                + id
-                + "/"
-                + page
-                + "?notice=saved";
+            var destination = '${PackageController.base(kind)}/${id}/${page}?notice=saved';
             return ResponseBuilder.asRedirect(destination, 303);
         } catch (error:Dynamic) {
             if (kind == "theme" && request.input("_context", "") == "preview") {

@@ -11,18 +11,18 @@ import hx.press.media.MediaLocks;
 
 class WorkingCopies {
     static function validNewKey(value:String, userId:Int, kind:String):Bool {
-        var prefix = "draft-" + userId + "-" + kind + "-";
+        var prefix = 'draft-${userId}-${kind}-';
         return ContentTypes.validKey(kind)
             && StringTools.startsWith(value, prefix)
             && ~/^[A-Za-z0-9_-]{32}$/.match(value.substr(prefix.length));
     }
 
     public static function key(userId:Int, kind:String, documentId:Int):String {
-        return "draft-" + userId + "-" + kind + "-" + documentId;
+        return 'draft-${userId}-${kind}-${documentId}';
     }
 
     public static function freshKey(userId:Int, kind:String):String {
-        return "draft-" + userId + "-" + kind + "-" + SecureToken.generate(32);
+        return 'draft-${userId}-${kind}-${SecureToken.generate(32)}';
     }
 
     public static function find(userId:Int, kind:String, documentId:Int,
@@ -59,7 +59,7 @@ class WorkingCopies {
             throw new Exception("This working copy exceeds the editor limits.");
         }
         var selectedKey = draftKey;
-        ContentLocks.run("working-" + draftKey, () -> MediaLocks.run(() -> {
+        ContentLocks.run('working-${draftKey}', () -> MediaLocks.run(() -> {
             var previous = EditorDraft.query.select(["key", "version", "document_id"])
                 .where("key", selectedKey)
                 .where("user_id", userId)
@@ -84,7 +84,7 @@ class WorkingCopies {
                 "updated_at" => SiteSettingsStore.timestamp()
             ];
             if (previous == null) {
-                EditorDraft.query.create(values);
+                EditorDraft.query.insert(values);
             } else {
                 previous.update(values);
             }
@@ -108,7 +108,7 @@ class WorkingCopies {
         if (!validNewKey(draftKey, userId, kind)) {
             return;
         }
-        EditorDraft.query.updateOrCreate(["key" => draftKey], [
+        var values:Map<String, Dynamic> = [
             "document_id" => documentId,
             "user_id" => userId,
             "kind" => kind,
@@ -118,7 +118,10 @@ class WorkingCopies {
             "base_version" => 1,
             "expires_epoch" => Date.now().getTime() + 3600000,
             "updated_at" => SiteSettingsStore.timestamp()
-        ]);
+        ];
+        var updateColumns = [for (column in values.keys()) column];
+        values.set("key", draftKey);
+        EditorDraft.query.upsert(values, ["key"], updateColumns);
     }
 
     public static function expire():Void {

@@ -14,7 +14,7 @@ def login(email, password):
     client = Client()
     client.request("/admin/login")
     status, _, body = client.request("/admin/login", "POST", {"email": email, "password": password})
-    check(status == 303, "member login returned " + str(status) + ": " + body[:200])
+    check(status == 303, f"member login returned {str(status)}: {body[:200]}")
     return client
 
 
@@ -45,15 +45,19 @@ def verify(fixtures):
     members = {}
     for role in ["writer", "editor"]:
         password = secrets.token_urlsafe(18)
-        email = "cms-" + role + "-" + suffix + "@example.com"
+        email = f"cms-{role}-{suffix}@example.com"
         values = {
-            "name": "CMS " + role,
+            "name": f"CMS {role}",
             "email": email,
             "password": password,
             "role": role,
             "active": "1",
         }
-        check(owner.request("/admin/team/save", "POST", values)[0] == 303, "create " + role)
+        with fixtures.guard(rejectFields=["entity_id"]):
+            check(
+                owner.request("/admin/team/save", "POST", values)[0] == 303,
+                f"create {role} without reading the activity record back",
+            )
         identifier = fixtures.rows("admins", ["id"], [("email", "=", email)], limit=1)[0]["id"]
         members[role] = {**values, "id": identifier, "client": login(email, password)}
     writer = members["writer"]["client"]
@@ -78,7 +82,7 @@ def verify(fixtures):
         "/admin/navigation",
         "/admin/activity",
     ]:
-        check(writer.request(path)[0] == 403, "writer accessed " + path)
+        check(writer.request(path)[0] == 403, f"writer accessed {path}")
     for path in [
         "/admin/team",
         "/admin/plugins",
@@ -86,19 +90,19 @@ def verify(fixtures):
         "/admin/settings",
         "/admin/subscribers",
     ]:
-        check(editor.request(path)[0] == 403, "editor accessed " + path)
+        check(editor.request(path)[0] == 403, f"editor accessed {path}")
     for path in [
         "/admin/categories/save",
         "/admin/settings",
         "/admin/team/save",
         "/admin/content/publish-due",
     ]:
-        check(writer.request(path, "POST", {})[0] == 403, "writer mutated " + path)
+        check(writer.request(path, "POST", {})[0] == 403, f"writer mutated {path}")
     category = props(writer, "/admin/content/new")["item"]["category"]
     document = {
         "id": "",
         "title": "A writer draft",
-        "slug": "writer-" + suffix,
+        "slug": f"writer-{suffix}",
         "content": "A private first draft with enough content for site.",
         "excerpt": "A first draft.",
         "category": category,
@@ -124,7 +128,7 @@ def verify(fixtures):
     another = props(owner, "/admin/content")["items"]
     another_id = next(item["id"] for item in another if item["id"] != content_id)
     check(
-        writer.request("/admin/content/" + str(another_id) + "/edit")[0] == 403,
+        writer.request(f"/admin/content/{str(another_id)}/edit")[0] == 403,
         "writer opened another author editor",
     )
     check(
@@ -139,15 +143,15 @@ def verify(fixtures):
     document.update(id=str(content_id), status="published")
     save(editor, "content", document)
     check(
-        public.request("/content/" + document["slug"])[0] == 200,
+        public.request(f"/content/{document['slug']}")[0] == 200,
         "editor could not publish writer content",
     )
     check(
-        writer.request("/admin/content/" + str(content_id) + "/trash", "POST", {})[0] == 403,
+        writer.request(f"/admin/content/{str(content_id)}/trash", "POST", {})[0] == 403,
         "writer unpublished live content",
     )
     check(
-        writer.request("/admin/content/" + str(content_id) + "/delete", "POST", {})[0] == 403,
+        writer.request(f"/admin/content/{str(content_id)}/delete", "POST", {})[0] == 403,
         "writer deleted live content",
     )
 
@@ -203,13 +207,13 @@ def verify(fixtures):
         **document,
         "id": "",
         "title": "A navigation page",
-        "slug": "navigation-" + suffix,
+        "slug": f"navigation-{suffix}",
         "category": "",
         "status": "published",
     }
     page_content_id = int(re.search(r"/pages/(\d+)/edit", save(owner, "pages", page)).group(1))
     menu = {
-        "label": "CMS menu " + suffix,
+        "label": f"CMS menu {suffix}",
         "location": "header",
         "url": "",
         "content_id": str(page_content_id),
@@ -223,17 +227,17 @@ def verify(fixtures):
     menu_id = fixtures.rows("menu_links", ["id"], [("label", "=", menu["label"])], limit=1)[0]["id"]
     nav = props(public, "/")["navigation"]["header"]
     check(
-        any(link["url"] == "/pages/" + page["slug"] for link in nav),
+        any(link["url"] == f"/pages/{page['slug']}" for link in nav),
         "navigation cache omitted new page link",
     )
     check(menu["label"] in public.request("/")[2], "navigation was not rendered in HTML")
-    page.update(id=str(page_content_id), slug=page["slug"] + "-updated")
+    page.update(id=str(page_content_id), slug=f"{page['slug']}-updated")
     save(owner, "pages", page)
     check(
         next(link for link in props(public, "/")["navigation"]["header"] if link["id"] == menu_id)[
             "url"
         ]
-        == "/pages/" + page["slug"],
+        == f"/pages/{page['slug']}",
         "navigation did not follow a page slug change",
     )
     for unsafe in [
@@ -249,17 +253,17 @@ def verify(fixtures):
             == 422,
             "unsafe navigation address accepted",
         )
-    owner.request("/admin/pages/" + str(page_content_id) + "/trash", "POST", {})
+    owner.request(f"/admin/pages/{str(page_content_id)}/trash", "POST", {})
     check(
         all(link["id"] != menu_id for link in props(public, "/")["navigation"]["header"]),
         "trashed page remained in navigation",
     )
-    owner.request("/admin/pages/" + str(page_content_id) + "/restore", "POST", {})
+    owner.request(f"/admin/pages/{str(page_content_id)}/restore", "POST", {})
     check(
         any(link["id"] == menu_id for link in props(public, "/")["navigation"]["header"]),
         "restored page did not return to navigation",
     )
-    owner.request("/admin/pages/" + str(page_content_id) + "/delete", "POST", {})
+    owner.request(f"/admin/pages/{str(page_content_id)}/delete", "POST", {})
     check(
         fixtures.count("menu_links", [("id", "=", menu_id)]) == 0,
         "deleted page left a managed link",
@@ -273,7 +277,7 @@ def verify(fixtures):
         "password" not in json.dumps(props(owner, "/admin/team")["members"]),
         "team response exposed credential fields",
     )
-    owner.request("/admin/content/" + str(content_id) + "/delete", "POST", {})
+    owner.request(f"/admin/content/{str(content_id)}/delete", "POST", {})
     for member in members.values():
         fixtures.delete("editor_drafts", [("user_id", "=", member["id"])])
         fixtures.delete("admins", [("id", "=", member["id"])])

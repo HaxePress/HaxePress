@@ -33,7 +33,7 @@ export default function RevisionHistory({
   async function load() {
     setBusy(true);
     try {
-      const response = await fetch(base + '/' + id + '/history', {
+      const response = await fetch(`${base}/${id}/history`, {
         headers: { Accept: 'application/json' },
       });
       if (!response.ok) throw new Error('History could not be loaded.');
@@ -85,7 +85,7 @@ export default function RevisionHistory({
                     type="button"
                     onClick={async () => {
                       try {
-                        const response = await fetch(base + '/' + id + '/history/' + revision.id, {
+                        const response = await fetch(`${base}/${id}/history/${revision.id}`, {
                           headers: { Accept: 'application/json' },
                         });
                         if (!response.ok) throw new Error('This revision could not be loaded.');
@@ -117,7 +117,7 @@ export default function RevisionHistory({
                 onClick={() => {
                   beforeRestore();
                   router.post(
-                    base + '/' + id + '/history/' + preview.revision.id + '/restore',
+                    `${base}/${id}/history/${preview.revision.id}/restore`,
                     { _token: csrfToken },
                     { preserveState: false },
                   );

@@ -67,7 +67,7 @@ export default function Dashboard({
             </Link>
           )}
           {firstCollection && (
-            <Link className="button" href={'/admin/' + firstCollection.admin_path + '/new'}>
+            <Link className="button" href={`/admin/${firstCollection.admin_path}/new`}>
               <Icon name="plus" /> {t('Create {type}', { type: t(firstCollection.singular) })}
             </Link>
           )}
@@ -75,7 +75,7 @@ export default function Dashboard({
       </div>
       <section className="publication-summary" aria-label={t('Site summary')}>
         {stats.map((stat) => (
-          <div className={'site-stat site-stat-' + stat.status} key={stat.label}>
+          <div className={`site-stat site-stat-${stat.status}`} key={stat.label}>
             <span className="publication-stat-label">
               <Icon name={stat.icon} /> {t(stat.label)}
             </span>
@@ -96,7 +96,7 @@ export default function Dashboard({
           </div>
           <div className="collection-shortcuts">
             {collectionCards.map((type) => (
-              <Link key={type.key} href={'/admin/' + type.admin_path}>
+              <Link key={type.key} href={`/admin/${type.admin_path}`}>
                 <Icon name={type.icon} />
                 <span>
                   <strong>{t(type.name)}</strong>

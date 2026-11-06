@@ -34,7 +34,7 @@ class SiteRuntime {
                 Connection.free();
             } catch (error:Dynamic) {
                 Connection.free();
-                trace("Temporary upload cleanup failed: " + Std.string(error));
+                trace('Temporary upload cleanup failed: ${Std.string(error)}');
             }
             return true;
         }, 60000, 60000);
@@ -44,7 +44,7 @@ class SiteRuntime {
                 Connection.free();
             } catch (error:Dynamic) {
                 Connection.free();
-                trace("Scheduled publishing failed: " + Std.string(error));
+                trace('Scheduled publishing failed: ${Std.string(error)}');
             }
             return true;
         }, 5000, 5000);

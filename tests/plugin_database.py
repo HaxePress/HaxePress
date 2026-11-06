@@ -45,7 +45,7 @@ def run():
         archive = package.read_bytes()
         install(owner, "plugins", archive)
         check(
-            owner.request("/admin/plugins/" + identifier + "/enable", "POST", {})[0] == 303,
+            owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})[0] == 303,
             "Activate plugin-owned schema",
         )
         context = {
@@ -70,8 +70,8 @@ def run():
         first = dispatch()
         check(first["entry"]["title"] == context["data"]["title"], "Native plugin model write")
         context["data"]["action"] = "read"
-        owner.request("/admin/plugins/" + identifier + "/disable", "POST", {})
-        owner.request("/admin/plugins/" + identifier + "/uninstall", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/disable", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
         check(
             fixtures.count(
                 "plugin_values", [("plugin_id", "=", "database-test"), ("scope", "=", "content:1")]
@@ -84,7 +84,7 @@ def run():
             "Uninstall removed migration history",
         )
         install(owner, "plugins", archive)
-        owner.request("/admin/plugins/" + identifier + "/enable", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})
         restored = dispatch()
         check(
             restored["entry"]["id"] == first["entry"]["id"]
@@ -99,7 +99,7 @@ def run():
             manifest_file = plugin / "cms-package.json"
             manifest = json.loads(manifest_file.read_text())
             manifest["version"] = "2.8.1"
-            manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
+            manifest_file.write_text(f"{json.dumps(manifest, indent=2)}\n")
             source = plugin / "src/extensions/database/DatabasePlugin.hx"
             source.write_text(
                 source.read_text().replace("SCHEMA_VERSION = 2", "SCHEMA_VERSION = 3")
@@ -117,14 +117,14 @@ def run():
             fixtures.count("plugin_migrations", [("plugin_id", "=", "database-test")]) == 3,
             "Plugin upgrade migration was not recorded exactly once",
         )
-        owner.request("/admin/plugins/" + identifier + "/disable", "POST", {})
-        owner.request("/admin/plugins/" + identifier + "/enable", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/disable", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})
         check(
             fixtures.count("plugin_migrations", [("plugin_id", "=", "database-test")]) == 3,
             "Reactivation repeated an applied migration",
         )
-        owner.request("/admin/plugins/" + identifier + "/disable", "POST", {})
-        owner.request("/admin/plugins/" + identifier + "/uninstall", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/disable", "POST", {})
+        owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
     print(
         "PASS Plugin database lifecycle: owned models, schema upgrades, scoped metadata and retention across disable/uninstall/reinstall",
         flush=True,

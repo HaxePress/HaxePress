@@ -22,7 +22,7 @@ class ContentHistory {
         var snapshot:Dynamic = document.toObject();
         snapshot.tags = tags;
         snapshot.fields = ContentFields.values(document.id, type, false, false);
-        ContentRevision.query.create([
+        ContentRevision.query.insert([
             "document_id" => document.id,
             "version" => document.version,
             "title" => document.title,

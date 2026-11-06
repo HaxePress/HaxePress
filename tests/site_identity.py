@@ -48,12 +48,12 @@ def run():
 
     def save(logo):
         status, _, body = admin.request("/admin/settings", "POST", {**settings, "site_logo": logo})
-        check(status == 303, "Save site identity returned " + str(status) + ": " + body[:200])
+        check(status == 303, f"Save site identity returned {str(status)}: {body[:200]}")
 
     def themes(logo):
         for slug in ("simple", "fieldnotes", "notebook", "gallery"):
-            status, _, source = admin.request("/admin/themes/theme-" + slug + "/preview/frame")
-            check(status == 200, "Theme preview failed: " + slug)
+            status, _, source = admin.request(f"/admin/themes/theme-{slug}/preview/frame")
+            check(status == 200, f"Theme preview failed: {slug}")
             images = Logos(source).images
             if logo:
                 check(
@@ -62,11 +62,11 @@ def run():
                         image["src"] == logo and image["alt"] == settings["site_name"]
                         for image in images
                     ),
-                    "Theme did not use the configured logo: " + slug,
+                    f"Theme did not use the configured logo: {slug}",
                 )
             else:
-                check(not images, "Theme retained a removed logo: " + slug)
-                check(settings["site_name"] in source, "Theme omitted the site name: " + slug)
+                check(not images, f"Theme retained a removed logo: {slug}")
+                check(settings["site_name"] in source, f"Theme omitted the site name: {slug}")
 
     try:
         with FixtureStore.from_environment() as fixtures:
@@ -88,7 +88,7 @@ def run():
                     status, _, body = admin.upload_image(
                         "/admin/media/upload", content, mime, (120, 40)
                     )
-                    check(status == 201, name + " upload: " + str(status) + " " + body[:200])
+                    check(status == 201, f"{name} upload: {str(status)} {body[:200]}")
                     image = json.loads(body)
                     check(
                         image["contentType"] == mime
@@ -104,7 +104,7 @@ def run():
                         == 415,
                         "New WebP logo upload was accepted",
                     )
-                    filename = secrets.token_hex(16) + ".webp"
+                    filename = f"{secrets.token_hex(16)}.webp"
                     (fixtures.work / "storage/media" / filename).write_bytes(content)
                     identifier = fixtures.create(
                         "media_assets",
@@ -120,7 +120,7 @@ def run():
                             }
                         ],
                     )[0]
-                    image = {"id": identifier, "url": "/media/" + filename}
+                    image = {"id": identifier, "url": f"/media/{filename}"}
                 created.append(image)
                 save(image["url"])
                 check(props(public, "/")["site"]["site_logo"] == image["url"], "Stale logo cache")
@@ -131,8 +131,7 @@ def run():
                     "Logo bytes, transparency or media MIME type changed",
                 )
                 check(
-                    admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0]
-                    == 422,
+                    admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 422,
                     "A configured site logo could be deleted",
                 )
                 check(
@@ -144,7 +143,7 @@ def run():
             for invalid in (
                 "https://example.test/logo.png",
                 "data:image/png;base64,AAAA",
-                "/media/" + "a" * 32 + ".webp",
+                f"/media/{'a' * 32}.webp",
                 "/media/../logo.png",
             ):
                 response = admin.request(
@@ -192,7 +191,7 @@ def run():
         check(admin.request("/admin/settings", "POST", original)[0] == 303, "Restore site identity")
         for image in created:
             check(
-                admin.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})[0] == 303,
+                admin.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})[0] == 303,
                 "A detached logo could not be deleted",
             )
         admin.request("/admin/logout", "POST", {})

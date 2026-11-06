@@ -52,10 +52,10 @@ class ThemeMcpHost {
         process = child;
         secret = SecureToken.generate(32);
         try {
-            child.stdin.writeString(Json.stringify({
+            child.stdin.writeString('${Json.stringify({
                 secret: secret,
-                origin: "http://127.0.0.1:" + ServerSettings.port
-            }) + "\n");
+                origin: 'http://127.0.0.1:${ServerSettings.port}'
+            })}\n');
             child.stdin.flush();
         } catch (_:Dynamic) {
             stop();
@@ -131,7 +131,7 @@ class ThemeMcpHost {
             throw new Exception("The MCP request exceeds its size limit.");
         }
         #if jvm
-        var address = "http://127.0.0.1:" + port + "/themes/" + StringTools.urlEncode(themeId);
+        var address = 'http://127.0.0.1:${port}/themes/${StringTools.urlEncode(themeId)}';
         var connection:HttpURLConnection = cast new URL(address).openConnection();
         connection.setConnectTimeout(5000);
         connection.setReadTimeout(30000);

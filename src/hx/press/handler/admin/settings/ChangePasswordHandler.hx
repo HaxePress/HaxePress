@@ -44,7 +44,7 @@ class ChangePasswordHandler extends AbstractHandler implements ValidationRespond
         request.session.regenerate();
         request.session.put("auth_version", hash);
         Activity.record("password updated", "member", admin.id, admin.name);
-        return ResponseBuilder.asRedirect(destination(request) + "?notice=password", 303);
+        return ResponseBuilder.asRedirect('${destination(request)}?notice=password', 303);
     }
 
     static function destination(request:Request):String {

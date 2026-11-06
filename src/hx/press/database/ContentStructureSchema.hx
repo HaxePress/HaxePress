@@ -86,7 +86,7 @@ class ContentStructureSchema {
                 title: "Page title",
                 description: "Build the permanent pages of your site."
             });
-        if (Setting.query.find("content_structure_v1") == null) {
+        if (!Setting.query.where("key", "content_structure_v1").exists()) {
             for (index in ["posts_slug_unique", "content_items_slug_unique"]) {
                 if (Schema.hasIndex("content_items", index)) {
                     Schema.table("content_items", table -> table.dropUnique(index));
@@ -99,7 +99,7 @@ class ContentStructureSchema {
                     table -> table.unique(["content_type", "slug"],
                         "content_items_type_slug_unique"));
             }
-            Setting.query.create(["key" => "content_structure_v1", "value" => "1"]);
+            Setting.query.insert(["key" => "content_structure_v1", "value" => "1"]);
             ContentCache.contentChanged();
         }
     }
@@ -109,7 +109,7 @@ class ContentStructureSchema {
         if (ContentType.query.where("key", key).exists()) {
             return;
         }
-        ContentType.query.create([
+        ContentType.query.insert([
             "key" => key,
             "name" => name,
             "singular" => singular,

@@ -51,7 +51,7 @@ def verify(fixtures):
         "Native admin guard login or email normalization failed",
     )
     suffix = secrets.token_hex(5)
-    member_email = "native-login-" + suffix + "@example.test"
+    member_email = f"native-login-{suffix}@example.test"
     member_password = secrets.token_urlsafe(36)
     member = {
         "name": "Native login fixture",

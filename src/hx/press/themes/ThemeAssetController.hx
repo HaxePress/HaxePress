@@ -46,31 +46,38 @@ class ThemeAssetController {
     }
 
     public static function readForAi(request:Request):AbstractResponse {
-        var asset = ThemeAsset.query.select(["filename"])
-            .where("theme_id", request.route("id"))
+        var id = request.route("id");
+        var asset = ThemeAsset.query.select(["filename", "mime_type"])
+            .where("theme_id", id)
             .where("id", Std.parseInt(request.route("asset")))
             .limit(1)
             .first();
         if (asset == null) {
             return ResponseBuilder.asJson({error: "Choose an image owned by this theme."}, 404);
         }
-        return serve(request.route("id"), asset.filename, true);
+        return serve(id, asset.filename, true, asset.mime_type);
     }
 
-    static function serve(id:String, filename:String,
-            privateResponse:Bool = false):AbstractResponse {
+    static function serve(id:String, filename:String, privateResponse:Bool = false,
+            ?mimeType:String):AbstractResponse {
         if (!ThemeAssets.validThemeId(id)
-            || !ThemeAssets.imageUrl("/theme-assets/" + id + "/" + filename)) {
+            || !ThemeAssets.imageUrl('/theme-assets/${id}/${filename}')) {
             return ResponseBuilder.asString("Theme image not found.", 404);
         }
-        var asset = ThemeAssets.find(id, filename);
-        var path = id + "/" + filename;
+        if (mimeType == null) {
+            var asset = ThemeAssets.find(id, filename);
+            if (asset == null) {
+                return ResponseBuilder.asString("Theme image not found.", 404);
+            }
+            mimeType = asset.mime_type;
+        }
+        var path = '${id}/${filename}';
         var disk = Storage.disk("theme_assets");
-        if (asset == null || !disk.fileExists(path)) {
+        if (!disk.fileExists(path)) {
             return ResponseBuilder.asString("Theme image not found.", 404);
         }
         return disk.response(path, filename, [
-            "Content-Type" => asset.mime_type,
+            "Content-Type" => mimeType,
             "Cache-Control" =>
             privateResponse ? "private, no-store" : "public, max-age=31536000, immutable",
             "X-Content-Type-Options" => "nosniff"

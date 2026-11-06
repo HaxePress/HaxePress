@@ -12,7 +12,7 @@ export function activate({ root, t }) {
     const bounds = article.getBoundingClientRect();
     const distance = Math.max(1, bounds.height - window.innerHeight);
     const value = Math.round(Math.max(0, Math.min(1, -bounds.top / distance)) * 100);
-    progress.style.width = value + '%';
+    progress.style.width = `${value}%`;
     progress.setAttribute('aria-valuenow', String(value));
   }
   window.addEventListener('scroll', update, { passive: true });

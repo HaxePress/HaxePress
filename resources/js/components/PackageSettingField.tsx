@@ -19,7 +19,7 @@ export default function PackageSettingField({
   onClearSecret?: (clear: boolean) => void;
 }) {
   const { t } = useTranslation(packageId);
-  const id = 'setting-' + field.key;
+  const id = `setting-${field.key}`;
   const colorEnabled = field.required || value !== '';
   return (
     <div className="extension-setting">

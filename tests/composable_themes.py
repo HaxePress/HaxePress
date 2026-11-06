@@ -57,19 +57,19 @@ def run():
 def verify(owner, public, fixtures):
     original_theme = props(public, "/")["theme"]["id"]
     original_site = props(public, "/")["site"]
-    name = "Composable " + secrets.token_hex(5)
+    name = f"Composable {secrets.token_hex(5)}"
     status, headers, body = owner.request(
         "/admin/themes/create", "POST", {"name": name, "starter": "content"}
     )
-    check(status == 303, "Create composable theme: " + body[:150])
+    check(status == 303, f"Create composable theme: {body[:150]}")
     editor_url = headers["location"]
     studio = props(owner, editor_url)["studio"]
     identifier = studio["id"]
-    base = "/admin/themes/" + identifier
-    data_url = editor_url + "/data"
+    base = f"/admin/themes/{identifier}"
+    data_url = f"{editor_url}/data"
     document = studio["document"]
     media_id = None
-    category = "Source " + secrets.token_hex(6)
+    category = f"Source {secrets.token_hex(6)}"
     version = 1
 
     def save(value, publish=False):
@@ -119,8 +119,8 @@ def verify(owner, public, fixtures):
             "items",
             [
                 {
-                    "title": "Composable source " + str(index).zfill(3),
-                    "slug": "source-" + category.split()[-1] + "-" + str(index),
+                    "title": f"Composable source {str(index).zfill(3)}",
+                    "slug": f"source-{category.split()[-1]}-{str(index)}",
                     "excerpt": "Bounded summary",
                     "content": "This body must not be selected by a theme source.",
                     "category": category,
@@ -178,7 +178,7 @@ def verify(owner, public, fixtures):
                     styles={
                         "desktop": {
                             "normal": {
-                                "background-image": 'url("' + escaped_image + '")',
+                                "background-image": f'url("{escaped_image}")',
                                 "min-height": "240px",
                                 "background-size": "cover",
                                 "border-radius": "24px",
@@ -291,7 +291,7 @@ def verify(owner, public, fixtures):
 
         with fixtures.guard(summaryLimits={data_url: 2}, bodyPaths={}):
             status, _, body = preview(document, normalize=True)
-        check(status == 200, "Scoped source or CSS normalization failed: " + body[:200])
+        check(status == 200, f"Scoped source or CSS normalization failed: {body[:200]}")
         normalized = json.loads(body)
         check(set(normalized["feeds"]) == {"used"}, "Unused source was resolved")
         rows = normalized["feeds"]["used"]
@@ -342,7 +342,7 @@ def verify(owner, public, fixtures):
         deep = block("deep-0")
         cursor = deep
         for index in range(1, 18):
-            child = block("deep-" + str(index))
+            child = block(f"deep-{str(index)}")
             cursor["children"] = [child]
             cursor = child
         invalid = copy.deepcopy(document)
@@ -351,7 +351,7 @@ def verify(owner, public, fixtures):
 
         check(save(document, True)[0] == 200, "Composed theme publish failed")
         check(
-            owner.request(base + "/enable", "POST", {})[0] == 303, "Composed theme activate failed"
+            owner.request(f"{base}/enable", "POST", {})[0] == 303, "Composed theme activate failed"
         )
         public_props = props(public, "/")
         check(set(public_props["themeFeeds"]) == {"used"}, "Public source context is incorrect")
@@ -365,10 +365,10 @@ def verify(owner, public, fixtures):
             "grid-template-columns:1.2fr 0.8fr",
             "max-width:600px",
         ]:
-            check(expected in html, "Composed SSR output is missing: " + expected)
+            check(expected in html, f"Composed SSR output is missing: {expected}")
         check(html.count("Reusable notice") >= 2, "Shared component did not render both instances")
         check(
-            owner.request("/admin/media/" + str(media_id) + "/delete", "POST", {})[0] == 422,
+            owner.request(f"/admin/media/{str(media_id)}/delete", "POST", {})[0] == 422,
             "CSS background image was deleted",
         )
         props(public, "/")
@@ -424,11 +424,11 @@ def verify(owner, public, fixtures):
         check(save(removed, True)[0] == 422, "A template assigned to the homepage could be removed")
     finally:
         owner.request("/admin/settings", "POST", original_site)
-        owner.request("/admin/themes/" + original_theme + "/enable", "POST", {})
-        owner.request(base + "/uninstall", "POST", {})
+        owner.request(f"/admin/themes/{original_theme}/enable", "POST", {})
+        owner.request(f"{base}/uninstall", "POST", {})
         fixtures.delete("items", [("category", "=", category)])
         if media_id is not None:
-            owner.request("/admin/media/" + str(media_id) + "/delete", "POST", {})
+            owner.request(f"/admin/media/{str(media_id)}/delete", "POST", {})
 
 
 if __name__ == "__main__":

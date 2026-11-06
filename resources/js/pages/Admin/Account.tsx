@@ -33,7 +33,7 @@ export default function Account({
           <p>
             {member.email} ·{' '}
             <span className="role-label">
-              {t(member.role.charAt(0).toUpperCase() + member.role.slice(1))}
+              {t(`${member.role.charAt(0).toUpperCase()}${member.role.slice(1)}`)}
             </span>
           </p>
           <form

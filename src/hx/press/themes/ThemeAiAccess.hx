@@ -30,7 +30,7 @@ class ThemeAiAccess {
     public static inline var LIFETIME = 24 * 60 * 60 * 1000;
 
     public static function create(themeId:String, admin:Admin):{token:String, expires:Float} {
-        var token = "hxp_" + SecureToken.generate(32);
+        var token = 'hxp_${SecureToken.generate(32)}';
         var expires = Date.now().getTime() + LIFETIME;
         ThemeAiConnection.query.upsert([
             "id" => SecureToken.generate(32),
@@ -96,7 +96,7 @@ class ThemeAiAccess {
         }
         if (~/^Bearer hxb_[A-Za-z0-9_-]{32}$/.match(authorization)) {
             var ticket:Null<{themeId:String, sessionKey:String}> = Cache.store()
-                .get(BROWSER_PREFIX + Sha256.encode(authorization.substr(7)));
+                .get('${BROWSER_PREFIX}${Sha256.encode(authorization.substr(7))}');
             if (ticket == null || ticket.themeId != themeId) {
                 return null;
             }
@@ -118,25 +118,25 @@ class ThemeAiAccess {
     }
 
     public static function browserCredential(themeId:String, sessionKey:String):String {
-        var token = "hxb_" + SecureToken.generate(32);
+        var token = 'hxb_${SecureToken.generate(32)}';
         var lifetime:Int = Config.get("session.lifetime");
-        Cache.store().put(BROWSER_PREFIX + Sha256.encode(token), {
+        Cache.store().put('${BROWSER_PREFIX}${Sha256.encode(token)}', {
             themeId: themeId,
             sessionKey: sessionKey
         }, lifetime * 60);
-        return "Bearer " + token;
+        return 'Bearer ${token}';
     }
 
     public static function forgetBrowserCredential(authorization:String):Void {
         if (authorization != null && StringTools.startsWith(authorization, "Bearer hxb_")) {
-            Cache.store().forget(BROWSER_PREFIX + Sha256.encode(authorization.substr(7)));
+            Cache.store().forget('${BROWSER_PREFIX}${Sha256.encode(authorization.substr(7))}');
         }
     }
 
     public static function authenticateBrowser(themeId:String,
             sessionKey:String):Null<ThemeAiActor> {
         var stored:Null<Map<String, Dynamic>> = Cache.store(FileSystemSessionCacheStore)
-            .get("session." + sessionKey);
+            .get('session.${sessionKey}');
         if (stored == null || !ThemeDesign.query.where("id", themeId).exists()) {
             return null;
         }

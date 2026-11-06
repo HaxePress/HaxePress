@@ -96,7 +96,7 @@ const server = createServer(async (incoming, outgoing) => {
         const field = message.method === 'resources/read' ? 'uri' : 'name';
         const name = message.params?.[field];
         if (typeof name === 'string') {
-          headers.set('Mcp-Name', '=?base64?' + Buffer.from(name).toString('base64') + '?=');
+          headers.set('Mcp-Name', `=?base64?${Buffer.from(name).toString('base64')}?=`);
         }
       } catch {
         // Malformed JSON is returned to the SDK's own parse-error handler.
@@ -176,7 +176,7 @@ server.keepAliveTimeout = 1000;
 server.listen(0, '127.0.0.1', () => {
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('MCP listener did not start.');
-  process.stdout.write(JSON.stringify({ port: address.port }) + '\n');
+  process.stdout.write(`${JSON.stringify({ port: address.port })}\n`);
 });
 function stop() {
   for (const controller of activeRequests) controller.abort();

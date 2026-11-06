@@ -15,9 +15,9 @@ class BrowserPeer:
         self.sequence = 0
         self.socket = WebSocket(
             os.environ["TEST_URL"],
-            path="/admin/themes/" + theme_id + "/ai/ws",
+            path=f"/admin/themes/{theme_id}/ai/ws",
             headers={
-                "Cookie": "; ".join(key + "=" + value for key, value in owner.cookies.items()),
+                "Cookie": "; ".join(f"{key}={value}" for key, value in owner.cookies.items()),
                 "Origin": os.environ["TEST_URL"],
             },
             opened=False,
@@ -41,7 +41,7 @@ class BrowserPeer:
 
     def tool(self, name, arguments=None):
         reply = self.rpc("tools/call", {"name": name, "arguments": arguments or {}})
-        check("result" in reply, "The browser tool was rejected: " + str(reply.get("error")))
+        check("result" in reply, f"The browser tool was rejected: {str(reply.get('error'))}")
         result = reply["result"]
         check(not result.get("isError"), "The browser tool failed")
         return result.get("structuredContent") or json.loads(result["content"][0]["text"])
@@ -60,9 +60,9 @@ def reject_socket(path, headers):
 
 
 def initial_browser(owner, store, theme_id):
-    path = "/admin/themes/" + theme_id + "/ai/ws"
+    path = f"/admin/themes/{theme_id}/ai/ws"
     reject_socket(path, {"Origin": os.environ["TEST_URL"]})
-    cookies = "; ".join(key + "=" + value for key, value in owner.cookies.items())
+    cookies = "; ".join(f"{key}={value}" for key, value in owner.cookies.items())
     reject_socket(path, {"Origin": "https://untrusted.test", "Cookie": cookies})
     reject_socket(path, {"Cookie": cookies})
     peer = BrowserPeer(owner, theme_id)
@@ -76,9 +76,9 @@ def initial_browser(owner, store, theme_id):
 
 
 def permissions_and_events(owner, public, store, peer, other, token, version):
-    route = "/admin/themes/" + peer.theme_id
-    api = "/api/theme-designer/" + peer.theme_id
-    bearer = {"Authorization": "Bearer " + token}
+    route = f"/admin/themes/{peer.theme_id}"
+    api = f"/api/theme-designer/{peer.theme_id}"
+    bearer = {"Authorization": f"Bearer {token}"}
     peer.tool("get_design")
     changes = [
         event["params"]
@@ -106,20 +106,20 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
     )
     check(
         owner.request(
-            route + "/ai/permissions", "POST", {"read": "1", "edit": "0", "media": "0"}, csrf=False
+            f"{route}/ai/permissions", "POST", {"read": "1", "edit": "0", "media": "0"}, csrf=False
         )[0]
         == 419,
         "Permission changes bypassed CSRF",
     )
     check(
-        post_json(owner, route + "/ai/permissions", {"read": "1", "edit": "invalid", "media": "1"})[
+        post_json(owner, f"{route}/ai/permissions", {"read": "1", "edit": "invalid", "media": "1"})[
             0
         ]
         == 422,
         "Permission validation was bypassed",
     )
     check(
-        post_json(owner, route + "/ai/permissions", {"read": "1", "edit": "0", "media": "0"})[0]
+        post_json(owner, f"{route}/ai/permissions", {"read": "1", "edit": "0", "media": "0"})[0]
         == 200,
         "Read-only permissions could not be saved",
     )
@@ -133,11 +133,11 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
     ]
     check([tool["name"] for tool in tools] == expected, "Browser tool permissions were not applied")
     check(
-        public.request(api + "/design", "POST", {}, extra_headers=bearer)[0] == 403,
+        public.request(f"{api}/design", "POST", {}, extra_headers=bearer)[0] == 403,
         "A read-only AI connection could write",
     )
     check(
-        public.request(api + "/media", extra_headers=bearer)[0] == 403,
+        public.request(f"{api}/media", extra_headers=bearer)[0] == 403,
         "A denied media permission was ignored",
     )
     reply = peer.rpc(
@@ -155,7 +155,7 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
         "A forbidden browser edit succeeded",
     )
     status, _, body = public.request(
-        "/mcp/themes/" + peer.theme_id,
+        f"/mcp/themes/{peer.theme_id}",
         "POST",
         raw=json.dumps({"jsonrpc": "2.0", "id": 31, "method": "tools/list"}).encode(),
         content_type="application/json",
@@ -180,16 +180,16 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
         "Saving permissions rotated a connection key",
     )
     check(
-        post_json(owner, route + "/ai/permissions", {"read": "0", "edit": "1", "media": "1"})[0]
+        post_json(owner, f"{route}/ai/permissions", {"read": "0", "edit": "1", "media": "1"})[0]
         == 200,
         "AI tools could not be disabled",
     )
     check(
-        public.request(api + "/design", extra_headers=bearer)[0] == 403,
+        public.request(f"{api}/design", extra_headers=bearer)[0] == 403,
         "Disabled AI tools retained design access",
     )
     check(
-        post_json(owner, route + "/ai/permissions", {"read": "1", "edit": "1", "media": "1"})[0]
+        post_json(owner, f"{route}/ai/permissions", {"read": "1", "edit": "1", "media": "1"})[0]
         == 200,
         "AI permissions could not be restored",
     )

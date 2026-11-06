@@ -60,7 +60,7 @@ export function createContentDetail(
           <header className="content-header">
             <Link
               className="category-pill"
-              href={item.archiveUrl + '?category=' + encodeURIComponent(item.category)}
+              href={`${item.archiveUrl}?category=${encodeURIComponent(item.category)}`}
             >
               {item.category}
             </Link>
@@ -69,7 +69,7 @@ export function createContentDetail(
             {(item.tags || []).length > 0 && (
               <nav className="content-tags" aria-label={t('Content tags')}>
                 {item.tags?.map((tag) => (
-                  <Link key={tag.id} href={tag.url || '/tags/' + tag.slug}>
+                  <Link key={tag.id} href={tag.url || `/tags/${tag.slug}`}>
                     #{tag.name}
                   </Link>
                 ))}

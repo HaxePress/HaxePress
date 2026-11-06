@@ -52,7 +52,7 @@ class ImageUploads {
                         429);
             }
             var key = SecureToken.generate(32);
-            var upload = ImageUpload.query.create([
+            ImageUpload.query.insert([
                 "key" => key,
                 "user_id" => userId,
                 "owner_hash" => ownerHash,
@@ -63,17 +63,17 @@ class ImageUploads {
                 "expires_epoch" => now + LIFETIME
             ]);
             var disk = Storage.disk("image_uploads");
-            var path = key + "/image";
+            var path = '${key}/image';
             try {
                 disk.put(path, bytes);
-                return disk.response(path, "upload." + format.extension, [
+                return disk.response(path, 'upload.${format.extension}', [
                     "Content-Type" => format.contentType,
                     "Cache-Control" => "private, no-store",
                     "X-Content-Type-Options" => "nosniff",
                     "X-Upload-Id" => key
                 ], "attachment").status(202);
             } catch (error:Dynamic) {
-                discard(upload);
+                discard(key);
                 throw error;
             }
         });
@@ -100,7 +100,7 @@ class ImageUploads {
             return ResponseBuilder.asJson({error: "Choose an image under 20 megapixels."}, 422);
         }
         return locked(() -> {
-            var upload = ImageUpload.query.select(["key", "label", "sha256", "size"])
+            var upload = ImageUpload.query.select(["label", "sha256", "size"])
                 .where("key", key)
                 .where("user_id", userId)
                 .where("owner_hash", Sha256.encode(credential))
@@ -109,7 +109,7 @@ class ImageUploads {
                 .limit(1)
                 .first();
             var disk = Storage.disk("image_uploads");
-            var path = key + "/image";
+            var path = '${key}/image';
             if (upload == null || !disk.fileExists(path)) {
                 return ResponseBuilder.asJson({error: "This image upload is no longer available."},
                     404);
@@ -128,8 +128,8 @@ class ImageUploads {
                         422);
             }
             // Claim the file before saving so concurrent confirmations cannot publish it twice.
-            disk.move(path, key + "/verified");
-            discard(upload);
+            disk.move(path, '${key}/verified');
+            discard(key);
             var image:Dynamic;
             if (themeId == "") {
                 image = MediaStorage.save(bytes, format, {width: width, height: height},
@@ -155,18 +155,18 @@ class ImageUploads {
                 .limit(100)
                 .get();
             for (upload in expired) {
-                discard(upload);
+                discard(upload.key);
             }
             return true;
         });
     }
 
-    static function discard(upload:ImageUpload):Void {
+    static function discard(key:String):Void {
         var disk = Storage.disk("image_uploads");
-        if (disk.directoryExists(upload.key)) {
-            disk.deleteDirectory(upload.key);
+        if (disk.directoryExists(key)) {
+            disk.deleteDirectory(key);
         }
-        upload.delete();
+        ImageUpload.query.where("key", key).delete();
     }
 
     static function locked<T>(work:Void->T):T {

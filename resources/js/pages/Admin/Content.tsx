@@ -52,7 +52,7 @@ export default function Content({
             <p>{t(contentType.labels.description || contentType.description)}</p>
           )}
         </div>
-        <Link className="button" href={base + '/new'}>
+        <Link className="button" href={`${base}/new`}>
           <Icon name="plus" /> {collectionLabel(contentType, 'create', t)}
         </Link>
       </div>
@@ -62,7 +62,7 @@ export default function Content({
           <h2>{t('Your new working copies')}</h2>
           <p>{t('Resume content that has not been saved to the collection yet.')}</p>
           {workingDrafts.map((draft) => (
-            <Link key={draft.key} href={base + '/new?draft=' + encodeURIComponent(draft.key)}>
+            <Link key={draft.key} href={`${base}/new?draft=${encodeURIComponent(draft.key)}`}>
               {draft.title || t('Untitled working copy')}
             </Link>
           ))}
@@ -84,7 +84,7 @@ export default function Content({
               <Link
                 key={value}
                 className={status === value ? 'selected' : ''}
-                href={base + (value ? '?status=' + value : '')}
+                href={`${base}${value ? `?status=${value}` : ''}`}
               >
                 {label} <span>{count}</span>
               </Link>

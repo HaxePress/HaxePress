@@ -39,7 +39,7 @@ def run(skip_packages=False):
     compiler = Path(os.environ.get("HXWELL_HAXE", ROOT / ".tools/haxe/haxe")).resolve()
     environment = {
         **os.environ,
-        "PATH": str(compiler.parent) + os.pathsep + os.environ["PATH"],
+        "PATH": f"{str(compiler.parent)}{os.pathsep}{os.environ['PATH']}",
         "HAXE_STD_PATH": str(ROOT / ".tools/haxe/std"),
     }
     if platform.system() == "Darwin":
@@ -75,7 +75,7 @@ def run(skip_packages=False):
         "-D",
         "HXCPP_COMPILE_THREADS=4",
         "-D",
-        "dll_export=" + str(host / "export_classes.info"),
+        f"dll_export={str(host / 'export_classes.info')}",
     ]
     if platform.machine() == "arm64":
         command.extend(["-D", "HXCPP_ARM64"])
@@ -91,7 +91,7 @@ def run(skip_packages=False):
         updated_source.parent.mkdir(parents=True)
         updated_source.write_text(
             text.replace(
-                original, 'var message:String = "Updated module: " + input.settings.message;'
+                original, "var message:String = 'Updated module: ${input.settings.message}';"
             )
         )
         updated = work / "updated.cppia"
@@ -107,7 +107,7 @@ def run(skip_packages=False):
                 'include("example")',
                 *external_host_options(),
                 "-D",
-                "dll_import=" + str(api),
+                f"dll_import={str(api)}",
                 "--cppia",
                 str(updated),
             ],
@@ -124,7 +124,7 @@ def run(skip_packages=False):
                 "--macro",
                 'haxe.macro.Context.getType("plugins.InvalidEntrypoint")',
                 "-D",
-                "dll_import=" + str(api),
+                f"dll_import={str(api)}",
                 "--cppia",
                 str(invalid),
             ],
@@ -183,12 +183,12 @@ def run(skip_packages=False):
             "total expanded size",
             archive(
                 minimal,
-                modules + [("expanded-" + str(index) + ".txt", block) for index in range(11)],
+                modules + [(f"expanded-{str(index)}.txt", block) for index in range(11)],
             ),
         )
         reject(
             "entry count",
-            archive(minimal, modules + [("files/" + str(index), b"") for index in range(256)]),
+            archive(minimal, modules + [(f"files/{str(index)}", b"") for index in range(256)]),
         )
         corrupt = bytearray(archive(minimal, modules, compression=ZIP_STORED))
         position = corrupt.find(script)
@@ -207,9 +207,7 @@ def run(skip_packages=False):
             "APP_URL": "http://localhost",
             "SESSION_PATH": str(work / "storage/sessions"),
         }
-        (work / ".env").write_text(
-            "".join(key + "=" + value + "\n" for key, value in values.items())
-        )
+        (work / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         with FixtureStore(work) as fixtures:
             fixtures.call("initialize_schema")
             fixtures.create(
@@ -265,7 +263,7 @@ def run(skip_packages=False):
             if failure.exists():
                 shutil.rmtree(failure)
             shutil.copytree(work, failure)
-            print("Saved isolated CPPIA failure workspace: " + str(failure), flush=True)
+            print(f"Saved isolated CPPIA failure workspace: {str(failure)}", flush=True)
             raise
         streamed = work / "streamed.zip"
         streamed.write_bytes(archive(minimal, modules, descriptor=True))

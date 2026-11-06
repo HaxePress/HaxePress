@@ -125,7 +125,7 @@ class PackageController {
             }
             PackageManager.install(key, kind, admin.id, admin.name,
                 request.input("replace", "0") == "1");
-            return ResponseBuilder.asRedirect(base(kind) + "?notice=installed", 303);
+            return ResponseBuilder.asRedirect('${base(kind)}?notice=installed', 303);
         } catch (error:Dynamic) {
             return index(request, kind, Std.string(error), 422);
         }
@@ -162,7 +162,7 @@ class PackageController {
                     throw new Exception("Unsupported package action.");
             }
             var notice = action == "enable" ? "enabled" : action == "disable" ? "disabled" : "removed";
-            return ResponseBuilder.asRedirect(base(kind) + "?notice=" + notice, 303);
+            return ResponseBuilder.asRedirect('${base(kind)}?notice=${notice}', 303);
         } catch (error:Dynamic) {
             return index(request, kind, Std.string(error), 422);
         }
@@ -178,7 +178,7 @@ class PackageController {
         if (item == null) {
             return SiteController.notFound(request);
         }
-        var url = base(kind) + "/" + id + "/settings";
+        var url = '${base(kind)}/${id}/settings';
         var redirect = AdminController.validationRedirect(request, "package", error, url);
         if (redirect != null) {
             return redirect;
@@ -222,8 +222,8 @@ class PackageController {
         if (theme == null || theme.kind != "theme") {
             return SiteController.notFound(request);
         }
-        var previewBase = "/admin/themes/" + theme.id + "/preview/frame";
-        var previewUrl = previewBase + "?lang=" + StringTools.urlEncode(I18n.locale());
+        var previewBase = '/admin/themes/${theme.id}/preview/frame';
+        var previewUrl = '${previewBase}?lang=${StringTools.urlEncode(I18n.locale())}';
         var manifest = PackageManifest.parse(theme.manifest);
         var fields = manifest.fields.filter(field -> field.kind != "secret");
         var customization:Dynamic = null;
@@ -231,10 +231,10 @@ class PackageController {
             var session = SecureToken.generate(32);
             var values = PackageSettings.values(manifest, theme.settings, false);
             customization = {fields: fields, values: values, session: session};
-            previewUrl += "&customizeSession=" + session;
+            previewUrl += '&customizeSession=${session}';
         }
         var redirect = AdminController.validationRedirect(request, "package", error,
-            "/admin/themes/" + theme.id + "/preview");
+            '/admin/themes/${theme.id}/preview');
         if (redirect != null) {
             return redirect;
         }
@@ -263,7 +263,7 @@ class PackageController {
         if (theme == null || theme.kind != "theme") {
             return SiteController.notFound(request);
         }
-        var previewBase = "/admin/themes/" + theme.id + "/preview/frame";
+        var previewBase = '/admin/themes/${theme.id}/preview/frame';
         request.setAttribute("hx.press.preview.base", previewBase);
         var themeInfo = ThemeData.info(theme, true);
         themeInfo.preview = false;

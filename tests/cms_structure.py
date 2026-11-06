@@ -45,9 +45,9 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
         for row in fixtures.scan("cms_packages", ["id", "kind", "enabled"])
         if row["kind"] == "theme" and row["enabled"]
     )
-    theme_slug = "runtime-" + suffix
-    theme_id = "theme-" + theme_slug
-    region = "runtime_" + suffix
+    theme_slug = f"runtime-{suffix}"
+    theme_id = f"theme-{theme_slug}"
+    region = f"runtime_{suffix}"
     manifest = {
         "apiVersion": 4,
         "cmsVersion": "2.16.0",
@@ -76,13 +76,13 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
     link_id = None
     try:
         check(
-            owner.request("/admin/themes/" + theme_id + "/enable", "POST", {})[0] == 303,
+            owner.request(f"/admin/themes/{theme_id}/enable", "POST", {})[0] == 303,
             "Activate a partial theme with an arbitrary layout",
         )
         definition["template"] = "RuntimeDetail"
         check(
             owner.request(
-                "/admin/content-types/" + definition["key"] + "/save",
+                f"/admin/content-types/{definition['key']}/save",
                 "POST",
                 {"definition": json.dumps(definition)},
             )[0]
@@ -90,11 +90,11 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
             "Assign a named public template",
         )
         check(
-            'data-runtime-template="true"' in public.request("/" + prefix + "/" + slug)[2],
+            'data-runtime-template="true"' in public.request(f"/{prefix}/{slug}")[2],
             "Named partial theme did not render an initial HTML request",
         )
         check(public.request("/")[0] == 200, "Partial theme lost its standard homepage fallback")
-        frame = owner.request("/admin/themes/" + theme_id + "/preview/frame/" + prefix + "/" + slug)
+        frame = owner.request(f"/admin/themes/{theme_id}/preview/frame/{prefix}/{slug}")
         check(
             frame[0] == 200
             and frame[1].get("x-frame-options") == "SAMEORIGIN"
@@ -117,7 +117,7 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
         )
         link_id = fixtures.rows("menu_links", ["id"], [("location", "=", region)])[0]["id"]
         check(
-            props(public, "/")["navigation"][region][0]["url"] == "/" + prefix + "/" + slug,
+            props(public, "/")["navigation"][region][0]["url"] == f"/{prefix}/{slug}",
             "Dynamic navigation region or managed content address",
         )
         changed_site = {
@@ -136,7 +136,7 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
             "Homepage did not use its selected content",
         )
         check(
-            public.request("/" + prefix + "/" + slug)[1]["location"] == "/",
+            public.request(f"/{prefix}/{slug}")[1]["location"] == "/",
             "Homepage content retained a duplicate canonical address",
         )
         check(
@@ -150,14 +150,14 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
         definition["template"] = "MissingRuntimeTemplate"
         check(
             owner.request(
-                "/admin/content-types/" + definition["key"] + "/save",
+                f"/admin/content-types/{definition['key']}/save",
                 "POST",
                 {"definition": json.dumps(definition)},
             )[0]
             == 303,
             "Configure an unavailable template",
         )
-        fallback = public.request("/" + prefix + "/" + slug)
+        fallback = public.request(f"/{prefix}/{slug}")
         check(
             fallback[0] == 200 and "content-field-values" in fallback[2],
             "Missing named template lost its standard field-aware fallback",
@@ -166,14 +166,14 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
         owner.request("/admin/settings", "POST", original_site)
         definition["template"] = "ContentDetail"
         owner.request(
-            "/admin/content-types/" + definition["key"] + "/save",
+            f"/admin/content-types/{definition['key']}/save",
             "POST",
             {"definition": json.dumps(definition)},
         )
-        owner.request("/admin/themes/" + original_theme + "/enable", "POST", {})
-        owner.request("/admin/themes/" + theme_id + "/uninstall", "POST", {})
+        owner.request(f"/admin/themes/{original_theme}/enable", "POST", {})
+        owner.request(f"/admin/themes/{theme_id}/uninstall", "POST", {})
         if link_id is not None:
-            owner.request("/admin/navigation/" + str(link_id) + "/delete", "POST", {})
+            owner.request(f"/admin/navigation/{str(link_id)}/delete", "POST", {})
         fixtures.delete("navigation_regions", [("key", "=", region)])
 
 
@@ -182,11 +182,11 @@ def run():
     public = Client()
     login(owner, os.environ["TEST_ADMIN_EMAIL"], os.environ["TEST_ADMIN_PASSWORD"])
     suffix = secrets.token_hex(4)
-    key = "product_" + suffix
-    role = "product_editor_" + suffix
-    prefix = "products-" + suffix
-    base = "/admin/collections/" + key
-    email = "product-editor-" + suffix + "@example.test"
+    key = f"product_{suffix}"
+    role = f"product_editor_{suffix}"
+    prefix = f"products-{suffix}"
+    base = f"/admin/collections/{key}"
+    email = f"product-editor-{suffix}@example.test"
     password = secrets.token_urlsafe(20)
     definition = {
         "key": key,
@@ -213,8 +213,8 @@ def run():
             created = owner.request(
                 "/admin/content-types/create", "POST", {"definition": json.dumps(definition)}
             )
-            check(created[0] == 303, "Create runtime content definition: " + created[2][:300])
-            editor = props(owner, base + "/new")
+            check(created[0] == 303, f"Create runtime content definition: {created[2][:300]}")
+            editor = props(owner, f"{base}/new")
             check(
                 editor["contentType"]["key"] == key and not editor["hasCategories"] is False,
                 "Generic editor definition",
@@ -236,7 +236,7 @@ def run():
             values = {
                 "price": 0,
                 "stock": False,
-                "secret": "PRIVATE-" + suffix,
+                "secret": f"PRIVATE-{suffix}",
                 "banner": image["url"],
             }
             data = {
@@ -258,25 +258,25 @@ def run():
                 "custom_fields": json.dumps(values),
             }
             missing = owner.request(
-                base + "/save", "POST", {**data, "custom_fields": json.dumps({"stock": False})}
+                f"{base}/save", "POST", {**data, "custom_fields": json.dumps({"stock": False})}
             )
             check(missing[0] == 422, "Publication accepted a missing required custom field")
             check(
-                owner.request(base + "/working-copy", "POST", {**data, "draft_version": "1"})[0]
+                owner.request(f"{base}/working-copy", "POST", {**data, "draft_version": "1"})[0]
                 == 200,
                 "Generic new working copy",
             )
-            restored = props(owner, base + "/new?draft=" + editor["draftKey"])
+            restored = props(owner, f"{base}/new?draft={editor['draftKey']}")
             check(
                 json.loads(restored["workingCopy"]["data"]["custom_fields"])["price"] == 0,
                 "Working copy lost structured values",
             )
-            status, headers, body = owner.request(base + "/save", "POST", data)
-            check(status == 303, "Save structured content: " + body[:300])
+            status, headers, body = owner.request(f"{base}/save", "POST", data)
+            check(status == 303, f"Save structured content: {body[:300]}")
             identifier = int(re.search(r"/(\d+)/edit", headers["location"]).group(1))
             identifiers.append(identifier)
             data["id"] = str(identifier)
-            page = props(public, "/" + prefix + "/" + data["slug"])
+            page = props(public, f"/{prefix}/{data['slug']}")
             check(
                 page["item"]["fields"]["price"] == 0 and page["item"]["fields"]["stock"] is False,
                 "Zero/false custom values changed",
@@ -285,18 +285,18 @@ def run():
                 "secret" not in page["item"]["fields"] and values["secret"] not in json.dumps(page),
                 "Private custom value leaked",
             )
-            listing = props(public, "/" + prefix + "?field_price=0&field_stock=false")
+            listing = props(public, f"/{prefix}?field_price=0&field_stock=false")
             check(
                 listing["resultCount"] == 1 and len(listing["items"]) == 1,
                 "Native custom-field filter",
             )
             check("secret" not in listing["items"][0]["fields"], "Private list projection leaked")
             check(
-                props(public, "/" + prefix + "?field_price=11")["resultCount"] == 0,
+                props(public, f"/{prefix}?field_price=11")["resultCount"] == 0,
                 "Specific custom-field query reused another filter",
             )
             check(
-                props(public, "/" + prefix + "?field_secret=wrong")["resultCount"] == 1,
+                props(public, f"/{prefix}?field_secret=wrong")["resultCount"] == 1,
                 "Private fields became public predicates",
             )
             admin_list = props(owner, base)
@@ -308,39 +308,37 @@ def run():
                 "media_assets", ["id"], [("filename", "=", Path(image["url"]).name)]
             )[0]["id"]
             check(
-                owner.request("/admin/media/" + str(media_id) + "/delete", "POST", {})[0] == 422,
+                owner.request(f"/admin/media/{str(media_id)}/delete", "POST", {})[0] == 422,
                 "A referenced custom image was deleted",
             )
-            history = json.loads(owner.request(base + "/" + str(identifier) + "/history")[2])[
-                "revisions"
-            ]
+            history = json.loads(owner.request(f"{base}/{str(identifier)}/history")[2])["revisions"]
             snapshot = json.loads(
-                owner.request(base + "/" + str(identifier) + "/history/" + str(history[0]["id"]))[2]
+                owner.request(f"{base}/{str(identifier)}/history/{str(history[0]['id'])}")[2]
             )["snapshot"]
             check(
                 snapshot["fields"]["price"] == 0
                 and snapshot["fields"]["secret"] == values["secret"],
                 "Revision omitted native custom values",
             )
-            renamed = prefix + "-new"
+            renamed = f"{prefix}-new"
             definition["publicPath"] = renamed
             check(
                 owner.request(
-                    "/admin/content-types/" + key + "/save",
+                    f"/admin/content-types/{key}/save",
                     "POST",
                     {"definition": json.dumps(definition)},
                 )[0]
                 == 303,
                 "Change collection path",
             )
-            redirect = public.request("/" + prefix + "/" + data["slug"] + "?q=kept")
+            redirect = public.request(f"/{prefix}/{data['slug']}?q=kept")
             check(
                 redirect[0] == 301
-                and redirect[1]["location"] == "/" + renamed + "/" + data["slug"] + "?q=kept",
+                and redirect[1]["location"] == f"/{renamed}/{data['slug']}?q=kept",
                 "Old collection address did not redirect",
             )
             check(
-                owner.request("/admin/content-types/" + key + "/delete", "POST", {})[0] == 422,
+                owner.request(f"/admin/content-types/{key}/delete", "POST", {})[0] == 422,
                 "Removed a populated definition",
             )
             verify_presentation(
@@ -361,11 +359,11 @@ def run():
             )
             fresh_definition = {**definition, "description": "Refresh the schema boundary"}
             owner.request(
-                "/admin/content-types/" + key + "/save",
+                f"/admin/content-types/{key}/save",
                 "POST",
                 {"definition": json.dumps(fresh_definition)},
             )
-            sanitized = props(public, "/" + renamed + "/" + data["slug"])
+            sanitized = props(public, f"/{renamed}/{data['slug']}")
             check(
                 sanitized["item"]["fields"].get("banner") is None,
                 "An incompatible stored image bypassed the upload boundary",
@@ -376,11 +374,11 @@ def run():
                 [("id", "=", old_banner["id"])],
             )
             owner.request(
-                "/admin/content-types/" + key + "/save",
+                f"/admin/content-types/{key}/save",
                 "POST",
                 {"definition": json.dumps(definition)},
             )
-            grants = ["content." + key, "account", "publish"]
+            grants = [f"content.{key}", "account", "publish"]
             result = owner.request(
                 "/admin/roles/create",
                 "POST",
@@ -392,7 +390,7 @@ def run():
                     "capabilities": json.dumps(grants),
                 },
             )
-            check(result[0] == 303, "Create database role: " + result[2][:300])
+            check(result[0] == 303, f"Create database role: {result[2][:300]}")
             result = owner.request(
                 "/admin/team/save",
                 "POST",
@@ -418,29 +416,29 @@ def run():
                 "Scoped role saw another author's private administration rows",
             )
             check(
-                writer.request(base + "/" + str(identifier) + "/edit")[0] == 403,
+                writer.request(f"{base}/{str(identifier)}/edit")[0] == 403,
                 "Scoped role edited another author's content",
             )
-            user_editor = props(writer, base + "/new")
+            user_editor = props(writer, f"{base}/new")
             draft = {
                 **data,
                 "id": "",
                 "title": "Owned product",
-                "slug": "owned-" + suffix,
+                "slug": f"owned-{suffix}",
                 "draft_key": user_editor["draftKey"],
                 "status": "draft",
                 "custom_fields": json.dumps({"price": 3, "stock": True}),
             }
-            result = writer.request(base + "/save", "POST", draft)
+            result = writer.request(f"{base}/save", "POST", draft)
             check(result[0] == 303, "Save within dedicated collection permission")
             identifiers.append(int(re.search(r"/(\d+)/edit", result[1]["location"]).group(1)))
             check(
-                owner.request("/admin/roles/" + role + "/delete", "POST", {})[0] == 422,
+                owner.request(f"/admin/roles/{role}/delete", "POST", {})[0] == 422,
                 "Removed a role that is assigned to an account",
             )
             check(
                 owner.request(
-                    "/admin/roles/" + role + "/save",
+                    f"/admin/roles/{role}/save",
                     "POST",
                     {
                         "key": role,
@@ -459,7 +457,7 @@ def run():
             )
             check(
                 owner.request(
-                    "/admin/roles/" + role + "/save",
+                    f"/admin/roles/{role}/save",
                     "POST",
                     {
                         "key": role,
@@ -479,7 +477,7 @@ def run():
             definition["publicVisible"] = False
             check(
                 owner.request(
-                    "/admin/content-types/" + key + "/save",
+                    f"/admin/content-types/{key}/save",
                     "POST",
                     {"definition": json.dumps(definition)},
                 )[0]
@@ -487,17 +485,17 @@ def run():
                 "Make collection private",
             )
             check(
-                public.request("/" + renamed)[0] == 404
-                and public.request("/" + renamed + "/" + data["slug"])[0] == 404,
+                public.request(f"/{renamed}")[0] == 404
+                and public.request(f"/{renamed}/{data['slug']}")[0] == 404,
                 "Private collection remained public",
             )
         finally:
             for identifier in identifiers:
-                owner.request(base + "/" + str(identifier) + "/delete", "POST", {})
+                owner.request(f"{base}/{str(identifier)}/delete", "POST", {})
             fixtures.delete("admins", [("email", "=", email)])
-            owner.request("/admin/roles/" + role + "/delete", "POST", {})
+            owner.request(f"/admin/roles/{role}/delete", "POST", {})
             fixtures.delete("editor_drafts", [("kind", "=", key)])
-            owner.request("/admin/content-types/" + key + "/delete", "POST", {})
+            owner.request(f"/admin/content-types/{key}/delete", "POST", {})
             owner.request("/admin/logout", "POST", {})
     print(
         "PASS Dynamic CMS: runtime collections, dedicated role grants, scalar/list/filter privacy, zero/false values, working copies, revisions, image references and retained permalink redirects",

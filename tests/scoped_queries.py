@@ -17,7 +17,7 @@ HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
 
 def page(client, route, group=None):
     status, _, body = client.request(route, extra_headers=HEADERS)
-    check(status == 200, "page failed: " + route + " " + body[:200])
+    check(status == 200, f"page failed: {route} {body[:200]}")
     props = json.loads(body)["props"]
     return props[group] if group else props
 
@@ -30,13 +30,13 @@ def walk(client, route, field, limit, expected, category_counts=None, group=None
     for index in range(100):
         props = page(client, next_route, group)
         items = props[field]
-        check(len(items) <= limit, "unbounded page: " + route)
+        check(len(items) <= limit, f"unbounded page: {route}")
         check(props["pagination"]["total"] == len(expected), "incorrect filtered count")
         if category_counts is not None:
             for category in items:
                 check(
                     category["items"] == category_counts.get(category["name"], 0),
-                    "category content item count is incorrect: " + category["name"],
+                    f"category content item count is incorrect: {category['name']}",
                 )
         if index == 1:
             previous = page(client, props["pagination"]["previous"], group)[field]
@@ -54,7 +54,7 @@ def walk(client, route, field, limit, expected, category_counts=None, group=None
         raise AssertionError("pagination never ended")
     check(
         seen == expected and len(seen) == len(set(seen)),
-        "missing/duplicate/incorrect cursor rows: " + route,
+        f"missing/duplicate/incorrect cursor rows: {route}",
     )
     for expected_page in reversed(pages[:-1]):
         previous_route = props["pagination"]["previous"]
@@ -62,7 +62,7 @@ def walk(client, route, field, limit, expected, category_counts=None, group=None
         props = page(client, previous_route, group)
         check(
             [item["id"] for item in props[field]] == expected_page,
-            "backward cursor changed ordering: " + route,
+            f"backward cursor changed ordering: {route}",
         )
     check(props["pagination"]["previous"] is None, "first page has a previous cursor")
 
@@ -105,8 +105,8 @@ def verify(fixtures):
 
     category_inputs = [
         {
-            "name": "Scale category " + str(index).zfill(3),
-            "name_key": "scale category " + str(index).zfill(3),
+            "name": f"Scale category {str(index).zfill(3)}",
+            "name_key": f"scale category {str(index).zfill(3)}",
             "created_at": stamp,
             "updated_at": stamp,
         }
@@ -115,19 +115,19 @@ def verify(fixtures):
     category_ids = fixtures.create("categories", category_inputs)
     content_inputs = []
     for index in range(120):
-        title = "Scale fixture " + str(index).zfill(3)
+        title = f"Scale fixture {str(index).zfill(3)}"
         if index == 0:
             title += " literal_% !"
         content_inputs.append(
             {
                 "title": title,
-                "slug": "scale-fixture-" + str(index),
+                "slug": f"scale-fixture-{str(index)}",
                 "excerpt": "A bounded test content item for cursor pagination.",
                 "content": marker,
                 "category": (
                     "Getting started"
                     if index % 5 == 0
-                    else "Scale category " + str(index % 87).zfill(3)
+                    else f"Scale category {str(index % 87).zfill(3)}"
                 ),
                 "image": "",
                 "image_alt": "",
@@ -141,7 +141,7 @@ def verify(fixtures):
         )
     content_ids = fixtures.create("items", content_inputs)
     subscriber_inputs = [
-        {"email": "scale-" + str(index).zfill(3) + "@example.com", "created_at": stamp}
+        {"email": f"scale-{str(index).zfill(3)}@example.com", "created_at": stamp}
         for index in range(95)
     ]
     subscriber_ids = fixtures.create("subscribers", subscriber_inputs)

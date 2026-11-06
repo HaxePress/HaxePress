@@ -58,7 +58,7 @@ def run(skip_packages=False):
         source.write_text(
             source.read_text().replace(
                 "var message:String = input.settings.message;",
-                'var message:String = "Updated module: " + input.settings.message;',
+                "var message:String = 'Updated module: ${input.settings.message}';",
             )
         )
         build_php_plugin(
@@ -87,7 +87,7 @@ def run(skip_packages=False):
                 if path != "cms-package.json"
             }
         definition = json.loads(files["php/module.json"])
-        entry_file = "php/" + next(iter(definition["classes"].values()))
+        entry_file = f"php/{next(iter(definition['classes'].values()))}"
         inspection_files = {
             **files,
             entry_file: b'<?php throw new \\RuntimeException("Inspection executed PHP code");',
@@ -111,12 +111,12 @@ def run(skip_packages=False):
                 "entry-limit",
                 archive(
                     manifest,
-                    [*files.items(), *[("extra/" + str(index), "") for index in range(256)]],
+                    [*files.items(), *[(f"extra/{str(index)}", "") for index in range(256)]],
                 ),
             ),
         ]
         for label, data in cases:
-            (work / (label + ".zip")).write_bytes(data)
+            (work / (f"{label}.zip")).write_bytes(data)
         values = {
             "APP_NAME": "haxepress_test",
             "APP_ENV": "development",
@@ -128,9 +128,7 @@ def run(skip_packages=False):
             "SESSION_PATH": str(work / "storage/sessions"),
         }
         (work / "storage/cache").mkdir(parents=True)
-        (work / ".env").write_text(
-            "".join(key + "=" + value + "\n" for key, value in values.items())
-        )
+        (work / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         with FixtureStore(work) as fixtures:
             fixtures.call("initialize_schema")
             fixtures.create(

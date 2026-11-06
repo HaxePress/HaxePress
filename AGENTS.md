@@ -21,6 +21,7 @@ Compile the JVM target after changing imports to verify type and native-binding 
 ## Readability and HxWell APIs
 
 - Use descriptive intermediate variables for filtering, mapping, validation, and page props. Prepare data before calling `Inertia.render`.
+- Use native string interpolation when composing text from values. In Haxe, write single-quoted strings with `${...}`. Use template literals in JavaScript and TypeScript and f-strings in Python. Prepare complex values before interpolating them.
 - Keep one statement per line and use multiline blocks. Do not hand-minify Haxe, JSX, CSS, or Python source.
 - Prefer the installed framework's APIs: `request.validate`, `request.only`, model queries, `toObject`, and `Inertia.render(component, props)`. Check their implementation before creating a wrapper or assuming Laravel API parity.
 - In this adapter, `withData` is for root-template data, not page props. Prepare all page props before calling `Inertia.render`.
@@ -33,6 +34,9 @@ Compile the JVM target after changing imports to verify type and native-binding 
 - Application and test source must use model/query builder and Schema APIs, without raw SQL strings, `selectRaw`, `whereRaw`, or direct database statements. Test data uses the test-only JVM ORM fixture process. Maintain necessary framework compatibility changes in `patches/hxwell-query-builder.patch`, rather than introducing SQL wrappers. Connection/result-set decorators may observe and forward framework-generated statements; they must not construct or rewrite them.
 - Filter, count, sort, and limit collections in SQL. Never load a full table or a whole-entity cache and filter it for a page or detail request.
 - Select only the columns used by the response. Content bodies belong to a single detail/editor query or a SQL search predicate, not list projections.
+- Use the query builder's `exists()` for Boolean checks and `count()` when the number of matches matters. Combine lookup, scope, status, ownership and version predicates in the same query when their SQL comparisons preserve the application's rules.
+- Use `Model.query.insert()` when the caller needs only the write or the generated numeric ID. Use `create()` when the caller needs the hydrated record. Prefer keyed `upsert()` with a complete insert payload and explicit update columns when the table's unique constraints match the intended conflict behavior on each database driver.
+- Reuse rows, scalar projections and permission lists already read for the same operation. Keep availability and authorization checks at their enforcement points and keep presentation lookups scoped to the values displayed.
 - Cache a specific query result: include filters, cursor, page size, and lookup identifiers in its key. Keep aggregate counts separate from result rows.
 - Use bounded cursor pagination for lists and batches/streams for exports or migrations. Presentation mapping may run only on those bounded results.
 - Keep reading time as write-time metadata so lists do not need to fetch content bodies.

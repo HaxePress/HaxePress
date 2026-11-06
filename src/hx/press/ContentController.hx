@@ -16,6 +16,7 @@ import hx.press.model.ContentRevision;
 import hx.press.model.EditorDraft;
 import hx.press.content.ContentTypes;
 import hx.press.content.ContentFields;
+import hx.press.content.ContentTypeDefinition;
 
 class ContentController {
     public static function base(kind:String):String {
@@ -27,7 +28,7 @@ class ContentController {
         if (type == null) {
             return SiteController.notFound(request);
         }
-        if (!CmsAccess.canCollection(kind)) {
+        if (!CmsAccess.can(type.capability)) {
             return CmsController.forbidden(request);
         }
         var admin = CmsAccess.current();
@@ -40,7 +41,7 @@ class ContentController {
         var cursor = Pagination.cursor(request);
         var page = ContentData.page(kind, search, status, author, cursor);
         var count = ContentData.count(kind, search, status, author);
-        var links = Pagination.links(base(kind), ["q" => search, "status" => status], page,
+        var links = Pagination.links(type.adminBase, ["q" => search, "status" => status], page,
             cursor, count, document -> document.id,
             document -> ContentItemData.dateValue(document.updated_at));
         var drafts = EditorDraft.query.select(["key", "title", "updated_at"])
@@ -60,7 +61,7 @@ class ContentController {
             default: "";
         };
         var props = {
-            items: page.items.map(ContentItemData.adminSummary),
+            items: page.items.map(item -> ContentItemData.adminSummary(item, type)),
             query: search,
             status: status,
             total: ContentData.count(kind, "", "", author),
@@ -82,37 +83,43 @@ class ContentController {
         if (type == null) {
             return SiteController.notFound(request);
         }
-        if (!CmsAccess.canCollection(kind)) {
+        if (!CmsAccess.can(type.capability)) {
             return CmsController.forbidden(request);
         }
         var item = new ContentItem();
         item.content_type = kind;
         item.author_id = CmsAccess.current().id;
         item.category = ContentTypes.supports(type, "categories") ? CategoryData.firstName() : "";
-        return editor(request, item.toObject());
+        return renderEditor(request, item.toObject(), type);
     }
 
     public static function edit(request:Request, kind:String):AbstractResponse {
-        if (ContentTypes.find(kind) == null) {
-            return SiteController.notFound(request);
-        }
-        var item = ContentData.detail(Std.parseInt(request.route("id")), kind);
-        return item == null ? SiteController.notFound(request) : editor(request, item);
-    }
-
-    public static function editor(request:Request, item:ContentItemRecord, error:String = "",
-            status:Int = 200):AbstractResponse {
-        var kind = item.content_type;
         var type = ContentTypes.find(kind);
         if (type == null) {
             return SiteController.notFound(request);
         }
-        if (!CmsAccess.canCollection(kind)
+        var item = ContentData.detail(Std.parseInt(request.route("id")), kind);
+        return item == null ? SiteController.notFound(request) : renderEditor(request, item, type);
+    }
+
+    public static function editor(request:Request, item:ContentItemRecord, error:String = "",
+            status:Int = 200):AbstractResponse {
+        var type = ContentTypes.find(item.content_type);
+        if (type == null) {
+            return SiteController.notFound(request);
+        }
+        return renderEditor(request, item, type, error, status);
+    }
+
+    static function renderEditor(request:Request, item:ContentItemRecord,
+            type:ContentTypeDefinition, error:String = "", status:Int = 200):AbstractResponse {
+        var kind = item.content_type;
+        if (!CmsAccess.can(type.capability)
             || (item.id > 0 && !CmsAccess.canEdit(item.author_id ?? 0))) {
             return CmsController.forbidden(request);
         }
         var isNew = item.id == 0;
-        var url = isNew ? base(kind) + "/new" : base(kind) + "/" + item.id + "/edit";
+        var url = isNew ? '${type.adminBase}/new' : '${type.adminBase}/${item.id}/edit';
         var redirect = AdminController.validationRedirect(request, "content", error, url);
         if (redirect != null) {
             return redirect;
@@ -120,12 +127,13 @@ class ContentController {
         var admin = CmsAccess.current();
         var draftKey = item.id > 0 ? WorkingCopies.key(admin.id, kind,
             item.id) : request.query("draft", "");
-        if (item.id == 0
-            && !StringTools.startsWith(draftKey, "draft-" + admin.id + "-" + kind + "-")) {
+        if (item.id == 0 && !StringTools.startsWith(draftKey, 'draft-${admin.id}-${kind}-')) {
             draftKey = WorkingCopies.freshKey(admin.id, kind);
         }
         var working = WorkingCopies.find(admin.id, kind, item.id, draftKey);
-        var options = ContentTypes.supports(type, "categories") ? CategoryData.options("") : [];
+        var supportsCategories = ContentTypes.supports(type, "categories");
+        var options = supportsCategories ? CategoryData.options("") : [];
+        var hasCategories = !supportsCategories || options.length > 0;
         if (item.category != "" && !options.contains(item.category)) {
             options.push(item.category);
         }
@@ -141,8 +149,7 @@ class ContentController {
             "kind" => kind,
             "contentType" => type,
             "isNew" => isNew,
-            "hasCategories" => !ContentTypes.supports(type,
-                "categories") || CategoryData.count() > 0,
+            "hasCategories" => hasCategories,
             "categories" => options,
             "draftKey" => draftKey,
             "workingCopy" => working,
@@ -155,14 +162,19 @@ class ContentController {
         return Inertia.render("Admin/Editor", props).status(status);
     }
 
-    public static function owned(id:Int, kind:String):Bool {
-        var document = ContentItem.query.select(["id", "author_id"])
-            .where("id", id)
-            .where("content_type", kind)
-            .limit(1)
-            .first();
-        return document != null && CmsAccess.canCollection(kind)
-            && CmsAccess.canEdit(document.author_id);
+    public static function owned(id:Int, kind:String, ?version:Int):Bool {
+        var admin = CmsAccess.current();
+        if (admin == null || !CmsAccess.canCollection(kind)) {
+            return false;
+        }
+        var query = ContentItem.query.where("id", id).where("content_type", kind);
+        if (!CmsAccess.can("edit_others")) {
+            query.where("author_id", admin.id);
+        }
+        if (version != null) {
+            query.where("version", version);
+        }
+        return query.exists();
     }
 
     public static function discardWorking(request:Request, kind:String):AbstractResponse {
@@ -172,8 +184,9 @@ class ContentController {
         }
         WorkingCopies.clear(CmsAccess.current().id, id, kind,
             AdminController.input(request, "draft_key", 128));
-        return ResponseBuilder.asRedirect(id > 0 ? base(kind) + "/" + id + "/edit" : base(kind)
-            + "/new", 303);
+        return
+            ResponseBuilder.asRedirect(id > 0 ? '${base(kind)}/${id}/edit' : '${base(kind)}/new',
+                303);
     }
 
     public static function history(request:Request, kind:String):AbstractResponse {
@@ -227,6 +240,6 @@ class ContentController {
         snapshot.custom_fields = Json.stringify(snapshot.fields ?? {});
         WorkingCopies.clear(admin.id, id, kind);
         WorkingCopies.save(admin.id, kind, id, "", 1, document.version, snapshot);
-        return ResponseBuilder.asRedirect(base(kind) + "/" + id + "/edit?notice=revision", 303);
+        return ResponseBuilder.asRedirect('${base(kind)}/${id}/edit?notice=revision', 303);
     }
 }

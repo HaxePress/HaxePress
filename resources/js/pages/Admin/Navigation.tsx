@@ -71,10 +71,7 @@ export default function Navigation({
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(
-          '/admin/navigation/regions?q=' +
-            encodeURIComponent(regionQuery) +
-            '&selected=' +
-            encodeURIComponent(location),
+          `/admin/navigation/regions?q=${encodeURIComponent(regionQuery)}&selected=${encodeURIComponent(location)}`,
           { signal: abort.signal },
         );
         if (!response.ok) throw new Error('Navigation regions could not be loaded.');
@@ -378,7 +375,7 @@ export default function Navigation({
         onConfirm={() => {
           if (!pending) return;
           router.post(
-            '/admin/navigation/' + pending.id + '/delete',
+            `/admin/navigation/${pending.id}/delete`,
             { _token: csrfToken },
             {
               onStart: () => setBusy(true),

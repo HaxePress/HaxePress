@@ -27,10 +27,10 @@ def archive(manifest, css=None):
 
 def verify_order(admin, fixtures, source, active_theme):
     suffix = secrets.token_hex(5)
-    identifiers = ["theme-a-pinned-" + suffix + "-" + str(index).zfill(2) for index in range(25)]
+    identifiers = [f"theme-a-pinned-{suffix}-{str(index).zfill(2)}" for index in range(25)]
     records = []
     for index, identifier in enumerate(identifiers):
-        name = "Simple ordering sample " + suffix + " " + str(index)
+        name = f"Simple ordering sample {suffix} {str(index)}"
         manifest = {**source, "slug": identifier[6:], "name": name, "translations": {}}
         records.append(
             {
@@ -56,7 +56,7 @@ def verify_order(admin, fixtures, source, active_theme):
     try:
         fixtures.create("cms_packages", records)
         # A native activation invalidates package queries after test-only ORM inserts.
-        admin.request("/admin/themes/" + active_theme + "/enable", "POST", {})
+        admin.request(f"/admin/themes/{active_theme}/enable", "POST", {})
         for initial in ("/admin/themes", "/admin/themes?q=Simple"):
             pages = []
             url = initial
@@ -94,7 +94,7 @@ def verify_order(admin, fixtures, source, active_theme):
     finally:
         for identifier in identifiers:
             fixtures.delete("cms_packages", [("id", "=", identifier)])
-        admin.request("/admin/themes/" + active_theme + "/enable", "POST", {})
+        admin.request(f"/admin/themes/{active_theme}/enable", "POST", {})
 
 
 def run():
@@ -115,7 +115,7 @@ def run():
     )
     default = "theme-simple"
     original_theme = props(public, "/")["theme"]["id"]
-    original_settings = props(admin, "/admin/themes/" + default + "/settings")["values"]
+    original_settings = props(admin, f"/admin/themes/{default}/settings")["values"]
     source = json.loads((ROOT / "resources/themes/simple/cms-package.json").read_text())
     custom = {
         **source,
@@ -134,9 +134,9 @@ def run():
             )
             check(row["built_in"] is True, "Default theme was not marked as built in")
             install(admin, "themes", archive(custom, ".simple-site {--green:#325697;}"))
-            identifier = "theme-" + custom["slug"]
+            identifier = f"theme-{custom['slug']}"
             check(
-                admin.request("/admin/themes/" + identifier + "/enable", "POST", {})[0] == 303,
+                admin.request(f"/admin/themes/{identifier}/enable", "POST", {})[0] == 303,
                 "Activate a different theme",
             )
             before = fixtures.rows(
@@ -149,7 +149,7 @@ def run():
             )
             verify_order(admin, fixtures, source, identifier)
             check(
-                admin.request("/admin/themes/" + default + "/uninstall", "POST", {})[0] == 422,
+                admin.request(f"/admin/themes/{default}/uninstall", "POST", {})[0] == 422,
                 "Inactive default theme could be uninstalled",
             )
             replacement = admin.request(
@@ -170,10 +170,10 @@ def run():
             check(after == before, "Rejected operations changed the default theme")
             values = {**original_settings, "accent": "#2569a3", "width": "800"}
             check(
-                admin.request("/admin/themes/" + default + "/settings", "POST", values)[0] == 303,
+                admin.request(f"/admin/themes/{default}/settings", "POST", values)[0] == 303,
                 "Built-in customization failed",
             )
-            preview = props(admin, "/admin/themes/" + default + "/preview/frame")["theme"]
+            preview = props(admin, f"/admin/themes/{default}/preview/frame")["theme"]
             check(
                 preview["built_in"] and preview["stylesheet"] == "" and preview["renderer"] == "",
                 "Built-in preview still needs package assets",
@@ -184,7 +184,7 @@ def run():
                 "Built-in preview ignored saved settings",
             )
             check(
-                admin.request("/admin/themes/" + default + "/enable", "POST", {})[0] == 303,
+                admin.request(f"/admin/themes/{default}/enable", "POST", {})[0] == 303,
                 "Built-in theme could not be activated",
             )
             check(
@@ -198,10 +198,10 @@ def run():
                 "The panel offered default theme deletion",
             )
     finally:
-        admin.request("/admin/themes/" + default + "/settings", "POST", original_settings)
-        admin.request("/admin/themes/" + original_theme + "/enable", "POST", {})
+        admin.request(f"/admin/themes/{default}/settings", "POST", original_settings)
+        admin.request(f"/admin/themes/{original_theme}/enable", "POST", {})
         if identifier:
-            admin.request("/admin/themes/" + identifier + "/uninstall", "POST", {})
+            admin.request(f"/admin/themes/{identifier}/uninstall", "POST", {})
         admin.request("/admin/logout", "POST", {})
     print(
         "PASS Built-in theme: package-free registration, inactive uninstall/ZIP replacement protection, customization, preview and activation",

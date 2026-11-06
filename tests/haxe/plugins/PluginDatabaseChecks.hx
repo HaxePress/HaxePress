@@ -36,7 +36,7 @@ class PluginDatabaseChecks {
 
     static function load(work:StorageDisk, root:String, artifact:String,
             entrypoint:String):PluginModule {
-        return new PluginModule(work.path(root + "/" + artifact), entrypoint);
+        return new PluginModule(work.path('${root}/${artifact}'), entrypoint);
     }
 
     public static function run(host:PluginHost, packages:StorageDisk, work:StorageDisk,
@@ -46,8 +46,8 @@ class PluginDatabaseChecks {
         var artifact = PackageManifest.serverArtifact(inspected.manifest);
         var module = load(work, inspected.root, artifact, inspected.manifest.entrypoint);
         module.create(host, {});
-        var key = "record-'" + destination;
-        var scope = "content:" + destination;
+        var key = 'record-\'${destination}';
+        var scope = 'content:${destination}';
         var context = {
             data: {
                 action: "write",
@@ -91,9 +91,9 @@ class PluginDatabaseChecks {
         module.close();
 
         var token = Md5.encode(destination).substr(0, 12);
-        var database = new PluginDatabase("probe-" + token);
+        var database = new PluginDatabase('probe-${token}');
         database.initialize();
-        var other = new PluginDatabase("other-" + token);
+        var other = new PluginDatabase('other-${token}');
         database.put("value", {number: 7}, "content:1");
         database.put("value", false, "content:2");
         database.put("empty", null);
@@ -142,7 +142,7 @@ class PluginDatabaseChecks {
         rejects(() -> database.migrate([new PluginMigration("003_retry",
             () -> throw new Exception("Migration failure"))]),
             "Migration exceptions were swallowed");
-        check(!PluginMigrationRecord.query.where("id", database.slug + ":003_retry").exists(),
+        check(!PluginMigrationRecord.query.where("id", '${database.slug}:003_retry').exists(),
             "A failed migration was marked as applied");
         database.migrate([new PluginMigration("003_retry", () -> database.put("retry", true))]);
         check(database.get("retry") == true, "Failed migration retry");
@@ -153,13 +153,13 @@ class PluginDatabaseChecks {
             }, true)
         ]), "Atomic migration failure was swallowed");
         check(!database.has("rolled-back")
-            && !PluginMigrationRecord.query.where("id", database.slug + ":004_atomic").exists(),
+            && !PluginMigrationRecord.query.where("id", '${database.slug}:004_atomic').exists(),
             "Migration data and ledger must roll back together");
 
         var local = Storage.disk("local");
         local.makeDirectory("");
-        var alias = "plugin-probe-" + token;
-        Connection.create(alias, {path: local.path(alias + ".sqlite")});
+        var alias = 'plugin-probe-${token}';
+        Connection.create(alias, {path: local.path('${alias}.sqlite')});
         var alternate = new PluginDatabase(database.slug, alias);
         alternate.initialize();
         alternate.put("connection", "alternate");
@@ -181,7 +181,7 @@ class PluginDatabaseChecks {
             "Model update used another connection");
         // The alias exists only in this fixture process, not the isolated HTTP server.
         alternate.forget("connection");
-        MediaDependencySource.query.where("owner", "plugin-" + database.slug)
+        MediaDependencySource.query.where("owner", 'plugin-${database.slug}')
             .where("connection_name", alias)
             .delete();
         BuiltInThemeChecks.run();

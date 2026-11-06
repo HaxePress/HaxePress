@@ -32,7 +32,7 @@ class ContentQueries {
     ];
 
     static function summaryQuery(kind:String):QueryBuilder<ContentItem> {
-        var columns = [for (column in summaryColumns) "content_items." + column + " AS " + column];
+        var columns = [for (column in summaryColumns) 'content_items.${column} AS ${column}'];
         var query = ContentItem.query.select(columns).where("content_items.content_type", kind);
         var type = ContentTypes.find(kind);
         if (type != null) {
@@ -115,7 +115,7 @@ class ContentQueries {
             [kind, size, category, search, tagId, order, direction, ContentTypes.revision()],
             () -> {
                 var query = filteredQuery(search, category, tagId, kind, []);
-                query.orderBy("content_items." + order, direction)
+                query.orderBy('content_items.${order}', direction)
                     .orderBy("content_items.id", direction)
                     .limit(size);
                 return query.get().map(model -> cast model.toObject());
@@ -136,9 +136,7 @@ class ContentQueries {
         }
         if (search != "") {
             var type = ContentTypes.find(kind);
-            var pattern = "%"
-                + search.replace("!", "!!").replace("%", "!%").replace("_", "!_")
-                + "%";
+            var pattern = '%${search.replace("!", "!!").replace("%", "!%").replace("_", "!_")}%';
             items.where(matches -> {
                 matches.whereLike("content_items.title", pattern);
                 if (ContentTypes.supports(type, "excerpt")) {
@@ -158,7 +156,7 @@ class ContentQueries {
             addCursor(query, sortColumn, cursor);
         }
         var direction = cursor != null && cursor.before ? "ASC" : "DESC";
-        query.orderBy("content_items." + sortColumn, direction)
+        query.orderBy('content_items.${sortColumn}', direction)
             .orderBy("content_items.id", direction)
             .limit(limit + 1);
         var rows:Array<ContentSummaryRecord> = query.get().map(model -> cast model.toObject());

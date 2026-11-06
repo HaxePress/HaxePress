@@ -42,10 +42,10 @@ class MediaDependencyChecks {
     }
 
     public static function run(token:String):Void {
-        var slug = "media-" + token;
-        var owner = "plugin-" + slug;
+        var slug = 'media-${token}';
+        var owner = 'plugin-${slug}';
         var dependencies = MediaDependencies.forPlugin(slug);
-        var filename = SecureToken.generate(32) + ".webp";
+        var filename = '${SecureToken.generate(32)}.webp';
         var disk = Storage.disk("media");
         disk.makeDirectory("");
         disk.put(filename, "Dependency fixture bytes");
@@ -68,7 +68,7 @@ class MediaDependencyChecks {
         });
         dependencies.retain(asset.id, "gallery:1");
         check(used(asset.id, filename), "Persistent ID reference did not protect media");
-        MediaDependencies.forPlugin("unrelated-" + token).forget("gallery:1");
+        MediaDependencies.forPlugin('unrelated-${token}').forget("gallery:1");
         check(used(asset.id, filename), "Another owner released the reference");
         dependencies.forget("gallery:1");
         check(!used(asset.id, filename), "Released reference stayed active");
@@ -80,7 +80,7 @@ class MediaDependencyChecks {
         dependencies.watch("rows", model, "source", MediaDependencyMode.Url);
         row = MediaProbe.query.create([
             "media_id" => 0,
-            "source" => "https://example.test" + disk.url(filename) + "?size=small"
+            "source" => 'https://example.test${disk.url(filename)}?size=small'
         ]);
         check(used(asset.id, filename), "Absolute URL reference was missed");
         row.delete();
@@ -102,7 +102,7 @@ class MediaDependencyChecks {
             "An unregistered CASCADE relationship did not protect media");
         Schema.drop("media_cascade_probe");
         var database = new PluginDatabase(slug);
-        database.put("nested", {gallery: ["https://example.test" + disk.url(filename) + "#image"]});
+        database.put("nested", {gallery: ['https://example.test${disk.url(filename)}#image']});
         check(used(asset.id, filename), "Nested plugin JSON was not retained");
         database.forget("nested");
         check(!used(asset.id, filename), "Removed plugin JSON retained a stale dependency");

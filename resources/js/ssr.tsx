@@ -48,4 +48,4 @@ createServer(async (request, response) => {
     response.writeHead(500);
     response.end(JSON.stringify({ error: 'Unable to render page' }));
   }
-}).listen(port, '127.0.0.1', () => console.log('Inertia React SSR listening on 127.0.0.1:' + port));
+}).listen(port, '127.0.0.1', () => console.log(`Inertia React SSR listening on 127.0.0.1:${port}`));

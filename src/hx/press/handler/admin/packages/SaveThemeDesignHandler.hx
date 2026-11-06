@@ -65,7 +65,7 @@ class SaveThemeDesignHandler extends AbstractHandler implements ValidationRespon
             if (creating) {
                 var id = ThemeStudio.create(name, request.input("starter", "content") == "blank",
                     admin.id, admin.name, request.input("design", ""));
-                return ResponseBuilder.asRedirect("/admin/themes/" + id + "/design", 303);
+                return ResponseBuilder.asRedirect('/admin/themes/${id}/design', 303);
             }
             var version = Std.parseInt(request.input("version", "0")) ?? 0;
             var action = request.input("action", "save");
@@ -82,8 +82,7 @@ class SaveThemeDesignHandler extends AbstractHandler implements ValidationRespon
                         version: saved.version,
                         publishedVersion: saved.published_version,
                         active: false,
-                        error: "Your design was published, but the website could not be activated. " +
-                        Std.string(activationError)
+                        error: 'Your design was published, but the website could not be activated. ${Std.string(activationError)}'
                     }, 422);
                 }
             }

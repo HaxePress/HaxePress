@@ -43,7 +43,7 @@ def run():
     packages = []
     image = None
     peers = []
-    email = "theme-ai-" + secrets.token_hex(5) + "@example.test"
+    email = f"theme-ai-{secrets.token_hex(5)}@example.test"
     with FixtureStore.from_environment() as store:
         try:
             image_bytes = large_png()
@@ -59,23 +59,23 @@ def run():
                 check(status == 303, "MCP test design creation failed")
                 packages.append(props(owner, headers["location"])["studio"]["id"])
             identifier, other = packages
-            route = "/admin/themes/" + identifier
+            route = f"/admin/themes/{identifier}"
             peers.append(initial_browser(owner, store, identifier))
             peers.append(BrowserPeer(owner, other))
-            api = "/api/theme-designer/" + identifier
+            api = f"/api/theme-designer/{identifier}"
             check(
-                public.request(route + "/ai")[0] == 303,
+                public.request(f"{route}/ai")[0] == 303,
                 "Connection settings bypassed the admin guard",
             )
             check(
-                owner.request(route + "/ai", "POST", {}, csrf=False)[0] == 419,
+                owner.request(f"{route}/ai", "POST", {}, csrf=False)[0] == 419,
                 "Connection creation bypassed CSRF",
             )
             check(
-                owner.request(api + "/design")[0] == 401,
+                owner.request(f"{api}/design")[0] == 401,
                 "A browser cookie authorized the private bridge API",
             )
-            status, headers, body = owner.request(route + "/ai", "POST", {})
+            status, headers, body = owner.request(f"{route}/ai", "POST", {})
             check(
                 status == 200 and "no-store" in headers["cache-control"],
                 "Connection creation failed",
@@ -86,11 +86,11 @@ def run():
                 connection["active"] and connection["expires"] > time.time() * 1000,
                 "Connection expiry was not applied",
             )
-            mcp = "/mcp/themes/" + identifier
+            mcp = f"/mcp/themes/{identifier}"
             check(
                 connection["hosted"]
                 and connection["mcpPath"] == mcp
-                and connection["websocketPath"] == mcp + "/ws",
+                and connection["websocketPath"] == f"{mcp}/ws",
                 "The site-managed MCP service did not start",
             )
             keys = store.rows(
@@ -103,10 +103,10 @@ def run():
                 "A connection key was stored in plaintext",
             )
             check(
-                json.loads(owner.request(route + "/ai")[2])["token"] is None,
+                json.loads(owner.request(f"{route}/ai")[2])["token"] is None,
                 "An existing connection leaked its key",
             )
-            bearer = {"Authorization": "Bearer " + token}
+            bearer = {"Authorization": f"Bearer {token}"}
             check(owner.request(mcp)[0] == 401, "An admin cookie authorized MCP")
             for method in ("GET", "DELETE"):
                 status, headers, _ = public.request(mcp, method, extra_headers=bearer)
@@ -134,10 +134,10 @@ def run():
                 "An untrusted MCP origin was accepted",
             )
             check(
-                public.request("/mcp/themes/" + other, extra_headers=bearer)[0] == 401,
+                public.request(f"/mcp/themes/{other}", extra_headers=bearer)[0] == 401,
                 "The hosted MCP endpoint crossed its theme scope",
             )
-            status, headers, _ = public.request(api + "/design", extra_headers=bearer)
+            status, headers, _ = public.request(f"{api}/design", extra_headers=bearer)
             check(
                 status == 200
                 and "set-cookie" not in headers
@@ -145,13 +145,13 @@ def run():
                 "Scoped bridge request created a session or could not read its design",
             )
             check(
-                public.request("/api/theme-designer/" + other + "/design", extra_headers=bearer)[0]
+                public.request(f"/api/theme-designer/{other}/design", extra_headers=bearer)[0]
                 == 401,
                 "A connection accessed another theme",
             )
             check(
                 public.request(
-                    api + "/design", extra_headers={**bearer, "Origin": "https://untrusted.test"}
+                    f"{api}/design", extra_headers={**bearer, "Origin": "https://untrusted.test"}
                 )[0]
                 == 401,
                 "A browser origin accessed the local bridge",
@@ -170,7 +170,7 @@ def run():
                 capture_output=True,
                 timeout=120,
             )
-            check(completed.returncode == 0, "Real MCP client failed: " + completed.stderr[-2500:])
+            check(completed.returncode == 0, f"Real MCP client failed: {completed.stderr[-2500:]}")
             result = json.loads(completed.stdout)
             check(
                 result["modern"]
@@ -188,7 +188,7 @@ def run():
                     **os.environ,
                     "TEST_THEME_ID": identifier,
                     "TEST_BROWSER_COOKIE": "; ".join(
-                        key + "=" + value for key, value in browser_owner.cookies.items()
+                        f"{key}={value}" for key, value in browser_owner.cookies.items()
                     ),
                     "TEST_BROWSER_CSRF": browser_owner.csrf,
                 },
@@ -197,7 +197,7 @@ def run():
                 timeout=90,
             )
             check(
-                browser_test.returncode == 0, "Browser API failed: " + browser_test.stderr[-3000:]
+                browser_test.returncode == 0, f"Browser API failed: {browser_test.stderr[-3000:]}"
             )
             browser_result = json.loads(browser_test.stdout)
             check(
@@ -212,7 +212,7 @@ def run():
                 "PASS Browser JavaScript/WebMCP: real server tools, draft edits, dirty protection, permission registration/revocation, logout and teardown",
                 flush=True,
             )
-            studio = props(owner, route + "/design")["studio"]
+            studio = props(owner, f"{route}/design")["studio"]
             check(
                 studio["version"] == result["version"]
                 and studio["publishedVersion"] == 0
@@ -221,12 +221,12 @@ def run():
             )
             check(props(public, "/")["theme"]["id"] == previous, "MCP changed the live website")
             check(
-                json.loads(owner.request(route + "/design/status")[2])["version"]
+                json.loads(owner.request(f"{route}/design/status")[2])["version"]
                 == result["version"],
                 "The editor cannot observe an MCP draft version",
             )
             check(
-                owner.request(route + "/ai/server")[0] == 404,
+                owner.request(f"{route}/ai/server")[0] == 404,
                 "A client-side server download route remains",
             )
             check(
@@ -248,7 +248,7 @@ def run():
             store.update("admins", {"active": 0}, [("id", "=", admin["id"])])
             try:
                 check(
-                    public.request(api + "/design", extra_headers=bearer)[0] == 401,
+                    public.request(f"{api}/design", extra_headers=bearer)[0] == 401,
                     "A deactivated account retained AI access",
                 )
             finally:
@@ -258,13 +258,13 @@ def run():
             )
             try:
                 check(
-                    public.request(api + "/design", extra_headers=bearer)[0] == 401,
+                    public.request(f"{api}/design", extra_headers=bearer)[0] == 401,
                     "A changed password retained AI access",
                 )
             finally:
                 store.update("admins", {"password": admin["password"]}, [("id", "=", admin["id"])])
             socket = WebSocket(
-                os.environ["TEST_URL"], path=mcp + "/ws", headers=bearer, opened=False
+                os.environ["TEST_URL"], path=f"{mcp}/ws", headers=bearer, opened=False
             )
             try:
                 socket.send(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))
@@ -273,39 +273,39 @@ def run():
                     opcode == 1 and "result" in json.loads(source),
                     "The open MCP socket could not read tools",
                 )
-                status, _, body = owner.request(route + "/ai", "POST", {})
+                status, _, body = owner.request(f"{route}/ai", "POST", {})
                 replacement = json.loads(body)["token"]
                 socket.send(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}))
                 check(socket.receive()[0] == 8, "A replaced token kept its open WebSocket access")
             finally:
                 socket.socket.close()
             check(
-                public.request(api + "/design", extra_headers=bearer)[0] == 401,
+                public.request(f"{api}/design", extra_headers=bearer)[0] == 401,
                 "Replacing a connection left its old key valid",
             )
-            bearer = {"Authorization": "Bearer " + replacement}
+            bearer = {"Authorization": f"Bearer {replacement}"}
             check(
-                public.request(api + "/design", extra_headers=bearer)[0] == 200,
+                public.request(f"{api}/design", extra_headers=bearer)[0] == 200,
                 "Replacement connection failed",
             )
             store.update(
                 "theme_ai_connections", {"expires_epoch": 1}, [("theme_id", "=", identifier)]
             )
             check(
-                public.request(api + "/design", extra_headers=bearer)[0] == 401,
+                public.request(f"{api}/design", extra_headers=bearer)[0] == 401,
                 "An expired connection remained authorized",
             )
-            replacement = json.loads(owner.request(route + "/ai", "POST", {})[2])["token"]
-            bearer = {"Authorization": "Bearer " + replacement}
+            replacement = json.loads(owner.request(f"{route}/ai", "POST", {})[2])["token"]
+            bearer = {"Authorization": f"Bearer {replacement}"}
             check(
                 owner.request(
-                    route + "/ai", "DELETE", raw=b"", extra_headers={"X-CSRF-TOKEN": owner.csrf}
+                    f"{route}/ai", "DELETE", raw=b"", extra_headers={"X-CSRF-TOKEN": owner.csrf}
                 )[0]
                 == 200,
                 "Connection revocation failed",
             )
             check(
-                public.request(api + "/design", extra_headers=bearer)[0] == 401,
+                public.request(f"{api}/design", extra_headers=bearer)[0] == 401,
                 "A revoked connection still worked",
             )
             password = secrets.token_urlsafe(22)
@@ -326,20 +326,20 @@ def run():
             )
             member = login(email, password)
             check(
-                member.request(route + "/ai", "POST", {})[0] == 403,
+                member.request(f"{route}/ai", "POST", {})[0] == 403,
                 "A non-manager created a design connection",
             )
             check(
-                member.request(route + "/export")[0] == 403,
+                member.request(f"{route}/export")[0] == 403,
                 "A non-manager exported a private theme",
             )
         finally:
             for peer in peers:
                 peer.close()
             for identifier in packages:
-                owner.request("/admin/themes/" + identifier + "/uninstall", "POST", {})
+                owner.request(f"/admin/themes/{identifier}/uninstall", "POST", {})
             if image is not None:
-                owner.request("/admin/media/" + str(image["id"]) + "/delete", "POST", {})
+                owner.request(f"/admin/media/{str(image['id'])}/delete", "POST", {})
             store.delete("admins", [("email", "=", email)])
     print(
         "PASS Theme MCP: official legacy/modern clients over HTTP/WebSocket, draft edits and images, scoped keys, open-socket revocation, origins, permissions and stateless API",

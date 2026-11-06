@@ -52,7 +52,7 @@ export function linkValue(value: string): string {
 export function imageValue(value: string, pattern?: string, themeId?: string): string {
   if (!value) return '';
   const managed = pattern && new RegExp(pattern).test(value);
-  const prefix = '/theme-assets/' + themeId + '/';
+  const prefix = `/theme-assets/${themeId}/`;
   const ownImage =
     themeId &&
     value.startsWith(prefix) &&

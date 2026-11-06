@@ -84,7 +84,7 @@ export default function DesignLibrary({
           </p>
           <div className="studio-presets">
             {Object.entries(layoutPresets).map(([id, label]) =>
-              tile('layout:' + id, label, id === 'grid' || id === 'cards' ? 'grid' : 'layout'),
+              tile(`layout:${id}`, label, id === 'grid' || id === 'cards' ? 'grid' : 'layout'),
             )}
           </div>
         </>
@@ -97,7 +97,7 @@ export default function DesignLibrary({
           <div className="studio-block-library">
             {atomic.map((type) =>
               tile(
-                'block:' + type,
+                `block:${type}`,
                 friendly ? friendlyBlockLabels[type] : blockLabels[type],
                 type.includes('image') ? 'image' : type === 'extension' ? 'puzzle' : 'file',
               ),
@@ -112,7 +112,7 @@ export default function DesignLibrary({
           </div>
           <div className="studio-block-library">
             {Object.entries(document.components || {}).map(([id, component]) =>
-              tile('component:' + id, component.name, 'puzzle'),
+              tile(`component:${id}`, component.name, 'puzzle'),
             )}
           </div>
         </>

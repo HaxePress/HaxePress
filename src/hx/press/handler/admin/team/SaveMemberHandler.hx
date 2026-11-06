@@ -44,7 +44,8 @@ class SaveMemberHandler extends AbstractHandler implements ValidationResponder {
             return CmsController.forbidden(request);
         }
         return ContentLocks.run("team", () -> {
-            var actingId = CmsAccess.current().id;
+            var actor = CmsAccess.current();
+            var actingId = actor.id;
             var id = Std.parseInt(AdminController.input(request, "id", 16)) ?? 0;
             var existing = id == 0 ? null : Admin.query.select(["id", "role", "active"])
                 .where("id", id)
@@ -56,13 +57,15 @@ class SaveMemberHandler extends AbstractHandler implements ValidationResponder {
             var active = request.input("active", "0") == "1" ? 1 : 0;
             var password:String = request.input("password", "");
 
-            if (name == "" || (id > 0 && existing == null) || Roles.find(role) == null) {
+            var validMember = name != "" && (id <= 0 || existing != null);
+            var assignable = validMember && Roles.canAssign(actor.role, role);
+            if (!validMember || (!assignable && !Roles.exists(role))) {
                 return ManagementController.team(request,
                     "Check the member name, email and role.", 422);
             }
-            var actorRole = CmsAccess.current().role;
-            if (!Roles.canAssign(actorRole, role)
-                || (existing != null && !Roles.canManage(actorRole, existing.role))) {
+            if (!assignable
+                || (existing != null && existing.role != role
+                    && !Roles.canManage(actor.role, existing.role))) {
                 return CmsController.forbidden(request);
             }
             if ((existing == null || password != "")
@@ -82,10 +85,10 @@ class SaveMemberHandler extends AbstractHandler implements ValidationResponder {
                 && existing.role == "owner"
                 && existing.active == 1
                 && (role != "owner" || active == 0)
-                && Admin.query.where("role", "owner")
+                && !Admin.query.where("role", "owner")
                     .where("active", 1)
                     .where("id", "!=", id)
-                    .count() == 0) {
+                    .exists()) {
                 return ManagementController.team(request,
                     "Keep at least one active owner account.", 422);
             }
@@ -98,7 +101,7 @@ class SaveMemberHandler extends AbstractHandler implements ValidationResponder {
                 var savedId = id;
                 if (existing == null) {
                     values.set("created_at", SiteSettingsStore.timestamp());
-                    savedId = Admin.query.create(values).id;
+                    savedId = Admin.query.insert(values);
                 } else {
                     existing.update(values);
                 }

@@ -42,7 +42,7 @@ export default function ContentFilters({
         if (collection.features.includes('categories')) values.category = selectedCategory;
         if (tag) values.tag = tag;
         for (const field of filters) {
-          if (fields[field.key]) values['field_' + field.key] = fields[field.key];
+          if (fields[field.key]) values[`field_${field.key}`] = fields[field.key];
         }
         router.get(siteHref(path), values, { preserveState: true });
       }}
@@ -73,11 +73,11 @@ export default function ContentFilters({
       )}
       {filters.map((field) => (
         <div key={field.key}>
-          <label htmlFor={'filter-' + field.key}>{field.label}</label>
+          <label htmlFor={`filter-${field.key}`}>{field.label}</label>
           {field.kind === 'select' || field.kind === 'boolean' ? (
             <select
-              id={'filter-' + field.key}
-              name={'field_' + field.key}
+              id={`filter-${field.key}`}
+              name={`field_${field.key}`}
               value={fields[field.key] || ''}
               onChange={(event) =>
                 setFields((previous) => ({ ...previous, [field.key]: event.target.value }))
@@ -99,8 +99,8 @@ export default function ContentFilters({
             </select>
           ) : (
             <input
-              id={'filter-' + field.key}
-              name={'field_' + field.key}
+              id={`filter-${field.key}`}
+              name={`field_${field.key}`}
               type={field.kind === 'number' ? 'number' : field.kind === 'date' ? 'date' : 'text'}
               step={field.kind === 'number' ? 'any' : undefined}
               maxLength={240}

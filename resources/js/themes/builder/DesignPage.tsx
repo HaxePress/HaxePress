@@ -169,7 +169,7 @@ export default function DesignPage({
     if (!editing || !selection) return;
     const id = selection.block || selection.section;
     const element = window.document.querySelector<HTMLElement>(
-      '[data-design-node="' + CSS.escape(id) + '"]',
+      `[data-design-node="${CSS.escape(id)}"]`,
     );
     element?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
   }, [editing, selection?.scope, selection?.section, selection?.block]);
@@ -261,11 +261,7 @@ export default function DesignPage({
         selection?.scope === ownerScope &&
         selection.section === sectionId &&
         selection.block === node.id;
-      const classes =
-        'hp-design-node ' +
-        classNames(node.classes) +
-        (selected ? ' is-selected' : '') +
-        (!visible ? ' is-condition-hidden' : '');
+      const classes = `hp-design-node ${classNames(node.classes)}${selected ? ' is-selected' : ''}${!visible ? ' is-condition-hidden' : ''}`;
       const common = {
         'data-design-node': node.id,
         'data-block-id': node.id,
@@ -359,32 +355,32 @@ export default function DesignPage({
         }
         case 'heading':
           element = createElement(
-            'h' + node.level,
+            `h${node.level}`,
             common,
             href ? <SiteLink href={href}>{text}</SiteLink> : text,
           );
           break;
         case 'text':
           element = (
-            <p {...common} className={classes + ' hp-design-text'}>
+            <p {...common} className={`${classes} hp-design-text`}>
               {text}
             </p>
           );
           break;
         case 'image':
           element = href ? (
-            <SiteLink {...common} className={classes + ' hp-design-image-link'} href={href}>
+            <SiteLink {...common} className={`${classes} hp-design-image-link`} href={href}>
               {blockImage}
             </SiteLink>
           ) : (
-            <figure {...common} className={classes + ' hp-design-image-node'}>
+            <figure {...common} className={`${classes} hp-design-image-node`}>
               {blockImage}
             </figure>
           );
           break;
         case 'button':
           element = (
-            <SiteLink {...common} className={classes + ' hp-design-button'} href={href || '/'}>
+            <SiteLink {...common} className={`${classes} hp-design-button`} href={href || '/'}>
               {text}
             </SiteLink>
           );
@@ -393,7 +389,7 @@ export default function DesignPage({
           element = (
             <div
               {...common}
-              className={classes + ' hp-design-spacer'}
+              className={`${classes} hp-design-spacer`}
               style={{ minHeight: node.level * 16 }}
             />
           );
@@ -403,7 +399,7 @@ export default function DesignPage({
           break;
         case 'brand':
           element = (
-            <SiteLink {...common} className={classes + ' hp-design-brand'} href="/">
+            <SiteLink {...common} className={`${classes} hp-design-brand`} href="/">
               {site.site_logo ? <img src={site.site_logo} alt={site.site_name} /> : site.site_name}
             </SiteLink>
           );
@@ -437,14 +433,14 @@ export default function DesignPage({
           break;
         case 'content-excerpt':
           element = (
-            <p {...common} className={classes + ' hp-design-excerpt'}>
+            <p {...common} className={`${classes} hp-design-excerpt`}>
               {data.item?.excerpt || (editing ? t('Content excerpt') : '')}
             </p>
           );
           break;
         case 'content-image':
           element = (
-            <figure {...common} className={classes + ' hp-design-image-node'}>
+            <figure {...common} className={`${classes} hp-design-image-node`}>
               {data.item?.image ? (
                 <img className="hp-design-image" src={data.item.image} alt={data.item.image_alt} />
               ) : editing ? (
@@ -455,7 +451,7 @@ export default function DesignPage({
           break;
         case 'content-body':
           element = (
-            <div {...common} className={classes + ' hp-design-prose'}>
+            <div {...common} className={`${classes} hp-design-prose`}>
               <ExtensionSlot name="content.before" />
               <Markdown
                 content={
@@ -476,7 +472,7 @@ export default function DesignPage({
               ? content.related || []
               : visibleItems;
           element = (
-            <div {...common} className={classes + ' hp-design-repeater'}>
+            <div {...common} className={`${classes} hp-design-repeater`}>
               {rows.map((entry) => (
                 <Fragment key={entry.id}>
                   {renderBlocks(
@@ -506,7 +502,7 @@ export default function DesignPage({
         case 'component': {
           const component = document.components?.[node.component || ''];
           element = (
-            <div {...common} className={classes + ' hp-design-component'}>
+            <div {...common} className={`${classes} hp-design-component`}>
               {component ? (
                 renderSections(component.sections, ownerScope, data, depth + 1, false)
               ) : editing ? (
@@ -577,7 +573,7 @@ export default function DesignPage({
           break;
         }
       }
-      return <Fragment key={node.id + ':' + (inline.revisions[node.id] || 0)}>{element}</Fragment>;
+      return <Fragment key={`${node.id}:${inline.revisions[node.id] || 0}`}>{element}</Fragment>;
     });
   }
   function renderSections(
@@ -602,12 +598,7 @@ export default function DesignPage({
           data-design-node={section.id}
           data-section-id={section.id}
           data-design-align={section.align}
-          className={
-            'hp-design-section ' +
-            classNames(section.classes) +
-            (selected ? ' is-selected' : '') +
-            (editing && editable ? ' is-editable' : '')
-          }
+          className={`hp-design-section ${classNames(section.classes)}${selected ? ' is-selected' : ''}${editing && editable ? ' is-editable' : ''}`}
           onClick={
             editing && editable
               ? (event) => {
@@ -649,7 +640,7 @@ export default function DesignPage({
             renderBlocks(section.blocks, section.id, ownerScope, data, depth, editable)
           ) : (
             <div
-              className={'hp-design-section-inner width-' + section.width}
+              className={`hp-design-section-inner width-${section.width}`}
               style={{ '--design-columns': section.columns } as CSSProperties}
             >
               {renderBlocks(section.blocks, section.id, ownerScope, data, depth, editable)}
@@ -673,17 +664,13 @@ export default function DesignPage({
     '--design-background': tokens.background,
     '--design-text': tokens.text,
     '--design-accent': tokens.accent,
-    '--design-width': tokens.width + 'px',
-    '--design-radius': tokens.radius + 'px',
+    '--design-width': `${tokens.width}px`,
+    '--design-radius': `${tokens.radius}px`,
     '--design-font': font,
   } as CSSProperties;
   return (
     <div
-      className={
-        'cms-site hp-design' +
-        (editing ? ' hp-design-editing' : '') +
-        (editing && easy ? ' hp-design-easy' : '')
-      }
+      className={`cms-site hp-design${editing ? ' hp-design-editing' : ''}${editing && easy ? ' hp-design-easy' : ''}`}
       data-cms-site
       data-layout="builder"
       style={style}

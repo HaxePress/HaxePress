@@ -25,7 +25,7 @@ class MediaDependencies {
         if (slug == null || slug.length > 64 || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(slug)) {
             throw new Exception("Use a valid package slug for media dependencies.");
         }
-        return new MediaDependencies(kind + "-" + slug);
+        return new MediaDependencies('${kind}-${slug}');
     }
 
     public static function forPlugin(slug:String):MediaDependencies {

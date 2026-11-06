@@ -39,11 +39,11 @@ class SaveAiThemeDesignHandler extends AbstractHandler implements ValidationResp
         }
         try {
             var result = ThemeStudio.save(request.route("id"), name, request.input("design", ""),
-                Std.parseInt(request.input("version", "0")), false, actor.id, actor.name + " (AI)");
+                Std.parseInt(request.input("version", "0")), false, actor.id, '${actor.name} (AI)');
             return ResponseBuilder.asJson({
                 version: result.version,
                 publishedVersion: result.published_version,
-                editorUrl: "/admin/themes/" + request.route("id") + "/design"
+                editorUrl: '/admin/themes/${request.route("id")}/design'
             });
         } catch (error:Dynamic) {
             return ResponseBuilder.asJson({error: Std.string(error)}, 422);

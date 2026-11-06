@@ -3,7 +3,6 @@ package hx.press.middleware;
 import hx.well.middleware.AbstractMiddleware;
 import hx.well.http.Request;
 import hx.well.http.Response;
-import hx.well.http.RequestStatic.auth;
 import hx.well.facades.Inertia;
 import hx.press.CmsAccess;
 import hx.press.plugins.PluginHealth;
@@ -17,15 +16,17 @@ class AdminInertiaProps extends AbstractMiddleware {
     public function handle(request:Request, next:Request->Null<Response>):Null<Response> {
         var current:Dynamic = null;
         var admin = CmsAccess.current();
+        var grants:Array<String> = [];
         if (admin != null) {
+            grants = Roles.grants(admin.role);
             Inertia.share("mediaRules", MediaReferences.rules());
             current = {
                 id: admin.id,
                 name: admin.name,
                 email: admin.email,
                 role: admin.role,
-                roleLabel: Roles.find(admin.role).name,
-                capabilities: CmsAccess.capabilities(admin.role)
+                roleLabel: Roles.label(admin.role),
+                capabilities: grants
             };
         }
         Inertia.share("auth", current == null ? null : {admin: current});
@@ -36,8 +37,8 @@ class AdminInertiaProps extends AbstractMiddleware {
         }
         Inertia.share("pluginRestartRequired", PluginHealth.restartRequired);
         if (admin != null) {
-            var pluginLinks = PluginRuntime.navigation("admin", CmsAccess.capabilities(admin.role));
-            Inertia.share("adminNavigation", AdminNavigation.groups(request, pluginLinks));
+            var pluginLinks = PluginRuntime.navigation("admin", grants.copy());
+            Inertia.share("adminNavigation", AdminNavigation.groups(request, pluginLinks, grants));
             Inertia.share("pluginNavigation", {
                 admin: pluginLinks,
                 header: [],

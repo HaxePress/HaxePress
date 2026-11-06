@@ -92,7 +92,7 @@ class SiteController {
         var publishedCount = tag == null ? ContentQueries.publishedCount(kind) : ContentQueries.indexCount(kind,
             "", "", tagId);
         var items = [for (item in page.items) ContentItemData.summary(item, type)];
-        var archiveUrl = archiveTag == null ? type.publicBase : "/tags/" + archiveTag.slug;
+        var archiveUrl = archiveTag == null ? type.publicBase : '/tags/${archiveTag.slug}';
         var parameters = ["q" => query, "category" => category];
         if (tag != null) {
             parameters.set("tag", tag.slug);
@@ -101,7 +101,7 @@ class SiteController {
         var fieldFilters:Dynamic = {};
         for (filter in filters) {
             var value = Std.string(filter.value);
-            parameters.set("field_" + filter.key, value);
+            parameters.set('field_${filter.key}', value);
             Reflect.setField(fieldFilters, filter.key, value);
         }
         var links = Pagination.links(archiveUrl, parameters, page, cursor, resultCount,

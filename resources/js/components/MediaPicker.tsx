@@ -84,7 +84,7 @@ export default function MediaPicker({
   useEffect(() => {
     if (!open) return;
     const timeout = setTimeout(
-      () => void load(libraryUrl + '?q=' + encodeURIComponent(query)),
+      () => void load(`${libraryUrl}?q=${encodeURIComponent(query)}`),
       200,
     );
     return () => {
@@ -97,14 +97,14 @@ export default function MediaPicker({
     <dialog
       ref={dialog}
       className="media-picker-dialog"
-      aria-labelledby={idPrefix + 'media-picker-title'}
+      aria-labelledby={`${idPrefix}media-picker-title`}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
       <div className="media-picker-heading">
-        <h2 id={idPrefix + 'media-picker-title'}>{t(title)}</h2>
+        <h2 id={`${idPrefix}media-picker-title`}>{t(title)}</h2>
         <button
           className="icon-button"
           type="button"
@@ -115,11 +115,11 @@ export default function MediaPicker({
         </button>
       </div>
       {description && <p className="field-help">{t(description)}</p>}
-      <label className="sr-only" htmlFor={idPrefix + 'picker-query'}>
+      <label className="sr-only" htmlFor={`${idPrefix}picker-query`}>
         {t('Search images')}
       </label>
       <input
-        id={idPrefix + 'picker-query'}
+        id={`${idPrefix}picker-query`}
         type="search"
         value={query}
         maxLength={100}

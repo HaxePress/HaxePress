@@ -102,7 +102,7 @@ export default function Tags({
                     <strong>{tag.name}</strong>
                     <span>
                       {tag.items || 0} {t('content items')}{' '}
-                      <Link href={'/tags/' + tag.slug} className="tag-archive-link">
+                      <Link href={`/tags/${tag.slug}`} className="tag-archive-link">
                         {t('View archive')}
                       </Link>
                     </span>
@@ -110,7 +110,7 @@ export default function Tags({
                   <div className="category-actions">
                     <button
                       className="icon-button"
-                      aria-label={'Edit ' + tag.name}
+                      aria-label={`Edit ${tag.name}`}
                       onClick={() => edit(tag)}
                       disabled={busy}
                     >
@@ -118,7 +118,7 @@ export default function Tags({
                     </button>
                     <button
                       className="icon-button danger"
-                      aria-label={'Delete ' + tag.name}
+                      aria-label={`Delete ${tag.name}`}
                       onClick={() => setPending(tag)}
                       disabled={busy}
                     >
@@ -209,17 +209,13 @@ export default function Tags({
       </div>
       <ConfirmDialog
         open={pending !== null}
-        message={
-          'Delete “' +
-          (pending?.name || '') +
-          '”? Its content assignments will be removed. Your content will be kept.'
-        }
+        message={`Delete “${pending?.name || ''}”? Its content assignments will be removed. Your content will be kept.`}
         busy={deleting}
         onCancel={() => setPending(null)}
         onConfirm={() => {
           if (!pending) return;
           router.post(
-            '/admin/tags/' + pending.id + '/delete',
+            `/admin/tags/${pending.id}/delete`,
             { _token: csrfToken },
             {
               preserveScroll: true,

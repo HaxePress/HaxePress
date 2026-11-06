@@ -77,7 +77,7 @@ export default function ContentTypeEditor({
 
   const savePath = isNew
     ? '/admin/content-types/create'
-    : '/admin/content-types/' + definition?.key + '/save';
+    : `/admin/content-types/${definition?.key}/save`;
   return (
     <>
       <PageHead title={isNew ? t('New collection') : t('Edit collection')} admin />
@@ -267,9 +267,9 @@ export default function ContentTypeEditor({
                   </div>
                   <div className="structure-field-grid">
                     <div>
-                      <label htmlFor={'field-label-' + index}>{t('Field label')}</label>
+                      <label htmlFor={`field-label-${index}`}>{t('Field label')}</label>
                       <input
-                        id={'field-label-' + index}
+                        id={`field-label-${index}`}
                         required
                         maxLength={100}
                         value={field.label}
@@ -277,9 +277,9 @@ export default function ContentTypeEditor({
                       />
                     </div>
                     <div>
-                      <label htmlFor={'field-key-' + index}>{t('Field key')}</label>
+                      <label htmlFor={`field-key-${index}`}>{t('Field key')}</label>
                       <input
-                        id={'field-key-' + index}
+                        id={`field-key-${index}`}
                         required
                         maxLength={32}
                         pattern="[a-z][a-z0-9_]{0,31}"
@@ -288,9 +288,9 @@ export default function ContentTypeEditor({
                       />
                     </div>
                     <div>
-                      <label htmlFor={'field-kind-' + index}>{t('Field type')}</label>
+                      <label htmlFor={`field-kind-${index}`}>{t('Field type')}</label>
                       <select
-                        id={'field-kind-' + index}
+                        id={`field-kind-${index}`}
                         value={field.kind}
                         onChange={(event) =>
                           updateField(index, {
@@ -306,15 +306,15 @@ export default function ContentTypeEditor({
                       >
                         {fieldKinds.map((kind) => (
                           <option key={kind} value={kind}>
-                            {t('field.kind.' + kind)}
+                            {t(`field.kind.${kind}`)}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label htmlFor={'field-help-' + index}>{t('Help text')}</label>
+                      <label htmlFor={`field-help-${index}`}>{t('Help text')}</label>
                       <input
-                        id={'field-help-' + index}
+                        id={`field-help-${index}`}
                         maxLength={300}
                         value={field.help}
                         onChange={(event) => updateField(index, { help: event.target.value })}
@@ -323,13 +323,13 @@ export default function ContentTypeEditor({
                   </div>
                   {field.kind === 'select' && (
                     <div>
-                      <label htmlFor={'field-options-' + index}>{t('Choices')}</label>
+                      <label htmlFor={`field-options-${index}`}>{t('Choices')}</label>
                       <textarea
-                        id={'field-options-' + index}
+                        id={`field-options-${index}`}
                         rows={3}
                         key={field.key}
                         defaultValue={field.options
-                          .map((option) => option.value + ' | ' + option.label)
+                          .map((option) => `${option.value} | ${option.label}`)
                           .join('\n')}
                         placeholder="in-stock | In stock"
                         onChange={(event) =>
@@ -507,9 +507,9 @@ export default function ContentTypeEditor({
                 ] as const
               ).map(([key, label, maximum]) => (
                 <div key={key}>
-                  <label htmlFor={'type-' + key}>{t(label)}</label>
+                  <label htmlFor={`type-${key}`}>{t(label)}</label>
                   <input
-                    id={'type-' + key}
+                    id={`type-${key}`}
                     type="number"
                     min={key === 'minimumTitleLength' ? 1 : 0}
                     max={maximum}
@@ -523,9 +523,9 @@ export default function ContentTypeEditor({
               <h2>{t('Interface labels')}</h2>
               {['create', 'edit', 'save', 'title', 'description'].map((key) => (
                 <div key={key}>
-                  <label htmlFor={'label-' + key}>{t('type.label.' + key)}</label>
+                  <label htmlFor={`label-${key}`}>{t(`type.label.${key}`)}</label>
                   <input
-                    id={'label-' + key}
+                    id={`label-${key}`}
                     value={form.data.labels[key] || ''}
                     maxLength={300}
                     onChange={(event) =>
@@ -551,7 +551,7 @@ export default function ContentTypeEditor({
                   type="button"
                   onClick={() => {
                     if (window.confirm(t('Remove this empty collection definition?')))
-                      router.post('/admin/content-types/' + definition?.key + '/delete', {
+                      router.post(`/admin/content-types/${definition?.key}/delete`, {
                         _token: csrfToken,
                       });
                   }}

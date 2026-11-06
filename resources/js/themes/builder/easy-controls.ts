@@ -30,12 +30,12 @@ export function templateIdentifier(label: string, document: ThemeDocument): stri
     .replace(/[\u0300-\u036f]/g, '')
     .split(/[^A-Za-z0-9]+/)
     .filter(Boolean);
-  let base = words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join('');
-  if (!/^[A-Za-z]/.test(base) || base.startsWith('Admin')) base = 'PageLayout' + base;
+  let base = words.map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join('');
+  if (!/^[A-Za-z]/.test(base) || base.startsWith('Admin')) base = `PageLayout${base}`;
   base = (base || 'PageLayout').slice(0, 70);
   let candidate = base;
   let suffix = 2;
-  while (Object.hasOwn(document.templates, candidate)) candidate = base + suffix++;
+  while (Object.hasOwn(document.templates, candidate)) candidate = `${base}${suffix++}`;
   return candidate;
 }
 

@@ -69,7 +69,7 @@ class SafePackageArchive {
                     throw new Exception("The package contains duplicate file paths.");
                 }
                 seen.set(key, true);
-                var path = destination + "/" + name;
+                var path = '${destination}/${name}';
                 var stream = new PackageEntryInput((bytes, position,
                         length) -> input.read(bytes.getData(), position, length),
                     budget, entry.isDirectory());
@@ -109,11 +109,11 @@ class SafePackageArchive {
     }
 
     static function inspect(disk:StorageDisk, root:String):InspectedPackage {
-        var manifest = PackageManifest.parse(disk.get(root + "/" + PackageManifest.FILENAME));
+        var manifest = PackageManifest.parse(disk.get('${root}/${PackageManifest.FILENAME}'));
         for (asset in [manifest.module, manifest.stylesheet, manifest.renderer]) {
             if (asset != ""
-                && (!disk.fileExists(root + "/public/" + asset)
-                    || disk.directoryExists(root + "/public/" + asset))) {
+                && (!disk.fileExists('${root}/public/${asset}')
+                    || disk.directoryExists('${root}/public/${asset}'))) {
                 throw new Exception("The package is missing a declared frontend asset.");
             }
         }
@@ -126,17 +126,16 @@ class SafePackageArchive {
             #end
         }
         for (locale => catalogue in manifest.translations) {
-            var path = root + "/" + catalogue;
+            var path = '${root}/${catalogue}';
             if (!disk.fileExists(path) || disk.directoryExists(path)
                 || disk.size(path) > TranslationCatalogue.MAX_BYTES) {
-                throw new Exception("The package is missing a bounded translation catalogue: "
-                    + locale);
+                throw new Exception('The package is missing a bounded translation catalogue: ${locale}');
             }
             TranslationCatalogue.parse(disk.get(path));
         }
         for (artifact in [manifest.serverJar, manifest.serverCppia, manifest.serverPhp]) {
             if (artifact != "") {
-                var path = root + "/" + artifact;
+                var path = '${root}/${artifact}';
                 if (!disk.fileExists(path)
                     || disk.directoryExists(path)
                     || disk.size(path) < 5
@@ -146,10 +145,10 @@ class SafePackageArchive {
             }
         }
         if (manifest.serverPhp != "") {
-            PhpModuleDefinition.inspect(disk, root + "/" + manifest.serverPhp, manifest.entrypoint);
+            PhpModuleDefinition.inspect(disk, '${root}/${manifest.serverPhp}', manifest.entrypoint);
         }
         if (manifest.serverCppia != "") {
-            var input = disk.readStream(root + "/" + manifest.serverCppia);
+            var input = disk.readStream('${root}/${manifest.serverCppia}');
             var magic = input.readString(5);
             input.close();
             if (magic != "CPPIA" && magic != "CPPIB") {
@@ -158,32 +157,32 @@ class SafePackageArchive {
         }
         #if jvm
         if (manifest.serverJar != "") {
-            inspectJar(disk.path(root + "/" + manifest.serverJar), manifest.entrypoint);
+            inspectJar(disk.path('${root}/${manifest.serverJar}'), manifest.entrypoint);
         }
         #end
         return {root: root, manifest: manifest};
     }
 
     static function packageRoot(disk:StorageDisk, directory:String):String {
-        if (disk.fileExists(directory + "/" + PackageManifest.FILENAME)) {
+        if (disk.fileExists('${directory}/${PackageManifest.FILENAME}')) {
             return directory;
         }
         var files = disk.files(directory);
         var directories = disk.directories(directory);
         if (files.length == 0 && directories.length == 1) {
             var nested = directories[0];
-            if (disk.fileExists(nested + "/" + PackageManifest.FILENAME)) {
+            if (disk.fileExists('${nested}/${PackageManifest.FILENAME}')) {
                 return nested;
             }
         }
-        throw new Exception("The ZIP package must include " + PackageManifest.FILENAME + ".");
+        throw new Exception('The ZIP package must include ${PackageManifest.FILENAME}.');
     }
 
     #if jvm
     static function inspectJar(path:String, entrypoint:String):Void {
         var jar = new JarFile(path);
         try {
-            var entry = jar.getJarEntry(entrypoint.split(".").join("/") + ".class");
+            var entry = jar.getJarEntry('${entrypoint.split(".").join("/")}.class');
             if (entry == null || entry.getSize() > 1024 * 1024) {
                 throw new Exception("The server JAR is missing a valid entrypoint class.");
             }

@@ -9,13 +9,10 @@ const environment = {
 };
 class WebSocketTransport {
   async start() {
-    const url = new URL(
-      '/mcp/themes/' + environment.HXPRESS_THEME_ID + '/ws',
-      environment.HXPRESS_URL,
-    );
+    const url = new URL(`/mcp/themes/${environment.HXPRESS_THEME_ID}/ws`, environment.HXPRESS_URL);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     this.socket = new WebSocket(url, {
-      headers: { Authorization: 'Bearer ' + environment.HXPRESS_MCP_TOKEN },
+      headers: { Authorization: `Bearer ${environment.HXPRESS_MCP_TOKEN}` },
       maxPayload: 10 * 1024 * 1024,
     });
     this.socket.on('message', (source) => {
@@ -58,8 +55,8 @@ for (const kind of ['http', 'websocket']) {
     let transport;
     if (kind === 'http') {
       transport = new StreamableHTTPClientTransport(
-        new URL('/mcp/themes/' + environment.HXPRESS_THEME_ID, environment.HXPRESS_URL),
-        { requestInit: { headers: { Authorization: 'Bearer ' + environment.HXPRESS_MCP_TOKEN } } },
+        new URL(`/mcp/themes/${environment.HXPRESS_THEME_ID}`, environment.HXPRESS_URL),
+        { requestInit: { headers: { Authorization: `Bearer ${environment.HXPRESS_MCP_TOKEN}` } } },
       );
     } else {
       transport = new WebSocketTransport();
@@ -229,7 +226,7 @@ for (const kind of ['http', 'websocket']) {
           height: png.readUInt32BE(20),
         }),
       );
-      assert.ok(ownedImage.url.startsWith('/theme-assets/' + environment.HXPRESS_THEME_ID + '/'));
+      assert.ok(ownedImage.url.startsWith(`/theme-assets/${environment.HXPRESS_THEME_ID}/`));
       const ownedLibrary = data(await call('search_theme_assets'));
       assert.ok(ownedLibrary.images.some((item) => item.id === ownedImage.id));
       const ownedRead = await call('read_theme_asset_image', { id: ownedImage.id });
@@ -238,7 +235,7 @@ for (const kind of ['http', 'websocket']) {
       latestVersion = saved.version;
     } catch (error) {
       throw new Error(
-        kind + ' / ' + JSON.stringify(mode) + ': ' + error.message + '\n' + errors.slice(-1000),
+        `${kind} / ${JSON.stringify(mode)}: ${error.message}\n${errors.slice(-1000)}`,
       );
     } finally {
       await client.close();
@@ -246,12 +243,12 @@ for (const kind of ['http', 'websocket']) {
   }
 }
 process.stdout.write(
-  JSON.stringify({
+  `${JSON.stringify({
     modern: true,
     legacy: true,
     hosted: true,
     websocket: true,
     version: latestVersion,
     imageRead: true,
-  }) + '\n',
+  })}\n`,
 );

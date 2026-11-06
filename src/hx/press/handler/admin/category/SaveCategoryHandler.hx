@@ -77,7 +77,7 @@ class SaveCategoryHandler extends AbstractHandler implements ValidationResponder
         var renamed = category != null && category.name != name;
         try {
             if (category == null) {
-                Category.query.create([
+                Category.query.insert([
                     "name" => name,
                     "name_key" => key,
                     "created_at" => SiteSettingsStore.timestamp(),
@@ -108,7 +108,7 @@ class SaveCategoryHandler extends AbstractHandler implements ValidationResponder
         if (renamed) {
             ContentCache.contentChanged();
         }
-        return ResponseBuilder.asRedirect("/admin/categories?notice="
-            + (category == null ? "created" : "renamed"), 303);
+        var notice = category == null ? "created" : "renamed";
+        return ResponseBuilder.asRedirect('/admin/categories?notice=${notice}', 303);
     }
 }

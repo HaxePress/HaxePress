@@ -51,7 +51,7 @@ class Client:
     ):
         headers = {"Accept-Encoding": "identity"}
         if self.cookies:
-            headers["Cookie"] = "; ".join(key + "=" + value for key, value in self.cookies.items())
+            headers["Cookie"] = "; ".join(f"{key}={value}" for key, value in self.cookies.items())
         body = None
         if data is not None:
             values = dict(data)
@@ -74,7 +74,7 @@ class Client:
             for key, value in fields:
                 name = key.lower()
                 normalized[name] = (
-                    normalized[name] + ", " + value
+                    f"{normalized[name]}, {value}"
                     if name == "vary" and name in normalized
                     else value
                 )
@@ -100,7 +100,7 @@ class Client:
     def verify_image(self, path, upload_id, digest, dimensions, csrf=True):
         width, height = dimensions
         return self.request(
-            path + "/verify",
+            f"{path}/verify",
             "POST",
             raw=json.dumps(
                 {"id": upload_id, "sha256": digest, "width": width, "height": height}
@@ -151,12 +151,12 @@ def run():
     category_id = None
     original_featured = None
     suffix = uuid.uuid4().hex[:12]
-    slug = "integration-content-" + suffix
-    email = "integration-" + suffix + "@example.com"
+    slug = f"integration-content-{suffix}"
+    email = f"integration-{suffix}@example.com"
 
     def mark(name):
         passed.append(name)
-        print("PASS " + name, flush=True)
+        print(f"PASS {name}", flush=True)
 
     try:
         status, headers, text = public.request("/")
@@ -263,7 +263,7 @@ def run():
             page_status, page_headers, _ = public.request(path)
             check(
                 page_status == 200 and "set-cookie" not in page_headers,
-                "public route or asset creates sessions: " + path,
+                f"public route or asset creates sessions: {path}",
             )
         mark("Session-free public routes, site search, filters, draft privacy and 404 pages")
         status, headers, _ = public.request("/admin/login")
@@ -284,7 +284,7 @@ def run():
             status, headers, _ = public.request(path)
             check(
                 status == 303 and headers.get("location") == "/admin/login",
-                "unprotected admin route: " + path,
+                f"unprotected admin route: {path}",
             )
         status, headers, _ = public.request(
             "/admin/content/save", "POST", {"title": "Unauthorized"}
@@ -296,7 +296,7 @@ def run():
             status, headers, _ = public.request(path, "POST", {"name": "Unauthorized"})
             check(
                 status == 303 and headers.get("location") == "/admin/login",
-                "unprotected category write: " + path,
+                f"unprotected category write: {path}",
             )
         fixture = (ROOT / "public/images/coast.jpg").read_bytes()
         status, headers, _ = public.request(
@@ -350,7 +350,7 @@ def run():
             "/admin/subscribers",
         ]:
             page_status, _, page = admin.request(path)
-            check(page_status == 200 and "::" not in page, "authenticated page rendering: " + path)
+            check(page_status == 200 and "::" not in page, f"authenticated page rendering: {path}")
             if path == "/admin/content/new":
                 check(
                     "Cover image URL" not in page and 'id="cover-url"' not in page,
@@ -364,14 +364,15 @@ def run():
                 )
                 check("No cover image yet." in page, "empty upload-only cover state")
         mark(
-            "HxWell admin auth guard and regenerated session ("
-            + str(round(time.monotonic() - start, 2))
-            + "s)"
+            (
+                "HxWell admin auth guard and regenerated session ("
+                f"{str(round(time.monotonic() - start, 2))}s)"
+            )
         )
-        category_name = "Integration " + suffix
+        category_name = f"Integration {suffix}"
         check(
             admin.request(
-                "/admin/categories/save", "POST", {"id": "", "name": "  " + category_name + "  "}
+                "/admin/categories/save", "POST", {"id": "", "name": f"  {category_name}  "}
             )[0]
             == 303,
             "create category",
@@ -395,7 +396,7 @@ def run():
         for name in ["", "x" * 81, category_name.upper()]:
             check(
                 admin.request("/admin/categories/save", "POST", {"id": "", "name": name})[0] == 422,
-                "invalid or duplicate category accepted: " + name,
+                f"invalid or duplicate category accepted: {name}",
             )
         status, redirect, _ = admin.request(
             "/admin/categories/save",
@@ -422,9 +423,7 @@ def run():
         status, _, text = admin.request("/admin/content/new")
         check(category_name in text, "new category missing from content item editor")
         check(
-            admin.request(
-                "/admin/categories/" + str(category_id) + "/delete", "POST", {}, csrf=False
-            )[0]
+            admin.request(f"/admin/categories/{str(category_id)}/delete", "POST", {}, csrf=False)[0]
             == 419,
             "category deletion missing CSRF accepted",
         )
@@ -494,7 +493,7 @@ def run():
             "Image confirmation accepted a mismatched hash",
         )
         status, _, text = admin.verify_image(upload, upload_id, digest, dimensions)
-        check(status == 201, "Valid image confirmation: " + text[:250])
+        check(status == 201, f"Valid image confirmation: {text[:250]}")
         check(
             admin.verify_image(upload, upload_id, digest, dimensions)[0] == 404,
             "A confirmed upload ID was reused",
@@ -523,21 +522,22 @@ def run():
             "/media/cms.sqlite",
             "/media/..%2Fcms.sqlite",
             "/media/.hidden.jpg",
-            "/media/" + ("a" * 32) + ".jpg",
+            f"/media/{'a' * 32}.jpg",
             "/storage/cms.sqlite",
         ]:
-            check(public.request(path)[0] in (403, 404), "unsafe storage path exposed: " + path)
+            check(public.request(path)[0] in (403, 404), f"unsafe storage path exposed: {path}")
         mark(
             "Private image staging, session-bound hash confirmation and PublicHandler media serving"
         )
         data = {
             "id": "",
-            "title": "Integration content item " + suffix + " & a <quiet> thought",
+            "title": f"Integration content item {suffix} & a <quiet> thought",
             "slug": slug,
             "excerpt": "A temporary content item used to verify publishing end to end.",
-            "content": "## A working notebook\n\nThis content item checks persistent model creation, publishing, and safe rendering.\n\n![A quiet coastline]("
-            + media["url"]
-            + ')\n\n<script>alert("unsafe")</script>',
+            "content": (
+                "## A working notebook\n\nThis content item checks persistent model creation, publishing, and safe rendering.\n\n![A quiet coastline]("
+                f"""{media['url']})\n\n<script>alert("unsafe")</script>"""
+            ),
             "category": category_name,
             "image": "",
             "image_alt": "A calm coastline",
@@ -545,20 +545,19 @@ def run():
             "published_at": "2026-11-03",
         }
         check(
-            admin.request("/admin/content/save", "POST", {**data, "category": "Unknown " + suffix})[
+            admin.request("/admin/content/save", "POST", {**data, "category": f"Unknown {suffix}"})[
                 0
             ]
             == 422,
             "content item saved with an unregistered category",
         )
         check(admin.request("/admin/content/save", "POST", data)[0] == 303, "create draft")
-        status, _, text = admin.request("/admin/content?q=" + slug)
+        status, _, text = admin.request(f"/admin/content?q={slug}")
         match = re.search(r"/admin/content/(\d+)/edit", text)
         check(status == 200 and match is not None, "created content item missing from collection")
         content_id = match.group(1)
         check(
-            admin.request("/admin/categories/" + str(category_id) + "/delete", "POST", {})[0]
-            == 422,
+            admin.request(f"/admin/categories/{str(category_id)}/delete", "POST", {})[0] == 422,
             "category with a draft was deleted",
         )
         _, _, payload = admin.request("/admin/categories", extra_headers=inertia_headers)
@@ -571,9 +570,9 @@ def run():
             == 1,
             "category counts exclude draft content",
         )
-        check(public.request("/content/" + slug)[0] == 404, "created draft is public")
+        check(public.request(f"/content/{slug}")[0] == 404, "created draft is public")
         status, _, payload = admin.request(
-            "/admin/content/" + content_id + "/edit", extra_headers=inertia_headers
+            f"/admin/content/{content_id}/edit", extra_headers=inertia_headers
         )
         check(
             status == 200 and json.loads(payload)["props"]["item"]["image"] == "",
@@ -581,7 +580,7 @@ def run():
         )
         data.update(id=content_id, status="published", image=media["url"])
         check(admin.request("/admin/content/save", "POST", data)[0] == 303, "publish content item")
-        status, _, text = public.request("/content/" + slug)
+        status, _, text = public.request(f"/content/{slug}")
         check(
             status == 200 and ">A working notebook</h2>" in text,
             "published content item or Markdown",
@@ -590,18 +589,19 @@ def run():
             "&lt;script&gt;" in text and "<script>alert(" not in text, "unsafe content item markup"
         )
         check(
-            '<figure class="content-inline-image"><img src="'
-            + media["url"]
-            + '" alt="A quiet coastline"'
+            (
+                f"""<figure class="content-inline-image"><img src="{media['url']}"""
+                '" alt="A quiet coastline"'
+            )
             in text,
             "uploaded inline image rendering",
         )
         check(
-            'class="content-cover" src="' + media["url"] + '"' in text,
+            f'''class="content-cover" src="{media['url']}"''' in text,
             "uploaded cover image rendering",
         )
         check(
-            slug in public.request("/content?category=" + urllib.parse.quote(category_name))[2],
+            slug in public.request(f"/content?category={urllib.parse.quote(category_name)}")[2],
             "published category listing",
         )
         feed = ElementTree.fromstring(public.request("/rss.xml")[2])
@@ -622,10 +622,10 @@ def run():
                 "invalid site date did not render a validation error",
             )
         _, _, payload = admin.request(
-            "/admin/content/" + content_id + "/edit", extra_headers=inertia_headers
+            f"/admin/content/{content_id}/edit", extra_headers=inertia_headers
         )
         before_rename = json.loads(payload)["props"]["item"]
-        renamed_category = "Renamed " + suffix
+        renamed_category = f"Renamed {suffix}"
         check(
             admin.request(
                 "/admin/categories/save", "POST", {"id": category_id, "name": renamed_category}
@@ -634,7 +634,7 @@ def run():
             "rename an assigned category",
         )
         _, _, payload = admin.request(
-            "/admin/content/" + content_id + "/edit", extra_headers=inertia_headers
+            f"/admin/content/{content_id}/edit", extra_headers=inertia_headers
         )
         after_rename = json.loads(payload)["props"]["item"]
         check(
@@ -644,7 +644,7 @@ def run():
             "category rename lost content item data or changed its edit date",
         )
         _, _, payload = public.request(
-            "/content?category=" + urllib.parse.quote(renamed_category),
+            f"/content?category={urllib.parse.quote(renamed_category)}",
             extra_headers=inertia_headers,
         )
         renamed_page = json.loads(payload)
@@ -658,7 +658,7 @@ def run():
             "old category remains in public filters",
         )
         status, redirect, _ = admin.request(
-            "/admin/categories/" + str(category_id) + "/delete",
+            f"/admin/categories/{str(category_id)}/delete",
             "POST",
             {},
             extra_headers=inertia_headers,
@@ -684,7 +684,7 @@ def run():
             "/admin/content/save", "POST", bad, extra_headers=inertia_headers
         )
         check(
-            status == 303 and redirect.get("location") == "/admin/content/" + content_id + "/edit",
+            status == 303 and redirect.get("location") == f"/admin/content/{content_id}/edit",
             "Inertia validation redirect",
         )
         status, _, payload = admin.request(redirect["location"], extra_headers=inertia_headers)
@@ -703,32 +703,32 @@ def run():
             "https://example.com/cover.jpg",
             "//example.com/cover.jpg",
             "/images/coast.jpg",
-            "/media/" + ("a" * 32) + ".jpg",
+            f"/media/{'a' * 32}.jpg",
         ]:
             check(
                 admin.request("/admin/content/save", "POST", {**data, "image": image})[0] == 422,
-                "non-uploaded cover accepted: " + image,
+                f"non-uploaded cover accepted: {image}",
             )
         for image in [
             "https://example.com/content.jpg",
             "//example.com/content.jpg",
             "/images/coast.jpg",
-            "/media/" + ("b" * 32) + ".jpg",
+            f"/media/{'b' * 32}.jpg",
         ]:
             check(
                 admin.request(
                     "/admin/content/save",
                     "POST",
-                    {**data, "content": data["content"] + "\n\n![Unmanaged image](" + image + ")"},
+                    {**data, "content": f"{data['content']}\n\n![Unmanaged image]({image})"},
                 )[0]
                 == 422,
-                "non-uploaded content item image accepted: " + image,
+                f"non-uploaded content item image accepted: {image}",
             )
         check(
             admin.request("/admin/content/save", "POST", {**data, "image": ""})[0] == 303,
             "remove cover reference",
         )
-        status, _, empty_cover_page = public.request("/content/" + slug)
+        status, _, empty_cover_page = public.request(f"/content/{slug}")
         check(
             status == 200
             and 'class="content-cover"' not in empty_cover_page
@@ -741,7 +741,7 @@ def run():
         _, _, payload = public.request("/", extra_headers=inertia_headers)
         featured_id = json.loads(payload)["props"]["featured"]["id"]
         _, _, payload = admin.request(
-            "/admin/content/" + str(featured_id) + "/edit", extra_headers=inertia_headers
+            f"/admin/content/{str(featured_id)}/edit", extra_headers=inertia_headers
         )
         original_featured = json.loads(payload)["props"]["item"]
         data["featured"] = "1"
@@ -760,7 +760,7 @@ def run():
             "unpublish the cached content item",
         )
         check(
-            public.request("/content/" + slug)[0] == 404
+            public.request(f"/content/{slug}")[0] == 404
             and slug not in public.request("/rss.xml")[2],
             "unpublished cached content item remains public",
         )
@@ -778,8 +778,8 @@ def run():
             "republish with a new slug",
         )
         check(
-            public.request("/content/" + previous_slug)[0] == 404
-            and public.request("/content/" + slug)[0] == 200,
+            public.request(f"/content/{previous_slug}")[0] == 404
+            and public.request(f"/content/{slug}")[0] == 200,
             "old or new content item slug cache is stale",
         )
         _, _, payload = public.request("/", extra_headers=inertia_headers)
@@ -809,11 +809,11 @@ def run():
         check(statuses == [200] * 6, "duplicate subscription requests need no transaction")
         status, _, text = admin.request("/admin/subscribers")
         check(
-            status == 200 and text.count("<strong>" + email + "</strong>") == 1,
+            status == 200 and text.count(f"<strong>{email}</strong>") == 1,
             "subscriber deduplication",
         )
         row = re.search(
-            r"<tr><td><strong>" + re.escape(email) + r"</strong>.*?/admin/subscribers/(\d+)/delete",
+            f"<tr><td><strong>{re.escape(email)}</strong>.*?/admin/subscribers/(\\d+)/delete",
             text,
             re.S,
         )
@@ -828,7 +828,7 @@ def run():
         mark("Persistent Eloquent newsletter signup, deduplication, management and CSV export")
         _, _, payload = admin.request("/admin/settings", extra_headers=inertia_headers)
         original_settings = json.loads(payload)["props"]["site"]
-        updated_settings = {**original_settings, "site_name": "HaxePress " + suffix}
+        updated_settings = {**original_settings, "site_name": f"HaxePress {suffix}"}
         try:
             check(
                 admin.request("/admin/settings", "POST", updated_settings)[0] == 303,
@@ -865,11 +865,11 @@ def run():
         )
         mark("Site settings and RSS caches refresh after a successful save")
         check(
-            admin.request("/admin/content/" + content_id + "/delete", "POST", {})[0] == 303,
+            admin.request(f"/admin/content/{content_id}/delete", "POST", {})[0] == 303,
             "delete content item",
         )
         content_id = None
-        check(public.request("/content/" + slug)[0] == 404, "deleted content item still public")
+        check(public.request(f"/content/{slug}")[0] == 404, "deleted content item still public")
         restored = {
             key: original_featured.get(key, "")
             for key in [
@@ -891,8 +891,7 @@ def run():
         )
         original_featured = None
         check(
-            admin.request("/admin/categories/" + str(category_id) + "/delete", "POST", {})[0]
-            == 303,
+            admin.request(f"/admin/categories/{str(category_id)}/delete", "POST", {})[0] == 303,
             "delete unused category",
         )
         category_id = None
@@ -903,7 +902,7 @@ def run():
         )
         mark("Unused category deletion and refreshed public category choices")
         check(
-            admin.request("/admin/subscribers/" + subscriber_id + "/delete", "POST", {})[0] == 303,
+            admin.request(f"/admin/subscribers/{subscriber_id}/delete", "POST", {})[0] == 303,
             "delete subscriber",
         )
         subscriber_id = None
@@ -918,13 +917,13 @@ def run():
     finally:
         if not content_id and admin.csrf:
             _, _, text = admin.request(
-                "/admin/content?q=" + urllib.parse.quote("Integration content item " + suffix)
+                f"/admin/content?q={urllib.parse.quote(f'Integration content item {suffix}')}"
             )
             match = re.search(r"/admin/content/(\d+)/edit", text)
             if match:
                 content_id = match.group(1)
         if content_id:
-            admin.request("/admin/content/" + content_id + "/delete", "POST", {})
+            admin.request(f"/admin/content/{content_id}/delete", "POST", {})
         if original_featured:
             restored = {
                 key: original_featured.get(key, "")
@@ -943,10 +942,10 @@ def run():
             restored.update(featured="1", published_at=original_featured["published_at"][:10])
             admin.request("/admin/content/save", "POST", restored)
         if category_id:
-            admin.request("/admin/categories/" + str(category_id) + "/delete", "POST", {})
+            admin.request(f"/admin/categories/{str(category_id)}/delete", "POST", {})
         if subscriber_id:
-            admin.request("/admin/subscribers/" + subscriber_id + "/delete", "POST", {})
-    print(str(len(passed)) + " integration checks passed.", flush=True)
+            admin.request(f"/admin/subscribers/{subscriber_id}/delete", "POST", {})
+    print(f"{str(len(passed))} integration checks passed.", flush=True)
 
 
 if __name__ == "__main__":

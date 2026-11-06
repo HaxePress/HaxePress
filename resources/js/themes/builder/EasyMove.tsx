@@ -54,10 +54,7 @@ export default function EasyMove({
         if (!excluded.has(node.id))
           choices.push({
             id: node.id,
-            label:
-              (section.name || t('Section')) +
-              ' / ' +
-              (node.name || node.text.slice(0, 32) || t(friendlyLabel(node))),
+            label: `${section.name || t('Section')} / ${node.name || node.text.slice(0, 32) || t(friendlyLabel(node))}`,
             target: { scope, section: section.id, block: node.id },
             container: canContain(node),
           });

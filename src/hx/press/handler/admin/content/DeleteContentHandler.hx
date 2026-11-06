@@ -5,7 +5,6 @@ import hx.press.ContentCache;
 import hx.press.Activity;
 import hx.press.CmsAccess;
 import hx.press.CmsController;
-import hx.press.ContentController;
 import hx.well.facades.DBStatic;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.Request;
@@ -18,6 +17,7 @@ import hx.press.model.EditorDraft;
 import hx.press.model.MenuLink;
 import hx.press.model.ContentValue;
 import hx.press.content.ContentTypes;
+import hx.press.ContentController;
 import hx.press.SiteController;
 
 class DeleteContentHandler extends AbstractHandler {
@@ -32,11 +32,11 @@ class DeleteContentHandler extends AbstractHandler {
 
     public function execute(request:Request):AbstractResponse {
         var kind = resolve(request);
-        if (ContentTypes.find(kind) == null) {
+        if (!ContentTypes.exists(kind)) {
             return SiteController.notFound(request);
         }
         var id = Std.parseInt(request.route("id"));
-        return ContentLocks.run("document-" + id, () -> {
+        return ContentLocks.run('document-${id}', () -> {
             var item = ContentItem.query.select(["id", "author_id", "status", "title"])
                 .where("id", id)
                 .where("content_type", kind)
@@ -65,7 +65,7 @@ class DeleteContentHandler extends AbstractHandler {
                 });
                 ContentCache.contentChanged();
             }
-            return ResponseBuilder.asRedirect(ContentController.base(kind) + "?notice=deleted",
+            return ResponseBuilder.asRedirect('${ContentController.base(kind)}?notice=deleted',
                 303);
         });
     }

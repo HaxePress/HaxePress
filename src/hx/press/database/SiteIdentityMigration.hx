@@ -17,8 +17,8 @@ class SiteIdentityMigration {
         DBStatic.transaction(() -> {
             for (setting in legacy) {
                 var key = names.get(setting.key);
-                if (Setting.query.find(key) == null) {
-                    Setting.query.create(["key" => key, "value" => setting.value]);
+                if (!Setting.query.where("key", key).exists()) {
+                    Setting.query.insert(["key" => key, "value" => setting.value]);
                 }
                 setting.delete();
             }

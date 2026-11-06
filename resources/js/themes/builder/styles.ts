@@ -41,7 +41,7 @@ export function designStyles(
     for (const section of sectionsFor(document, scope)) {
       const selector = `.hp-design [data-design-node="${section.id}"]`;
       const base: StyleMap = {
-        'padding-block': section.padding + 'px',
+        'padding-block': `${section.padding}px`,
         'text-align': section.align,
       };
       if (section.background) base.background = section.background;
@@ -66,13 +66,13 @@ export function designStyles(
       if (preview.breakpoint === 'mobile')
         Object.assign(values, styles.mobile?.[preview.interaction]);
       const target = preview.styleClass
-        ? '.design-class-' + preview.styleClass
-        : '[data-design-node="' + (selection?.block || selection?.section) + '"]';
+        ? `.design-class-${preview.styleClass}`
+        : `[data-design-node="${selection?.block || selection?.section}"]`;
       css += `.hp-design.hp-design-editing ${target}{${declarations(values)}}`;
     }
   }
   return css;
 }
 export function classNames(classes: string[] = []): string {
-  return classes.flatMap((name) => [name, 'design-class-' + name]).join(' ');
+  return classes.flatMap((name) => [name, `design-class-${name}`]).join(' ');
 }

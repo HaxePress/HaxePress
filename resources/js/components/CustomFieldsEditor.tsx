@@ -52,7 +52,7 @@ export default function CustomFieldsEditor({
         </p>
       )}
       {definitions.map((field) => {
-        const id = 'custom-field-' + field.key;
+        const id = `custom-field-${field.key}`;
         const value = values[field.key] ?? null;
         const required = publishing && field.required;
         return (
@@ -147,7 +147,7 @@ export default function CustomFieldsEditor({
               />
             )}
             {field.help && (
-              <p className="field-help" id={id + '-help'}>
+              <p className="field-help" id={`${id}-help`}>
                 {field.help}
               </p>
             )}

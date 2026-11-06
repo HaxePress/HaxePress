@@ -28,7 +28,7 @@ class ReadingPlugin implements PluginEntrypoint {
             return Json.stringify(result);
         }
         if (event == "content.render" && input.settings.content_note == "true") {
-            return Json.stringify({content: input.data.content + "\n\n---\n\n" + message});
+            return Json.stringify({content: '${input.data.content}\n\n---\n\n${message}'});
         }
         if (event == "content.saving" && input.data.document.status != "draft") {
             var content:String = input.data.document.content;
@@ -48,7 +48,7 @@ class ReadingPlugin implements PluginEntrypoint {
                 blocks: [
                     {
                         slot: "dashboard",
-                        content: "### " + heading + "\n\n" + summary
+                        content: '### ${heading}\n\n${summary}'
                     }
                 ]
             });

@@ -151,7 +151,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
         "APP_ENV": "development",
         "APP_KEY": base64.b64encode(secrets.token_bytes(32)).decode(),
         "APP_DEBUG": "false",
-        "APP_URL": "http://127.0.0.1:" + str(port),
+        "APP_URL": f"http://127.0.0.1:{str(port)}",
         "HOST": "127.0.0.1",
         "PORT": str(port),
         "MAX_CONNECTIONS": "10000",
@@ -168,10 +168,10 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
         VITE_USE_BUILD="true",
         VITE_INCLUDE_PAGE_ENTRY="false",
         INERTIA_SSR_ENABLED="true",
-        INERTIA_SSR_URL="http://127.0.0.1:" + str(ssr_port) + "/render",
+        INERTIA_SSR_URL=f"http://127.0.0.1:{str(ssr_port)}/render",
         INERTIA_SSR_TIMEOUT="3",
     )
-    (work / ".env").write_text("".join(key + "=" + value + "\n" for key, value in values.items()))
+    (work / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
     (work / ".env").chmod(0o600)
     with (work / "server.log").open("w+") as log:
         ssr_env = os.environ.copy()
@@ -251,10 +251,10 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
             )
             for suite in suites:
                 result = subprocess.run(
-                    [sys.executable, str(ROOT / "tests" / (suite + ".py"))], cwd=ROOT, env=env
+                    [sys.executable, str(ROOT / "tests" / (f"{suite}.py"))], cwd=ROOT, env=env
                 )
                 if result.returncode:
-                    raise RuntimeError(suite + " integration suite failed.")
+                    raise RuntimeError(f"{suite} integration suite failed.")
             if arguments.only is not None:
                 verify_shutdown(process, log)
                 sys.exit(0)
@@ -277,7 +277,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
             if not images:
                 raise RuntimeError("Uploaded image was not saved in storage/media.")
             client = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-            client.request("GET", "/media/" + images[0].name)
+            client.request("GET", f"/media/{images[0].name}")
             media = client.getresponse()
             media_body = media.read()
             client.close()

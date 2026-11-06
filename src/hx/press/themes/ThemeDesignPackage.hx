@@ -119,7 +119,7 @@ class ThemeDesignPackage {
         };
         PackageManifest.parse(Json.stringify(manifest));
         var disk = Storage.disk("exports");
-        var path = SecureToken.generate(32) + ".zip";
+        var path = '${SecureToken.generate(32)}.zip';
         try {
             MediaLocks.run(() -> ThemeAssets.locked(id, () -> {
                 ThemeAssets.requireDesign(id, document);
@@ -148,7 +148,7 @@ class ThemeDesignPackage {
                 var total = 0;
                 for (image in (cast owned : Array<ThemePackageMedia>)) {
                     var filename = image.filename;
-                    var imagePath = id + "/" + filename;
+                    var imagePath = '${id}/${filename}';
                     if (!ThemeAssets.validFilename(filename)
                         || !themeDisk.fileExists(imagePath)
                         || themeDisk.size(imagePath) > MediaReferences.MAX_BYTES) {
@@ -158,7 +158,7 @@ class ThemeDesignPackage {
                     media.push(image);
                     total += themeDisk.size(imagePath);
                     imageFiles.push({
-                        name: "media/" + filename,
+                        name: 'media/${filename}',
                         size: themeDisk.size(imagePath),
                         open: () -> themeDisk.readStream(imagePath)
                     });
@@ -172,15 +172,15 @@ class ThemeDesignPackage {
                     }
                     var filename = ThemeAssets.packagedFilename(original);
                     while (usedNames.exists(filename)) {
-                        filename = "ta_" + SecureToken.generate(32) + original.substr(32);
+                        filename = 'ta_${SecureToken.generate(32)}${original.substr(32)}';
                     }
                     usedNames.set(filename, true);
-                    replacements.set(MediaReferences.prefix() + original,
+                    replacements.set('${MediaReferences.prefix()}${original}',
                         ThemeAssets.url(id, filename));
                     media.push({filename: filename, title: image.title, alt: image.alt});
                     total += mediaDisk.size(original);
                     imageFiles.push({
-                        name: "media/" + filename,
+                        name: 'media/${filename}',
                         size: mediaDisk.size(original),
                         open: () -> mediaDisk.readStream(original)
                     });
@@ -209,7 +209,7 @@ class ThemeDesignPackage {
             if (filename == "") {
                 filename = item.slug;
             }
-            var response = disk.download(path, filename + "-" + item.version + ".zip",
+            var response = disk.download(path, '${filename}-${item.version}.zip',
                 ["Content-Type" => "application/zip", "Cache-Control" => "private, no-store"]);
             response.input = new TemporaryDownloadInput(response.input, () -> disk.delete(path));
             return response;
@@ -250,7 +250,7 @@ class ThemeDesignPackage {
 
     static function metadata(root:String, manifest:ManifestData):Array<ThemePackageMedia> {
         var input:Dynamic = Json.parse(read(Storage.disk("extensions"),
-            root + "/" + manifest.mediaFile, MEDIA_METADATA_BYTES).toString());
+            '${root}/${manifest.mediaFile}', MEDIA_METADATA_BYTES).toString());
         if (!Std.isOfType(input, Array)) {
             throw new Exception("The visual theme media list must be an array.");
         }
@@ -275,12 +275,12 @@ class ThemeDesignPackage {
     }
 
     static function document(root:String, manifest:ManifestData):Dynamic {
-        var source = read(Storage.disk("extensions"), root + "/" + manifest.designFile,
+        var source = read(Storage.disk("extensions"), '${root}/${manifest.designFile}',
             ThemeDesignSchema.MAX_BYTES).toString();
         var input:Dynamic = Json.parse(source);
         var replacements:Map<String, String> = [];
         for (image in metadata(root, manifest)) {
-            replacements.set(manifest.mediaPrefix + image.filename,
+            replacements.set('${manifest.mediaPrefix}${image.filename}',
                 ThemeAssets.url("theme-package", ThemeAssets.packagedFilename(image.filename)));
         }
         var rebased = rewrite(input, replacements);
@@ -341,13 +341,13 @@ class ThemeDesignPackage {
         var disk = Storage.disk("extensions");
         var total = 0;
         for (image in media) {
-            var bytes = read(disk, root + "/media/" + image.filename, MediaReferences.MAX_BYTES);
+            var bytes = read(disk, '${root}/media/${image.filename}', MediaReferences.MAX_BYTES);
             total += bytes.length;
             if (total > ThemeAssets.MAX_TOTAL_BYTES) {
                 throw new Exception("The theme images exceed the export package budget.");
             }
             var info = imageInfo(bytes);
-            if (!StringTools.endsWith(image.filename, "." + info.extension)) {
+            if (!StringTools.endsWith(image.filename, '.${info.extension}')) {
                 throw new Exception("A bundled theme image is invalid or exceeds the image dimension limits.");
             }
         }
@@ -356,7 +356,7 @@ class ThemeDesignPackage {
     /** Called under PackageManager's package lock; files are compensated if the ORM transaction fails. */
     public static function install(upload:PackageUpload, manifest:ManifestData,
             previous:Null<InstalledPackage>, userId:Int, userName:String):String {
-        var id = "theme-" + manifest.slug;
+        var id = 'theme-${manifest.slug}';
         var current = ThemeDesign.query.select(["version"]).where("id", id).limit(1).first();
         if (previous != null && current == null) {
             throw new Exception("A visual theme cannot replace a theme that uses a packaged renderer.");
@@ -377,7 +377,7 @@ class ThemeDesignPackage {
                     var additions:Array<Map<String, Dynamic>> = [];
                     for (image in media) {
                         var bytes = read(Storage.disk("extensions"),
-                            upload.directory + "/media/" + image.filename,
+                            '${upload.directory}/media/${image.filename}',
                             MediaReferences.MAX_BYTES);
                         var digest = Sha256.make(bytes).toHex();
                         var canonical = ThemeAssets.packagedFilename(image.filename);
@@ -387,7 +387,7 @@ class ThemeDesignPackage {
                             .limit(1)
                             .first();
                         var filename = canonical;
-                        var existingPath = id + "/" + filename;
+                        var existingPath = '${id}/${filename}';
                         if (existing != null && existing.sha256 == digest
                             && existing.size == bytes.length && images.fileExists(existingPath)) {
                             replacements.set(ThemeAssets.url("theme-package", canonical),
@@ -396,13 +396,13 @@ class ThemeDesignPackage {
                         }
                         if (existing != null || images.exists(existingPath)) {
                             do {
-                                filename = "ta_" + SecureToken.generate(32) + canonical.substr(35);
+                                filename = 'ta_${SecureToken.generate(32)}${canonical.substr(35)}';
                             } while (media.exists(image ->
                                 ThemeAssets.packagedFilename(image.filename) == filename)
-                                || images.exists(id + "/" + filename));
+                                || images.exists('${id}/${filename}'));
                         }
                         var info = imageInfo(bytes);
-                        var path = id + "/" + filename;
+                        var path = '${id}/${filename}';
                         images.put(path, bytes);
                         created.push(path);
                         additions.push([
@@ -426,7 +426,7 @@ class ThemeDesignPackage {
                     stored.templates = ThemeStudio.templateDefinitions(design);
                     var now = SiteSettingsStore.timestamp();
                     var version = current == null ? 1 : current.version + 1;
-                    InstalledPackage.query.updateOrCreate(["id" => id], [
+                    var packageValues:Map<String, Dynamic> = [
                         "kind" => "theme",
                         "slug" => manifest.slug,
                         "name" => manifest.name,
@@ -443,17 +443,26 @@ class ThemeDesignPackage {
                         "restart_required" => 0,
                         "installed_at" => previous == null ? now : previous.installed_at,
                         "updated_at" => now
-                    ]);
+                    ];
+                    var packageQuery = InstalledPackage.query.where("id", id);
+                    if (packageQuery.exists()) {
+                        packageQuery.update(packageValues);
+                    } else {
+                        packageValues.set("id", id);
+                        InstalledPackage.query.insert(packageValues);
+                    }
                     var serialized = Json.stringify(design);
-                    ThemeDesign.query.updateOrCreate(["id" => id], [
+                    ThemeDesign.query.upsert([
+                        "id" => id,
                         "draft" => serialized,
                         "published" => serialized,
                         "version" => version,
                         "published_version" => version,
                         "updated_at" => now
-                    ]);
+                    ], ["id"],
+                        ["draft", "published", "version", "published_version", "updated_at"]);
                     for (values in additions) {
-                        ThemeAsset.query.create(values);
+                        ThemeAsset.query.insert(values);
                     }
                     ThemeAssets.requireBudget(id);
                     ThemeAssets.requireDesign(id, design);
@@ -466,8 +475,8 @@ class ThemeDesignPackage {
                                 manifest.name);
                             return true;
                         },
-                            manifest.name + " (published design)"), manifest.name +
-                        " (design draft)");
+                            '${manifest.name} (published design)'),
+                        '${manifest.name} (design draft)');
                 });
                 committed = true;
                 return true;
@@ -482,7 +491,7 @@ class ThemeDesignPackage {
         }
         ContentCache.changed("extensions");
         ThemeAssets.changed(id);
-        PackageStorage.remove(PackageStorage.STAGING + "/" + upload.key);
+        PackageStorage.remove('${PackageStorage.STAGING}/${upload.key}');
         return id;
     }
 }

@@ -18,7 +18,8 @@ class DashboardController {
         var drafts = ContentData.count("", "", "draft", author, capabilities);
         var scheduled = ContentData.count("", "", "scheduled", author, capabilities);
         var topics = CmsAccess.can("taxonomy") ? CategoryData.count() : 0;
-        var recent = ContentData.recent(author, capabilities).map(ContentItemData.adminSummary);
+        var recent = ContentData.recent(author, capabilities)
+            .map(item -> ContentItemData.adminSummary(item));
         var collections = ContentTypes.dashboard(author, capabilities);
         var collectionCount = ContentTypes.dashboardCount(capabilities);
         var entries:Array<Dynamic> = CmsAccess.can("activity") ? ActivityLog.query.select(["id", "actor", "action", "entity", "label", "created_at"])

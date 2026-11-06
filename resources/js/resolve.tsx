@@ -64,7 +64,7 @@ function ThemeFrame({
   return (
     <>
       <ThemeCustomizationBridge />
-      <ThemeBoundary key={(theme?.renderer || 'simple') + name} fallback={fallback}>
+      <ThemeBoundary key={`${theme?.renderer || 'simple'}${name}`} fallback={fallback}>
         <Suspense fallback={<main className="theme-loading" aria-busy="true" />}>
           {theme?.design ? <DesignPage name={name} pageProps={pageProps} /> : children}
         </Suspense>
@@ -74,17 +74,17 @@ function ThemeFrame({
 }
 
 function fallbackFor(name: string, props: Record<string, unknown>): ThemePage {
-  const builtin = pages['./pages/' + name + '.tsx'];
+  const builtin = pages[`./pages/${name}.tsx`];
   if (builtin) return builtin.default;
   const declared = typeof props.templateFallback === 'string' ? props.templateFallback : name;
   const safe = /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(declared) ? declared : 'NotFound';
-  return pages['./pages/' + safe + '.tsx']?.default || pages['./pages/NotFound.tsx'].default;
+  return pages[`./pages/${safe}.tsx`]?.default || pages['./pages/NotFound.tsx'].default;
 }
 
 export function resolvePage(name: string, serverTheme?: ThemeDefinition | null): ThemePage {
   if (name.startsWith('Admin/')) {
-    const page = pages['./pages/' + name + '.tsx'];
-    if (!page) throw new Error('Unknown administration page: ' + name);
+    const page = pages[`./pages/${name}.tsx`];
+    if (!page) throw new Error(`Unknown administration page: ${name}`);
     return page.default;
   }
   if (!/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(name)) {

@@ -57,7 +57,7 @@ export default function ContentDetail({
           {(item.tags || []).length > 0 && (
             <nav className="simple-tags" aria-label={t('Content tags')}>
               {item.tags?.map((tag) => (
-                <Link key={tag.id} href={tag.url || '/tags/' + tag.slug}>
+                <Link key={tag.id} href={tag.url || `/tags/${tag.slug}`}>
                   #{tag.name}
                 </Link>
               ))}
@@ -72,7 +72,7 @@ export default function ContentDetail({
           <ExtensionSlot name="content.after" />
         </div>
         <footer className="simple-content-footer">
-          <Link href={item.archiveUrl + '?category=' + encodeURIComponent(item.category)}>
+          <Link href={`${item.archiveUrl}?category=${encodeURIComponent(item.category)}`}>
             {item.category}
           </Link>
           <button className="button button-outline" onClick={share}>

@@ -89,7 +89,7 @@ async function waitFor(check, message) {
 }
 async function permissions(read, edit, media) {
   const response = await fetch(
-    new URL('/admin/themes/' + connection.themeId + '/ai/permissions', process.env.TEST_URL),
+    new URL(`/admin/themes/${connection.themeId}/ai/permissions`, process.env.TEST_URL),
     {
       method: 'POST',
       headers: {
@@ -181,8 +181,7 @@ try {
     'Logout retained browser tool access',
   );
   process.stdout.write(
-    JSON.stringify({ version, browserApi: true, webMcp: true, permissions: true, logout: true }) +
-      '\n',
+    `${JSON.stringify({ version, browserApi: true, webMcp: true, permissions: true, logout: true })}\n`,
   );
 } finally {
   unsubscribe();

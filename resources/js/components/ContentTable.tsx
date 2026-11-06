@@ -17,7 +17,7 @@ export default function ContentTable({
 }) {
   const { t } = useTranslation();
   const base = (item: ContentItem) =>
-    item.adminBase || contentType?.adminBase || '/admin/collections/' + item.content_type;
+    item.adminBase || contentType?.adminBase || `/admin/collections/${item.content_type}`;
   const extraColumns = compact ? [] : contentType?.fields.filter((field) => field.inList) || [];
   const showCategory = !compact && Boolean(contentType?.features.includes('categories'));
   const { csrfToken, auth } = usePage<SharedProps>().props;
@@ -59,7 +59,7 @@ export default function ContentTable({
                         {item.status === 'trash' ? (
                           item.title
                         ) : (
-                          <Link href={base(item) + '/' + item.id + '/edit'}>{item.title}</Link>
+                          <Link href={`${base(item)}/${item.id}/edit`}>{item.title}</Link>
                         )}
                       </strong>
                       <small>
@@ -74,7 +74,7 @@ export default function ContentTable({
                   </div>
                 </td>
                 <td>
-                  <span className={'status ' + item.status}>
+                  <span className={`status ${item.status}`}>
                     {item.status === 'published'
                       ? t('Published')
                       : item.status === 'scheduled'
@@ -104,7 +104,7 @@ export default function ContentTable({
                     {item.status !== 'trash' && (
                       <Link
                         className="icon-button"
-                        href={base(item) + '/' + item.id + '/edit'}
+                        href={`${base(item)}/${item.id}/edit`}
                         aria-label={t('Edit {title}', { title: item.title })}
                       >
                         <Icon name="edit" />
@@ -133,7 +133,7 @@ export default function ContentTable({
                         className="button button-outline"
                         disabled={busy}
                         onClick={() =>
-                          router.post(base(item) + '/' + item.id + '/restore', {
+                          router.post(`${base(item)}/${item.id}/restore`, {
                             _token: csrfToken,
                           })
                         }
@@ -160,10 +160,7 @@ export default function ContentTable({
         onConfirm={() => {
           if (!pending) return;
           router.post(
-            base(pending) +
-              '/' +
-              pending.id +
-              (pending.status === 'trash' ? '/permanent-delete' : '/trash'),
+            `${base(pending)}/${pending.id}${pending.status === 'trash' ? '/permanent-delete' : '/trash'}`,
             { _token: csrfToken },
             {
               onStart: () => setBusy(true),

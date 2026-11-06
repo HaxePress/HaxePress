@@ -190,10 +190,7 @@ export class ThemeDesignerConnection {
     if (this.stopped) throw new Error('The collaboration connection is closed.');
     this.status = 'connecting';
     this.emit({ type: 'state' });
-    const url = new URL(
-      '/admin/themes/' + encodeURIComponent(this.themeId) + '/ai/ws',
-      location.origin,
-    );
+    const url = new URL(`/admin/themes/${encodeURIComponent(this.themeId)}/ai/ws`, location.origin);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     const transport = new BrowserSocketTransport(url, (method, params) =>
       this.notification(method, params),

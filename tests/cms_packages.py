@@ -24,26 +24,26 @@ HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
 
 def props(client, path):
     status, _, body = client.request(path, extra_headers=HEADERS)
-    check(status == 200, path + " returned " + str(status) + ": " + body[:200])
+    check(status == 200, f"{path} returned {str(status)}: {body[:200]}")
     return json.loads(body)["props"]
 
 
 def upload(admin, kind, package):
     status, _, body = admin.request(
-        "/admin/" + kind + "/upload", "POST", raw=package, content_type="application/zip"
+        f"/admin/{kind}/upload", "POST", raw=package, content_type="application/zip"
     )
-    check(status == 201, "package inspection returned " + str(status) + ": " + body[:400])
+    check(status == 201, f"package inspection returned {str(status)}: {body[:400]}")
     return json.loads(body)
 
 
 def install(admin, kind, package, replace=False):
     inspected = upload(admin, kind, package)
     status, _, body = admin.request(
-        "/admin/" + kind + "/install",
+        f"/admin/{kind}/install",
         "POST",
         {"key": inspected["key"], "replace": "1" if replace else "0"},
     )
-    check(status == 303, "package install returned " + str(status) + ": " + body[:200])
+    check(status == 303, f"package install returned {str(status)}: {body[:200]}")
     return inspected
 
 
@@ -69,7 +69,7 @@ def updated_server_modules():
         shutil.copytree(example, plugin)
         (plugin / source_path).write_text(
             source.replace(
-                original, 'var message:String = "Updated module: " + input.settings.message;'
+                original, "var message:String = 'Updated module: ${input.settings.message}';"
             )
         )
         package = build_plugin(plugin, work, ROOT / "Export/packages/cms-plugin-api-4.info")
@@ -106,7 +106,7 @@ def verify(fixtures):
     rejected = admin.request("/admin/plugins/upload", "POST", raw=b"invalid", csrf=False)
     check(
         rejected[0] == 419,
-        "package CSRF rejection returned " + str(rejected[0]) + ": " + rejected[2][:300],
+        f"package CSRF rejection returned {str(rejected[0])}: {rejected[2][:300]}",
     )
     check(
         admin.request("/admin/plugins/upload", "POST", raw=b"invalid")[0] == 422,
@@ -124,8 +124,8 @@ def verify(fixtures):
     check(props(public, "/")["theme"]["slug"] == "simple", "default theme is not active")
     for slug in ["simple", "notebook", "gallery", "fieldnotes"]:
         check(
-            admin.request("/admin/themes/theme-" + slug + "/enable", "POST", {})[0] == 303,
-            "activate theme " + slug,
+            admin.request(f"/admin/themes/theme-{slug}/enable", "POST", {})[0] == 303,
+            f"activate theme {slug}",
         )
         theme = props(public, "/")["theme"]
         check(
@@ -201,11 +201,11 @@ def verify(fixtures):
     )
     frame_base = content["theme"]["previewBase"]
     check(
-        props(admin, frame_base + "/content")["theme"]["id"] == "theme-gallery",
+        props(admin, f"{frame_base}/content")["theme"]["id"] == "theme-gallery",
         "site navigation lost preview theme",
     )
     check(
-        props(admin, frame_base + "/content/welcome-to-haxepress")["theme"]["id"]
+        props(admin, f"{frame_base}/content/welcome-to-haxepress")["theme"]["id"]
         == "theme-gallery",
         "content item navigation lost preview theme",
     )
@@ -215,7 +215,7 @@ def verify(fixtures):
         "preview shell bypassed authentication",
     )
     check(
-        frame_base + "/content" in frame_html,
+        f"{frame_base}/content" in frame_html,
         "preview links did not retain their frame route",
     )
     check(props(public, "/")["theme"]["layout"] == "fieldnotes", "preview changed the active theme")
@@ -258,7 +258,7 @@ def verify(fixtures):
     plugin_id = "plugin-reading-companion"
     check(
         admin.request(
-            "/admin/plugins/" + plugin_id + "/settings",
+            f"/admin/plugins/{plugin_id}/settings",
             "POST",
             {
                 "message": "Integration reading note",
@@ -270,7 +270,7 @@ def verify(fixtures):
         "Configure the reading note",
     )
     check(
-        admin.request("/admin/plugins/" + plugin_id + "/enable", "POST", {})[0] == 303,
+        admin.request(f"/admin/plugins/{plugin_id}/enable", "POST", {})[0] == 303,
         "activate JVM plugin",
     )
     blocks = props(public, "/")["extensions"]["blocks"]
@@ -282,23 +282,23 @@ def verify(fixtures):
         any(item["content"] == "Integration reading note" for item in blocks),
         "JVM hook did not affect the site",
     )
-    message = "A site note " + secrets.token_hex(5)
+    message = f"A site note {secrets.token_hex(5)}"
     settings = {"message": message, "content_note": "true", "minimum_characters": "0"}
     check(
-        admin.request("/admin/plugins/" + plugin_id + "/settings", "POST", settings)[0] == 303,
+        admin.request(f"/admin/plugins/{plugin_id}/settings", "POST", settings)[0] == 303,
         "configure plugin",
     )
     check(message in public.request("/")[2], "plugin output is missing from server-rendered HTML")
     page_data = {
         "id": "",
         "title": "Plugin rendering test",
-        "slug": "plugin-page-" + secrets.token_hex(5),
+        "slug": f"plugin-page-{secrets.token_hex(5)}",
         "content": "A published page used to verify content hooks.",
         "status": "published",
         "stay": "1",
     }
     admin.request(
-        "/admin/plugins/" + plugin_id + "/settings",
+        f"/admin/plugins/{plugin_id}/settings",
         "POST",
         {**settings, "minimum_characters": "1000"},
     )
@@ -307,12 +307,12 @@ def verify(fixtures):
         rejected[0] == 422 and "Reading Companion requires" in rejected[2],
         "content validation hook was ignored",
     )
-    admin.request("/admin/plugins/" + plugin_id + "/settings", "POST", settings)
+    admin.request(f"/admin/plugins/{plugin_id}/settings", "POST", settings)
     saved = admin.request("/admin/pages/save", "POST", page_data)
     check(saved[0] == 303, "save plugin render page")
     page_id = int(re.search(r"/pages/(\d+)/edit", saved[1]["location"]).group(1))
     check(
-        message in props(public, "/pages/" + page_data["slug"])["item"]["content"],
+        message in props(public, f"/pages/{page_data['slug']}")["item"]["content"],
         "content render hook was ignored",
     )
     check(
@@ -321,7 +321,7 @@ def verify(fixtures):
         "a presentation hook mutated stored content",
     )
     check(
-        admin.request("/admin/plugins/" + plugin_id + "/disable", "POST", {})[0] == 303,
+        admin.request(f"/admin/plugins/{plugin_id}/disable", "POST", {})[0] == 303,
         "deactivate plugin",
     )
     check(
@@ -329,12 +329,12 @@ def verify(fixtures):
         "disabled plugin kept affecting public output",
     )
     check(
-        message not in props(public, "/pages/" + page_data["slug"])["item"]["content"],
+        message not in props(public, f"/pages/{page_data['slug']}")["item"]["content"],
         "disabled plugin still rendered content item content",
     )
-    admin.request("/admin/pages/" + str(page_id) + "/delete", "POST", {})
+    admin.request(f"/admin/pages/{str(page_id)}/delete", "POST", {})
     check(
-        admin.request("/admin/plugins/" + plugin_id + "/enable", "POST", {})[0] == 303,
+        admin.request(f"/admin/plugins/{plugin_id}/enable", "POST", {})[0] == 303,
         "reactivate plugin",
     )
 
@@ -356,7 +356,7 @@ def verify(fixtures):
     )
     check(
         any(
-            item["content"] == "Updated module: " + message
+            item["content"] == f"Updated module: {message}"
             for item in props(public, "/")["extensions"]["blocks"]
         ),
         "updating a plugin lost settings or active state",
@@ -393,20 +393,20 @@ def verify(fixtures):
     install(admin, "plugins", frontend_zip)
     frontend_id = "plugin-test-banner"
     check(
-        admin.request("/admin/plugins/" + frontend_id + "/enable", "POST", {})[0] == 422,
+        admin.request(f"/admin/plugins/{frontend_id}/enable", "POST", {})[0] == 422,
         "required settings were ignored",
     )
-    secret = "private-" + secrets.token_hex(12)
+    secret = f"private-{secrets.token_hex(12)}"
     check(
         admin.request(
-            "/admin/plugins/" + frontend_id + "/settings",
+            f"/admin/plugins/{frontend_id}/settings",
             "POST",
             {"message": "Visible", "api_key": secret},
         )[0]
         == 303,
         "save secret setting",
     )
-    secret_page = props(admin, "/admin/plugins/" + frontend_id + "/settings")
+    secret_page = props(admin, f"/admin/plugins/{frontend_id}/settings")
     check(
         secret_page["values"]["api_key"] == "" and secret_page["secrets"]["api_key"],
         "saved secret leaked into page props",
@@ -416,7 +416,7 @@ def verify(fixtures):
     ]
     check(secret not in stored["settings"], "secret was stored in plaintext")
     check(
-        admin.request("/admin/plugins/" + frontend_id + "/enable", "POST", {})[0] == 303,
+        admin.request(f"/admin/plugins/{frontend_id}/enable", "POST", {})[0] == 303,
         "activate frontend plugin",
     )
     assets = props(public, "/")["extensions"]["assets"]
@@ -433,13 +433,13 @@ def verify(fixtures):
         "module assets are not served statelessly",
     )
     check(
-        admin.request("/admin/plugins/" + frontend_id + "/disable", "POST", {})[0] == 303,
+        admin.request(f"/admin/plugins/{frontend_id}/disable", "POST", {})[0] == 303,
         "disable frontend plugin",
     )
     check(public.request(asset["module"])[0] == 404, "disabled plugin assets remain public")
     for identifier in [frontend_id, plugin_id]:
         check(
-            admin.request("/admin/plugins/" + identifier + "/uninstall", "POST", {})[0] == 303,
+            admin.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})[0] == 303,
             "uninstall plugin",
         )
         check(

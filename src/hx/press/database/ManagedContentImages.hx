@@ -11,7 +11,7 @@ import hx.press.model.Setting;
 /** Import the original sample covers without changing article text or edit dates. */
 class ManagedContentImages {
     public static function run():Void {
-        if (Setting.query.find("managed_content_images_v1") != null) {
+        if (Setting.query.where("key", "managed_content_images_v1").exists()) {
             Connection.free();
             return;
         }
@@ -38,7 +38,7 @@ class ManagedContentImages {
                     var dimensions = MediaStorage.dimensions(bytes);
                     if (format == null || dimensions == null
                         || bytes.length > MediaReferences.MAX_BYTES)
-                        throw "Cannot import the existing post image: " + source;
+                        throw 'Cannot import the existing post image: ${source}';
                     imported.set(source, MediaStorage.save(bytes, format, dimensions).url);
                 }
                 item.update(["image" => imported.get(source)]);
@@ -46,7 +46,7 @@ class ManagedContentImages {
             }
             after = items[items.length - 1].id;
         }
-        Setting.query.create(["key" => "managed_content_images_v1", "value" => "1"]);
+        Setting.query.insert(["key" => "managed_content_images_v1", "value" => "1"]);
         Connection.free();
         if (changed)
             ContentCache.contentChanged();

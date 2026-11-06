@@ -83,7 +83,7 @@ class ThemeCollaboration {
         if (live(peer)) {
             peer.session.send(Json.stringify({
                 jsonrpc: "2.0",
-                method: "notifications/haxepress/" + event,
+                method: 'notifications/haxepress/${event}',
                 params: data
             }));
         }

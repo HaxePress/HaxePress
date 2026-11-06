@@ -87,7 +87,7 @@ export default function DesignScopeControls({
         {Object.keys(document.components || {}).length > 0 && (
           <optgroup label={t(friendly ? 'Saved parts' : 'Reusable components')}>
             {Object.entries(document.components || {}).map(([id, component]) => (
-              <option key={id} value={'@' + id}>
+              <option key={id} value={`@${id}`}>
                 {component.name}
               </option>
             ))}

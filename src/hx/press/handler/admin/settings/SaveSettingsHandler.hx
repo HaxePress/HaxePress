@@ -120,7 +120,7 @@ class SaveSettingsHandler extends AbstractHandler implements ValidationResponder
             }
             DBStatic.transaction(() -> {
                 for (key => value in values) {
-                    Setting.query.updateOrCreate(["key" => key], ["value" => value]);
+                    Setting.query.upsert(["key" => key, "value" => value], ["key"], ["value"]);
                 }
             });
 

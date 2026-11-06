@@ -189,18 +189,18 @@ class AdminRoutes extends RouteGroup {
                         capability: "extensions",
                         position: kind == "theme" ? 0 : 10
                     });
-                Route.post(prefix + "/upload",
+                Route.post('${prefix}/upload',
                     request -> PackageController.upload(request, packageKind));
-                Route.post(prefix + "/install",
+                Route.post('${prefix}/install',
                     request -> PackageController.install(request, packageKind));
-                Route.post(prefix + "/discard",
+                Route.post('${prefix}/discard',
                     request -> PackageController.discard(request, packageKind));
-                Route.get(prefix + "/{id}/settings",
+                Route.get('${prefix}/{id}/settings',
                     request -> PackageController.settings(request, packageKind));
-                Route.post(prefix + "/{id}/settings", new SavePackageSettingsHandler(packageKind));
+                Route.post('${prefix}/{id}/settings', new SavePackageSettingsHandler(packageKind));
                 for (action in ["enable", "disable", "uninstall"]) {
                     var packageAction = action;
-                    Route.post(prefix + "/{id}/" + action,
+                    Route.post('${prefix}/{id}/${action}',
                         request -> PackageController.action(request, packageKind, packageAction));
                 }
             }
@@ -212,7 +212,7 @@ class AdminRoutes extends RouteGroup {
                 request -> PackageController.previewContent(request, "/"))
                 .attribute("theme.preview.frame", true);
             Route.get("/themes/{id}/preview/frame/{path}",
-                request -> PackageController.previewContent(request, "/" + request.route("path")))
+                request -> PackageController.previewContent(request, '/${request.route("path")}'))
                 .where("path", ".+")
                 .attribute("theme.preview.frame", true);
             Route.get("/settings", AdminController.settings).attribute("cms.navigation", {

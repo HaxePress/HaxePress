@@ -55,7 +55,7 @@ class BuiltInThemeChecks {
             "key" => token,
             "user_id" => 0,
             "kind" => "theme",
-            "directory" => "staging/" + token,
+            "directory" => 'staging/${token}',
             "manifest" => Resource.getString(BuiltInTheme.RESOURCE),
             "expires_epoch" => Date.now().getTime() + 60000
         ]);

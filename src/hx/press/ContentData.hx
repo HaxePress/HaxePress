@@ -68,11 +68,9 @@ class ContentData {
             query.where("status", "!=", "trash");
         }
         if (search != "") {
-            var pattern = "%"
-                + StringTools.replace(StringTools.replace(StringTools.replace(search, "!", "!!"),
-                    "%", "!%"), "_",
-                    "!_")
-                + "%";
+            var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search, "!",
+                "!!"), "%", "!%"), "_", "!_");
+            var pattern = '%${escaped}%';
             query.where(matches -> {
                 matches.whereLike("title", pattern).orWhereLike("slug", pattern);
             });

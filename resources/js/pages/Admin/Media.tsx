@@ -108,9 +108,7 @@ export default function Media({
               const verified = checked[image.id]?.verified ?? image.references_verified;
               return (
                 <article
-                  className={
-                    'admin-card media-card ' + (selected?.id === image.id ? 'selected' : '')
-                  }
+                  className={`admin-card media-card ${selected?.id === image.id ? 'selected' : ''}`}
                   key={image.id}
                 >
                   <button
@@ -180,7 +178,7 @@ export default function Media({
               onSubmit={(event) => {
                 event.preventDefault();
                 form.transform((values) => ({ ...values, _token: csrfToken }));
-                form.post('/admin/media/' + selected.id + '/save', {
+                form.post(`/admin/media/${selected.id}/save`, {
                   preserveScroll: true,
                   onSuccess: () => setSelected(null),
                 });
@@ -220,12 +218,12 @@ export default function Media({
       <ConfirmDialog
         open={pending !== null}
         busy={busy}
-        message={'Delete “' + (pending?.title || '') + '”? This removes the uploaded file.'}
+        message={`Delete “${pending?.title || ''}”? This removes the uploaded file.`}
         onCancel={() => setPending(null)}
         onConfirm={() => {
           if (!pending) return;
           router.post(
-            '/admin/media/' + pending.id + '/delete',
+            `/admin/media/${pending.id}/delete`,
             { _token: csrfToken },
             {
               preserveScroll: true,

@@ -21,11 +21,11 @@ def run():
 
 def verify(owner, public, fixtures):
     identifier = "theme-simple"
-    url = "/admin/themes/" + identifier
+    url = f"/admin/themes/{identifier}"
     before = fixtures.rows("cms_packages", ["settings"], [("id", "=", identifier)], limit=1)[0][
         "settings"
     ]
-    preview = props(owner, url + "/preview")["preview"]
+    preview = props(owner, f"{url}/preview")["preview"]
     controls = preview["customization"]
     check(controls and len(controls["session"]) == 32, "Theme customization session is missing")
     fields = {field["key"]: field for field in controls["fields"]}
@@ -54,7 +54,7 @@ def verify(owner, public, fixtures):
     )
     check(
         owner.request(
-            url + "/settings", "POST", {**controls["values"], "_context": "preview"}, csrf=False
+            f"{url}/settings", "POST", {**controls["values"], "_context": "preview"}, csrf=False
         )[0]
         == 419,
         "Customization save bypassed CSRF",
@@ -67,10 +67,10 @@ def verify(owner, public, fixtures):
             "button_text_color": "#ffffff",
             "_context": "preview",
         }
-        status, headers, body = owner.request(url + "/settings", "POST", changed)
+        status, headers, body = owner.request(f"{url}/settings", "POST", changed)
         check(
-            status == 303 and headers["location"] == url + "/preview?notice=saved",
-            "Customization save left the preview: " + body[:120],
+            status == 303 and headers["location"] == f"{url}/preview?notice=saved",
+            f"Customization save left the preview: {body[:120]}",
         )
         stored = json.loads(
             fixtures.rows("cms_packages", ["settings"], [("id", "=", identifier)], limit=1)[0][
@@ -86,7 +86,7 @@ def verify(owner, public, fixtures):
             "settings"
         ]
         status, _, _ = owner.request(
-            url + "/settings",
+            f"{url}/settings",
             "POST",
             {**changed, "button_color": "url(https://example.test/unsafe)"},
         )
@@ -98,17 +98,17 @@ def verify(owner, public, fixtures):
             == saved,
             "Rejected customization changed stored values",
         )
-        status, headers, _ = post_json(owner, url + "/settings", {**changed, "width": []}, HEADERS)
+        status, headers, _ = post_json(owner, f"{url}/settings", {**changed, "width": []}, HEADERS)
         check(
-            status == 303 and headers["location"] == url + "/preview",
+            status == 303 and headers["location"] == f"{url}/preview",
             "Native validation lost the preview error context",
         )
         check(
-            props(owner, url + "/preview")["errors"].get("package"),
+            props(owner, f"{url}/preview")["errors"].get("package"),
             "Native preview error flash was lost",
         )
         check(
-            owner.request(url + "/settings", "POST", {**changed, "button_color": ""})[0] == 303,
+            owner.request(f"{url}/settings", "POST", {**changed, "button_color": ""})[0] == 303,
             "Optional custom color could not be cleared",
         )
         check(
@@ -121,7 +121,7 @@ def verify(owner, public, fixtures):
             "Clearing an optional color restored a forced default",
         )
     finally:
-        owner.request(url + "/settings", "POST", {**current, "_context": "preview"})
+        owner.request(f"{url}/settings", "POST", {**current, "_context": "preview"})
 
     synthetic = []
     base = fixtures.rows("cms_packages", ["manifest"], [("id", "=", identifier)], limit=1)[0]
@@ -133,10 +133,10 @@ def verify(owner, public, fixtures):
         ),
     ]:
         suffix = secrets.token_hex(4)
-        package_id = "theme-" + name + "-" + suffix
+        package_id = f"theme-{name}-{suffix}"
         manifest = {
             **json.loads(base["manifest"]),
-            "slug": name + "-" + suffix,
+            "slug": f"{name}-{suffix}",
             "name": name,
             "fields": declared,
         }
@@ -148,7 +148,7 @@ def verify(owner, public, fixtures):
                     "kind": "theme",
                     "slug": manifest["slug"],
                     "name": name,
-                    "name_key": name + suffix,
+                    "name_key": f"{name}{suffix}",
                     "description": "",
                     "author": "",
                     "version": "2.16.0",
@@ -165,14 +165,14 @@ def verify(owner, public, fixtures):
             ],
         )
         synthetic.append(package_id)
-        page = props(owner, "/admin/themes/" + package_id + "/preview")["preview"]
+        page = props(owner, f"/admin/themes/{package_id}/preview")["preview"]
         check(
             page["customization"] is None and "customizeSession" not in page["url"],
             "A theme without public fields exposed customization controls",
         )
     for package_id in synthetic:
         fixtures.delete("cms_packages", [("id", "=", package_id)])
-    check(public.request(url + "/preview")[0] == 303, "Theme customization bypassed admin access")
+    check(public.request(f"{url}/preview")[0] == 303, "Theme customization bypassed admin access")
     print(
         "PASS Theme customization: optional developer fields, secret exclusion, transient preview context, native validation/CSRF, persistence, cache invalidation and inherited colors",
         flush=True,

@@ -22,12 +22,12 @@ class UploadImageHandler extends AbstractHandler {
             return ResponseBuilder.asJson({error: "Your account cannot upload images."}, 403);
         }
         var admin:Admin = auth("admin").user();
-        var credential = "admin:" + request.session.sessionKey;
+        var credential = 'admin:${request.session.sessionKey}';
         try {
             return verification ? ImageUploads.verify(request, admin.id, credential,
                 "") : ImageUploads.stage(request, admin.id, credential, "");
         } catch (error:Dynamic) {
-            trace("Image upload failed: " + Std.string(error));
+            trace('Image upload failed: ${Std.string(error)}');
             return
                 ResponseBuilder.asJson({error: "The image could not be saved. Please try again."},
                     500);

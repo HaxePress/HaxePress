@@ -10,7 +10,7 @@ export default function FriendlyPreview({
 }) {
   return (
     <span
-      className={'easy-mini easy-mini-' + kind}
+      className={`easy-mini easy-mini-${kind}`}
       style={{ '--mini-accent': accent } as CSSProperties}
       aria-hidden="true"
     >

@@ -230,8 +230,8 @@ class CmsSchema {
                 table -> table.index(["author_id", "content_type", "status", "updated_at", "id"],
                     "cms_author_cursor"));
         }
-        if (Setting.query.find("cms_schema_v1") == null) {
-            Setting.query.create(["key" => "cms_schema_v1", "value" => "1"]);
+        if (!Setting.query.where("key", "cms_schema_v1").exists()) {
+            Setting.query.insert(["key" => "cms_schema_v1", "value" => "1"]);
             ContentCache.contentChanged();
         }
     }

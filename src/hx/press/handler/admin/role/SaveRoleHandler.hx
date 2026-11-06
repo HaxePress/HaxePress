@@ -73,7 +73,7 @@ class SaveRoleHandler extends AbstractHandler implements ValidationResponder {
                 AdminController.input(request, "description", 501),
                 request.input("enabled", "0") == "1", grants, creating);
             Activity.record("saved", "role", 0, key);
-            return ResponseBuilder.asRedirect("/admin/roles/" + key + "/edit?notice=saved", 303);
+            return ResponseBuilder.asRedirect('/admin/roles/${key}/edit?notice=saved', 303);
         } catch (error:Dynamic) {
             return RoleController.editor(request, creating, Std.string(error), 422);
         }

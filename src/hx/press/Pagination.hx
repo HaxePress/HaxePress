@@ -89,8 +89,8 @@ class Pagination {
         var pairs = [];
         for (key => value in values) {
             if (value != "")
-                pairs.push(StringTools.urlEncode(key) + "=" + StringTools.urlEncode(value));
+                pairs.push('${StringTools.urlEncode(key)}=${StringTools.urlEncode(value)}');
         }
-        return path + "?" + pairs.join("&");
+        return '${path}?${pairs.join("&")}';
     }
 }

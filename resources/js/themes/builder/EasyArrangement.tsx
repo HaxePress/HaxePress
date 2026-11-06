@@ -31,7 +31,7 @@ function LengthControl({
               onChange(
                 event.target.value === ''
                   ? ''
-                  : event.target.value + (unit === 'custom' ? '' : unit || 'px'),
+                  : `${event.target.value}${unit === 'custom' ? '' : unit || 'px'}`,
               )
             }
           />
@@ -42,7 +42,7 @@ function LengthControl({
           onChange={(event) => {
             const next = event.target.value;
             if (!next || next === 'auto') onChange(next);
-            else if (next !== 'custom') onChange((parsed?.[1] || '0') + next);
+            else if (next !== 'custom') onChange(`${parsed?.[1] || '0'}${next}`);
           }}
         >
           <option value="">{t('Automatic')}</option>
@@ -213,7 +213,7 @@ export default function EasyArrangement({
                 placeholder={t('Automatic')}
                 value={/^\d+px$/.test(values.padding || '') ? parseInt(values.padding, 10) : ''}
                 onChange={(event) =>
-                  onStyle('padding', event.target.value ? event.target.value + 'px' : '')
+                  onStyle('padding', event.target.value ? `${event.target.value}px` : '')
                 }
               />
             </label>
@@ -226,7 +226,7 @@ export default function EasyArrangement({
                 placeholder={t('Automatic')}
                 value={/^-?\d+px$/.test(values.margin || '') ? parseInt(values.margin, 10) : ''}
                 onChange={(event) =>
-                  onStyle('margin', event.target.value ? event.target.value + 'px' : '')
+                  onStyle('margin', event.target.value ? `${event.target.value}px` : '')
                 }
               />
             </label>

@@ -67,7 +67,7 @@ export function createContentIndex(
           />
           <div className="results-meta">
             <p>{t('Result count', { count: resultCount })}</p>
-            <Link href={archiveUrl + (tag ? '?tag=' + tag.slug + '&type=' + collection.key : '')}>
+            <Link href={`${archiveUrl}${tag ? `?tag=${tag.slug}&type=${collection.key}` : ''}`}>
               {t('Clear search')}
             </Link>
           </div>

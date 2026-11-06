@@ -31,7 +31,7 @@ export function previewHref(
   if (locale) url.searchParams.set('lang', locale);
   if (customizeSession) url.searchParams.set('customizeSession', customizeSession);
   const pathname = url.pathname === '/' ? '' : url.pathname;
-  return base + pathname + url.search + url.hash;
+  return `${base}${pathname}${url.search}${url.hash}`;
 }
 
 export function useSiteHref() {

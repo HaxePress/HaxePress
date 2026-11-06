@@ -226,8 +226,7 @@ export default function Editor({
       end = element?.selectionEnd ?? start;
     form.setData((previous) => ({
       ...previous,
-      content:
-        previous.content.slice(0, start) + prefix + text + suffix + previous.content.slice(end),
+      content: `${previous.content.slice(0, start)}${prefix}${text}${suffix}${previous.content.slice(end)}`,
     }));
     requestAnimationFrame(() => {
       element?.focus();
@@ -287,7 +286,7 @@ export default function Editor({
         status('Cover image uploaded.');
       } else {
         const prefix = (textarea.current?.selectionStart ?? 0) > 0 ? '\n\n![' : '![';
-        insert(prefix, description, '](' + data.url + ')\n\n', true);
+        insert(prefix, description, `](${data.url})\n\n`, true);
         status('Image added. Edit the selected text to describe it.');
       }
     } catch (error) {
@@ -304,7 +303,7 @@ export default function Editor({
   const uploadMessage = (kind: UploadTarget) =>
     feedback[kind] && (
       <p
-        className={'upload-status ' + (uploadError === kind ? 'error' : '')}
+        className={`upload-status ${uploadError === kind ? 'error' : ''}`}
         role="status"
         aria-live="polite"
       >
@@ -315,7 +314,7 @@ export default function Editor({
     <>
       <PageHead title={label(isNew ? 'create' : 'edit')} admin />
       <form
-        action={base + '/save'}
+        action={`${base}/save`}
         method="post"
         id="content-editor"
         onKeyDown={(event) => {
@@ -332,7 +331,7 @@ export default function Editor({
             featured: data.featured ? '1' : '0',
             _token: csrfToken,
           }));
-          form.post(base + '/save', {
+          form.post(`${base}/save`, {
             preserveState: 'errors',
             onFinish: () => {
               submitting.current = false;
@@ -401,7 +400,7 @@ export default function Editor({
                 onClick={() => {
                   submitting.current = true;
                   router.post(
-                    base + '/' + (item.id || 0) + '/discard-working',
+                    `${base}/${item.id || 0}/discard-working`,
                     { _token: csrfToken, draft_key: draftKey },
                     { preserveState: false },
                   );
@@ -458,7 +457,7 @@ export default function Editor({
           </div>
         </div>
         <div className="editor-grid">
-          <div className={'editor-content ' + (mode === 'split' ? 'editor-split' : '')}>
+          <div className={`editor-content ${mode === 'split' ? 'editor-split' : ''}`}>
             <section className="admin-card editor-writing" hidden={preview}>
               <label htmlFor="content-title">{label('title')}</label>
               <input
@@ -889,7 +888,7 @@ export default function Editor({
             insert(
               '\n\n![',
               image.alt.replace(/[\[\]\r\n]/g, ' ') || 'Image description',
-              '](' + image.url + ')\n\n',
+              `](${image.url})\n\n`,
             );
           }
         }}

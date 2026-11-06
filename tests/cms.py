@@ -75,7 +75,7 @@ def verify_packages(fixtures):
     inspected = fixtures.call("inspect_package", archive=package_archive(entries))
     check(inspected["manifest"]["slug"] == manifest["slug"], "valid plugin manifest")
     check(inspected["manifest"]["hooks"] == ["site.assets"], "asset hooks were not registered")
-    nested = [("reading-companion/" + name, content) for name, content in entries]
+    nested = [(f"reading-companion/{name}", content) for name, content in entries]
     check(
         fixtures.call("inspect_package", archive=package_archive(nested))["manifest"]["name"]
         == manifest["name"],
@@ -97,7 +97,7 @@ def verify_packages(fixtures):
         except RuntimeError:
             pass
         else:
-            raise AssertionError("Invalid plugin package was accepted: " + invalid[-1][0])
+            raise AssertionError(f"Invalid plugin package was accepted: {invalid[-1][0]}")
     work = Path(os.environ["TEST_DB_PATH"]).parent.parent
     check(not (work / "outside.txt").exists(), "package extraction escaped its staging directory")
     example = Path(__file__).resolve().parents[1] / "Export/packages/reading-companion-2.16.0.zip"
@@ -121,8 +121,8 @@ def verify_transaction_boundary(fixtures):
     keys = []
     try:
         for rollback in [False, True]:
-            before = "cms-tx-before-" + str(rollback) + suffix
-            after = "cms-tx-after-" + str(rollback) + suffix
+            before = f"cms-tx-before-{str(rollback)}{suffix}"
+            after = f"cms-tx-after-{str(rollback)}{suffix}"
             keys.extend([before, after])
             fixtures.call(
                 "transaction_boundary", beforeKey=before, afterKey=after, rollback=rollback
@@ -145,7 +145,7 @@ def verify_transaction_boundary(fixtures):
 
 def props(client, route):
     status, _, body = client.request(route, extra_headers=HEADERS)
-    check(status == 200, "CMS page failed: " + route + " " + body[:200])
+    check(status == 200, f"CMS page failed: {route} {body[:200]}")
     return json.loads(body)["props"]
 
 
@@ -173,8 +173,8 @@ def verify_tags(fixtures):
         "CMS login",
     )
     suffix = secrets.token_hex(5)
-    name = "Mindful days " + suffix
-    slug = "mindful-days-" + suffix
+    name = f"Mindful days {suffix}"
+    slug = f"mindful-days-{suffix}"
     tag = {"name": name, "slug": slug, "description": "Content about a more considered everyday."}
     check(public.request("/admin/tags")[0] == 303, "tags bypassed the admin guard")
     check(
@@ -193,10 +193,10 @@ def verify_tags(fixtures):
     else:
         raise AssertionError("Missing tag references were accepted by the database")
     check(admin.request("/admin/tags/save", "POST", tag)[0] == 422, "duplicate tag accepted")
-    invalid = {**tag, "name": name + " invalid", "slug": "bad/path"}
+    invalid = {**tag, "name": f"{name} invalid", "slug": "bad/path"}
     check(admin.request("/admin/tags/save", "POST", invalid)[0] == 422, "invalid tag slug accepted")
 
-    content_slug = "cms-tagged-content-" + suffix
+    content_slug = f"cms-tagged-content-{suffix}"
     content = {
         "title": "A content item connected by an idea",
         "slug": content_slug,
@@ -215,29 +215,29 @@ def verify_tags(fixtures):
         check(
             admin.request("/admin/content/save", "POST", content)[0] == 303, "save tag assignment"
         )
-        stored = props(admin, "/admin/content?q=" + content_slug)["items"][0]
+        stored = props(admin, f"/admin/content?q={content_slug}")["items"][0]
         content_id = stored["id"]
         content["id"] = str(content_id)
-        editor = props(admin, "/admin/content/" + str(content_id) + "/edit")["item"]
+        editor = props(admin, f"/admin/content/{str(content_id)}/edit")["item"]
         check([item["id"] for item in editor["tags"]] == [tag_id], "editor lost assigned tags")
-        check(props(public, "/tags/" + slug)["items"] == [], "tag archive exposed a draft")
+        check(props(public, f"/tags/{slug}")["items"] == [], "tag archive exposed a draft")
         content["status"] = "published"
         check(
             admin.request("/admin/content/save", "POST", content)[0] == 303,
             "publish tagged content item",
         )
-        archive = props(public, "/tags/" + slug)
+        archive = props(public, f"/tags/{slug}")
         check([item["id"] for item in archive["items"]] == [content_id], "tag archive is stale")
-        detail = props(public, "/content/" + content_slug)["item"]
+        detail = props(public, f"/content/{content_slug}")["item"]
         check(detail["tags"][0]["name"] == name, "public content item lost tag labels")
-        renamed = {**tag, "id": str(tag_id), "name": name + " revised", "slug": slug + "-revised"}
+        renamed = {**tag, "id": str(tag_id), "name": f"{name} revised", "slug": f"{slug}-revised"}
         check(admin.request("/admin/tags/save", "POST", renamed)[0] == 303, "rename assigned tag")
-        check(public.request("/tags/" + slug)[0] == 404, "old tag slug remained cached")
+        check(public.request(f"/tags/{slug}")[0] == 404, "old tag slug remained cached")
         check(
-            len(props(public, "/tags/" + renamed["slug"])["items"]) == 1, "tag rename lost content"
+            len(props(public, f"/tags/{renamed['slug']}")["items"]) == 1, "tag rename lost content"
         )
         check(
-            props(public, "/content/" + content_slug)["item"]["tags"][0]["name"] == renamed["name"],
+            props(public, f"/content/{content_slug}")["item"]["tags"][0]["name"] == renamed["name"],
             "tag rename left a stale detail label",
         )
         invalid_status, _, invalid_body = admin.request(
@@ -245,33 +245,31 @@ def verify_tags(fixtures):
         )
         check(
             invalid_status == 422,
-            "missing tag assignment returned " + str(invalid_status) + ": " + invalid_body[:300],
+            f"missing tag assignment returned {str(invalid_status)}: {invalid_body[:300]}",
         )
         remove_status, remove_headers, remove_body = admin.request(
-            "/admin/tags/" + str(tag_id) + "/delete", "POST", {}
+            f"/admin/tags/{str(tag_id)}/delete", "POST", {}
         )
         check(
             remove_status == 303,
-            "delete assigned tag returned "
-            + str(remove_status)
-            + ": "
-            + str(remove_headers)
-            + " "
-            + remove_body[:1000],
+            (
+                f"delete assigned tag returned {str(remove_status)}: {str(remove_headers)} "
+                f"{remove_body[:1000]}"
+            ),
         )
         check(
-            props(public, "/content/" + content_slug)["item"]["tags"] == [],
+            props(public, f"/content/{content_slug}")["item"]["tags"] == [],
             "deleted tag remained on content",
         )
-        deleted_status, _, deleted_body = public.request("/tags/" + renamed["slug"])
+        deleted_status, _, deleted_body = public.request(f"/tags/{renamed['slug']}")
         check(
             deleted_status == 404,
-            "deleted tag archive returned " + str(deleted_status) + ": " + deleted_body[:300],
+            f"deleted tag archive returned {str(deleted_status)}: {deleted_body[:300]}",
         )
     finally:
         if content_id is not None:
-            admin.request("/admin/content/" + str(content_id) + "/delete", "POST", {})
-        admin.request("/admin/tags/" + str(tag_id) + "/delete", "POST", {})
+            admin.request(f"/admin/content/{str(content_id)}/delete", "POST", {})
+        admin.request(f"/admin/tags/{str(tag_id)}/delete", "POST", {})
     print(
         "PASS CMS tags: guarded CRUD, assignment, draft privacy, public archives and rename/delete cache coherence",
         flush=True,

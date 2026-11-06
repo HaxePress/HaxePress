@@ -29,9 +29,10 @@ class BootProvider extends AbstractProvider {
         Inertia.resolveUrlUsing(request -> {
             var pairs = [
                 for (key => value in request.queries)
-                    StringTools.urlEncode(key) + "=" + StringTools.urlEncode(value)
+                    '${StringTools.urlEncode(key)}=${StringTools.urlEncode(value)}'
             ];
-            return request.path + (pairs.length == 0 ? "" : "?" + pairs.join("&"));
+            var query = pairs.length == 0 ? "" : '?${pairs.join("&")}';
+            return '${request.path}${query}';
         });
         InstallationRoutes.register();
         Route.get("/", SiteController.home);

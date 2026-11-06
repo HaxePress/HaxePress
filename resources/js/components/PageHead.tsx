@@ -20,8 +20,8 @@ export default function PageHead({
     document.documentElement.lang = locale;
     document.documentElement.dir = direction;
   }, [locale, direction]);
-  const administration = admin ? ' ' + t('Administration') : '';
-  const pageTitle = exactTitle ? title : title + ' — ' + site.site_name + administration;
+  const administration = admin ? ` ${t('Administration')}` : '';
+  const pageTitle = exactTitle ? title : `${title} — ${site.site_name}${administration}`;
   return (
     <Head title={pageTitle}>
       <meta head-key="description" name="description" content={description || site.description} />

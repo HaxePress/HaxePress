@@ -31,10 +31,10 @@ def main():
             "-q",
             "-f",
             str(ROOT / "tests/undertow-pom.xml"),
-            "-Dmaven.repo.local=" + str(ROOT / ".tools/maven-cache"),
+            f"-Dmaven.repo.local={str(ROOT / '.tools/maven-cache')}",
             "dependency:copy-dependencies",
             "-DincludeScope=runtime",
-            "-DoutputDirectory=" + str(dependencies),
+            f"-DoutputDirectory={str(dependencies)}",
         ],
         cwd=ROOT,
         check=True,
@@ -67,15 +67,13 @@ def main():
             "APP_NAME": "haxepress_test",
             "PORT": str(port),
         }
-        (work / ".env").write_text(
-            "".join(key + "=" + value + "\n" for key, value in values.items())
-        )
+        (work / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         (work / ".env").chmod(0o600)
         with (work / "server.log").open("w+") as log:
             server = subprocess.Popen(
                 ["java", "-jar", str(binary)], cwd=work, stdout=log, stderr=subprocess.STDOUT
             )
-            base = "http://127.0.0.1:" + str(port)
+            base = f"http://127.0.0.1:{str(port)}"
             try:
                 deadline = time.monotonic() + 20
                 while time.monotonic() < deadline:
@@ -88,7 +86,7 @@ def main():
                         time.sleep(0.1)
                 else:
                     raise RuntimeError("Undertow probe did not start")
-                print("Undertow: " + json.dumps(run(base, blocked=False)), flush=True)
+                print(f"Undertow: {json.dumps(run(base, blocked=False))}", flush=True)
             except Exception:
                 log.flush()
                 log.seek(0)

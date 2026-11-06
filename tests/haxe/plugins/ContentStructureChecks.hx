@@ -24,10 +24,10 @@ class ContentStructureChecks {
     }
 
     public static function run(token:String):Void {
-        var slug = "structure-" + token;
-        var owner = "plugin-" + slug;
-        var key = "structure_" + token;
-        var role = "structure_role_" + token;
+        var slug = 'structure-${token}';
+        var owner = 'plugin-${slug}';
+        var key = 'structure_${token}';
+        var role = 'structure_role_${token}';
         InstalledPackage.query.create([
             "id" => owner,
             "kind" => "plugin",
@@ -112,22 +112,32 @@ class ContentStructureChecks {
         var listed = ContentFields.listValues(projected, type, true);
         check(listed.amount == 0 && listed.enabled == false, "Native correlated field projections");
         Roles.save(role, "Probe role", "", true, [type.capability], true);
+        check(Roles.exists(role) && Roles.canAssign("owner", role), "Active role assignment");
         check(Roles.can(role, type.capability) && !Roles.can(role, "settings"),
             "Native role grants");
         check(!Roles.canAssign(role, "owner"), "Native permission ceiling");
+        Roles.save(role, "Probe role", "", false, [type.capability]);
+        check(!Roles.exists(role) && Roles.exists(role, false), "Disabled role visibility");
+        check(Roles.canManage("owner", role) && !Roles.canAssign("owner", role),
+            "A disabled target can be managed without being assigned");
+        check(!Roles.canManage(role, role), "A disabled actor cannot manage roles");
+        Roles.save(role, "Probe role", "", true, [type.capability]);
+        check(Roles.exists(role) && Roles.canAssign("owner", role), "Reactivated role assignment");
         ContentType.query.where("key", key).update(["name" => "Customized records"]);
         ContentCache.changed("structure");
         ContentTypes.register(slug, input);
         check(ContentTypes.find(key).name == "Customized records",
             "Plugin registration overwrote site customization");
+        check(ContentTypes.exists(key), "Active owner did not expose its collection");
         InstalledPackage.query.where("id", owner).update(["enabled" => 0]);
         ContentCache.changed("extensions");
-        check(ContentTypes.find(key) == null, "Inactive owner still exposed its collection");
+        check(!ContentTypes.exists(key) && ContentTypes.exists(key, false),
+            "Inactive owner still exposed its collection");
         check(ContentValue.query.where("content_id", item.id).count() == 2,
             "Inactive owner lost structured data");
         InstalledPackage.query.where("id", owner).update(["enabled" => 1]);
         ContentCache.changed("extensions");
-        check(ContentTypes.find(key) != null, "Reactivated owner did not restore its collection");
+        check(ContentTypes.exists(key), "Reactivated owner did not restore its collection");
         ContentValue.query.where("content_id", item.id).delete();
         item.delete();
         Roles.remove(role);

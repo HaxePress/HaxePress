@@ -63,7 +63,7 @@ export default function ContentIndex({
       <div className="simple-results">
         <p>{t('Result count', { count: resultCount })}</p>
         {filtered && (
-          <Link href={archiveUrl + (tag ? '?tag=' + tag.slug + '&type=' + collection.key : '')}>
+          <Link href={`${archiveUrl}${tag ? `?tag=${tag.slug}&type=${collection.key}` : ''}`}>
             {t('Clear search')}
           </Link>
         )}

@@ -24,7 +24,7 @@ export default function ExtensionSettings({
 }) {
   const { t } = useTranslation(packageInfo.id);
   const { csrfToken, errors } = usePage<SharedProps>().props;
-  const base = '/admin/' + (kind === 'theme' ? 'themes' : 'plugins');
+  const base = `/admin/${kind === 'theme' ? 'themes' : 'plugins'}`;
   const form = useForm<Record<string, string>>(values);
   return (
     <>
@@ -47,7 +47,7 @@ export default function ExtensionSettings({
         onSubmit={(event) => {
           event.preventDefault();
           form.transform((data) => ({ ...data, _token: csrfToken }));
-          form.post(base + '/' + packageInfo.id + '/settings', { preserveScroll: true });
+          form.post(`${base}/${packageInfo.id}/settings`, { preserveScroll: true });
         }}
       >
         {fields.map((field) => (
@@ -58,8 +58,8 @@ export default function ExtensionSettings({
             value={form.data[field.key] || ''}
             onChange={(value) => form.setData(field.key, value)}
             secretSaved={secrets[field.key]}
-            clearSecret={form.data['clear_' + field.key] === '1'}
-            onClearSecret={(clear) => form.setData('clear_' + field.key, clear ? '1' : '0')}
+            clearSecret={form.data[`clear_${field.key}`] === '1'}
+            onClearSecret={(clear) => form.setData(`clear_${field.key}`, clear ? '1' : '0')}
           />
         ))}
         <button className="button" disabled={form.processing}>

@@ -12,7 +12,7 @@ class InstallationEnv {
         }
         var escaped = StringTools.replace(value, "\\", "\\\\");
         escaped = StringTools.replace(escaped, "'", "\\'");
-        return "'" + escaped + "'";
+        return '\'${escaped}\'';
     }
 
     public static function prepare(values:Map<String, String>):String {
@@ -28,7 +28,7 @@ class InstallationEnv {
             if (match.match(line) && values.exists(match.matched(1))) {
                 var key = match.matched(1);
                 if (remaining.exists(key)) {
-                    lines.push(key + "=" + quoted(remaining.get(key)));
+                    lines.push('${key}=${quoted(remaining.get(key))}');
                     remaining.remove(key);
                 }
             } else {
@@ -36,10 +36,10 @@ class InstallationEnv {
             }
         }
         for (key => value in remaining) {
-            lines.push(key + "=" + quoted(value));
+            lines.push('${key}=${quoted(value)}');
         }
-        var path = ".env.install-" + SecureToken.generate(16);
-        disk.put(path, lines.join("\n") + "\n", "private");
+        var path = '.env.install-${SecureToken.generate(16)}';
+        disk.put(path, '${lines.join("\n")}\n', "private");
         return path;
     }
 

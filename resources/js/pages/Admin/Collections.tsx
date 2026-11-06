@@ -108,7 +108,7 @@ export default function Collections({
                         <span>
                           <strong>
                             {active ? (
-                              <Link href={'/admin/' + type.admin_path}>{t(type.name)}</Link>
+                              <Link href={`/admin/${type.admin_path}`}>{t(type.name)}</Link>
                             ) : (
                               t(type.name)
                             )}
@@ -121,7 +121,7 @@ export default function Collections({
                     </td>
                     <td>{type.items}</td>
                     <td>
-                      <span className={'status ' + (active ? 'published' : 'draft')}>
+                      <span className={`status ${active ? 'published' : 'draft'}`}>
                         {!active ? t('Disabled') : type.public_visible ? t('Public') : t('Private')}
                       </span>
                     </td>
@@ -133,7 +133,7 @@ export default function Collections({
                         {active && (
                           <Link
                             className="button button-outline"
-                            href={'/admin/' + type.admin_path}
+                            href={`/admin/${type.admin_path}`}
                           >
                             {t('Open collection')}
                           </Link>
@@ -141,7 +141,7 @@ export default function Collections({
                         {canManage && (
                           <Link
                             className="icon-button"
-                            href={'/admin/content-types/' + type.key + '/edit'}
+                            href={`/admin/content-types/${type.key}/edit`}
                             aria-label={t('Configure {name}', { name: type.name })}
                           >
                             <Icon name="settings" />

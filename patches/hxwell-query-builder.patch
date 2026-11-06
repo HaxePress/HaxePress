@@ -131,15 +131,15 @@ diff --git a/src/hx/well/database/query/InsertQueryBuilder.hx b/src/hx/well/data
 +            }
 +        }
 +        var statement = toString(query, columns.iterator());
-+        var assignments = update.map(column -> QueryIdentifier.quote(column) + " = ?");
++        var assignments = update.map(column -> '${QueryIdentifier.quote(column)} = ?').join(", ");
 +        return switch (Connection.driver(query.model.__connection)) {
 +            case "sqlite":
 +                var conflict = uniqueBy.map(QueryIdentifier.quote).join(", ");
-+                statement + " ON CONFLICT (" + conflict + ") DO UPDATE SET " + assignments.join(", ");
++                '${statement} ON CONFLICT (${conflict}) DO UPDATE SET ${assignments}';
 +            case "mysql":
-+                statement + " ON DUPLICATE KEY UPDATE " + assignments.join(", ");
++                '${statement} ON DUPLICATE KEY UPDATE ${assignments}';
 +            case driver:
-+                throw new Exception("Upsert is not supported by database driver: " + driver);
++                throw new Exception('Upsert is not supported by database driver: ${driver}');
 +        };
 +    }
 +
@@ -147,14 +147,14 @@ diff --git a/src/hx/well/database/query/InsertQueryBuilder.hx b/src/hx/well/data
 +    public static function legacyUpsert<T>(query:QueryBuilder<T>, columns:Array<String>,
 +            uniqueBy:Array<String>, update:Array<String>):Array<String> {
 +        var table = QueryIdentifier.quote(query.model.getTable());
-+        var predicate = uniqueBy.map(column -> QueryIdentifier.quote(column) + " = ?").join(" AND ");
-+        var assignments = update.map(column -> QueryIdentifier.quote(column) + " = ?").join(", ");
++        var predicate = uniqueBy.map(column -> '${QueryIdentifier.quote(column)} = ?').join(" AND ");
++        var assignments = update.map(column -> '${QueryIdentifier.quote(column)} = ?').join(", ");
 +        var projection = columns.map(QueryIdentifier.quote).join(", ");
 +        var placeholders = columns.map(_ -> "?").join(", ");
++        var exists = 'SELECT 1 FROM ${table} WHERE ${predicate}';
 +        return [
-+            "UPDATE " + table + " SET " + assignments + " WHERE " + predicate,
-+            "INSERT INTO " + table + " (" + projection + ") SELECT " + placeholders
-+                + " WHERE NOT EXISTS (SELECT 1 FROM " + table + " WHERE " + predicate + ")"
++            'UPDATE ${table} SET ${assignments} WHERE ${predicate}',
++            'INSERT INTO ${table} (${projection}) SELECT ${placeholders} WHERE NOT EXISTS (${exists})'
 +        ];
 +    }
 +}
@@ -434,9 +434,9 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
 +            throw new Exception('Invalid sort direction: ${direction}');
 +        var ordering = '$column $direction';
 +        if (this.orderByClause == "") {
-+            this.orderByClause = "ORDER BY " + ordering;
++            this.orderByClause = 'ORDER BY ${ordering}';
 +        } else {
-+            this.orderByClause += ", " + ordering;
++            this.orderByClause += ', ${ordering}';
 +        }
          return this;
      }
@@ -505,7 +505,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
 +        var previousLimit = limitValue;
 +        var previousOrdering = orderByClause;
 +        var previousDistinct = distinctValue;
-+        var distinctColumn = previousDistinct ? "DISTINCT " + reference : reference;
++        var distinctColumn = previousDistinct ? 'DISTINCT ${reference}' : reference;
 +        columns = ['COALESCE(SUM($distinctColumn), 0) AS aggregate_value'];
 +        selectValues = [];
 +        limitValue = -1;
@@ -655,7 +655,7 @@ diff --git a/src/hx/well/database/query/QueryIdentifier.hx b/src/hx/well/databas
 -            return reference(alias.matched(1)) + " AS " + alias.matched(2);
 -        if(value == "*")
 +        if (alias.match(value))
-+            return reference(alias.matched(1)) + " AS " + quote(alias.matched(2));
++            return '${reference(alias.matched(1))} AS ${quote(alias.matched(2))}';
 +        if (value == "*")
              return value;
 -        if(StringTools.endsWith(value, ".*"))
@@ -876,7 +876,7 @@ diff --git a/src/hx/well/database/schema/MysqlSchemaGrammar.hx b/src/hx/well/dat
          return 'ALTER TABLE ${quote(table)} ADD PRIMARY KEY (${quoteList(columns)})';
      }
  
-@@ -153,19 +171,32 @@
+@@ -153,19 +171,31 @@
      }
  
      public override function compileTableExists(table:String):String {
@@ -905,11 +905,10 @@ diff --git a/src/hx/well/database/schema/MysqlSchemaGrammar.hx b/src/hx/well/dat
 +
 +    public override function compileForeignKeyListing(table:String):String {
 +        quote(table);
-+        return
-+            "SELECT CONSTRAINT_NAME AS name, COLUMN_NAME AS column_name, REFERENCED_TABLE_NAME AS foreign_table, REFERENCED_COLUMN_NAME AS foreign_column, ORDINAL_POSITION AS position FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '"
-+            + escapeString(table)
-+            +
-+            "' AND REFERENCED_TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION";
++        var columns = "CONSTRAINT_NAME AS name, COLUMN_NAME AS column_name, REFERENCED_TABLE_NAME AS foreign_table, REFERENCED_COLUMN_NAME AS foreign_column, ORDINAL_POSITION AS position";
++        var source = "information_schema.KEY_COLUMN_USAGE";
++        var condition = 'TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'${escapeString(table)}\' AND REFERENCED_TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL';
++        return 'SELECT ${columns} FROM ${source} WHERE ${condition} ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION';
      }
  
      public override function compileEnableForeignKeyConstraints():String {
@@ -1400,14 +1399,13 @@ diff --git a/src/hx/well/database/schema/SqliteTableDefinition.hx b/src/hx/well/
              return null;
          return identifier.name;
      }
-@@ -104,10 +108,17 @@
+@@ -104,10 +108,16 @@
          }
          if (token == null)
              throw new Exception("Unable to parse index definition.");
 -        return sql.substring(0, token.start) + hx.well.database.query.QueryIdentifier.quote(name) + sql.substring(token.end);
-+        return sql.substring(0, token.start)
-+            + QueryIdentifier.quote(name)
-+            + sql.substring(token.end);
++        var quoted = QueryIdentifier.quote(name);
++        return '${sql.substring(0, token.start)}${quoted}${sql.substring(token.end)}';
      }
  
 -    private static function readIdentifier(text:String, position:Int):Null<{name:String, quoted:Bool, start:Int, end:Int}> {
@@ -1420,13 +1418,13 @@ diff --git a/src/hx/well/database/schema/SqliteTableDefinition.hx b/src/hx/well/
          var i = position;
          while (i < text.length) {
              if (text.isSpace(i))
-@@ -126,22 +137,36 @@
+@@ -126,22 +136,36 @@
          if (code == "'".code || code == '"'.code || code == "`".code) {
              var quote = text.charAt(i);
              var end = skipQuoted(text, i, code);
 -            return {name: text.substring(i + 1, end - 1).replace(quote + quote, quote), quoted: true, start: i, end: end};
 +            return {
-+                name: text.substring(i + 1, end - 1).replace(quote + quote, quote),
++                name: text.substring(i + 1, end - 1).replace('${quote}${quote}', quote),
 +                quoted: true,
 +                start: i,
 +                end: end

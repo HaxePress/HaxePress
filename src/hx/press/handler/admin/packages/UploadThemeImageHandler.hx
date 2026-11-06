@@ -35,8 +35,7 @@ class UploadThemeImageHandler extends AbstractHandler {
             return ResponseBuilder.asJson({error: "This theme is no longer available."}, 404);
         }
         var userId = ai ? actor.id : (cast auth("admin").user() : Admin).id;
-        var credential = ai ? "ai:" + request.header("Authorization", "") : "admin:"
-            + request.session.sessionKey;
+        var credential = ai ? 'ai:${request.header("Authorization", "")}' : 'admin:${request.session.sessionKey}';
         try {
             return verification ? ImageUploads.verify(request, userId, credential,
                 themeId) : ImageUploads.stage(request, userId, credential, themeId, 422);

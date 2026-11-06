@@ -35,7 +35,7 @@ class MediaTestHandler extends AbstractHandler {
             case "detach":
                 MediaLocks.run(() -> {
                     MediaAttachment.query.where("key", key).delete();
-                    dependencies.forget("attachment:" + key);
+                    dependencies.forget('attachment:${key}');
                     database.forget(key, "gallery");
                     return true;
                 });
@@ -47,7 +47,7 @@ class MediaTestHandler extends AbstractHandler {
                         return true;
                     });
                 } else {
-                    dependencies.withReferences("attachment:" + key, [id], () -> {
+                    dependencies.withReferences('attachment:${key}', [id], () -> {
                         MediaAttachment.query.updateOrCreate(["key" => key], ["media_id" => id]);
                         return true;
                     });

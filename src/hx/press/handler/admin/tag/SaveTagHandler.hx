@@ -82,8 +82,8 @@ class SaveTagHandler extends AbstractHandler implements ValidationResponder {
         ];
         if (existing == null) {
             values.set("created_at", SiteSettingsStore.timestamp());
-            var created = Tag.query.create(values);
-            Activity.record("created", "tag", created.id, name);
+            var createdId = Tag.query.insert(values);
+            Activity.record("created", "tag", createdId, name);
         } else {
             existing.update(values);
             Activity.record("updated", "tag", existing.id, name);

@@ -49,7 +49,7 @@ export default function RoleEditor({
     const abort = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch('/admin/roles/capabilities?q=' + encodeURIComponent(query), {
+        const response = await fetch(`/admin/roles/capabilities?q=${encodeURIComponent(query)}`, {
           signal: abort.signal,
         });
         if (!response.ok) throw new Error('Capabilities could not be loaded.');
@@ -67,7 +67,7 @@ export default function RoleEditor({
       abort.abort();
     };
   }, [query, choices]);
-  const path = isNew ? '/admin/roles/create' : '/admin/roles/' + definition?.key + '/save';
+  const path = isNew ? '/admin/roles/create' : `/admin/roles/${definition?.key}/save`;
   return (
     <>
       <PageHead title={isNew ? t('New role') : t('Edit role')} admin />
@@ -145,7 +145,7 @@ export default function RoleEditor({
                 className="button button-outline danger"
                 onClick={() => {
                   if (window.confirm(t('Remove this unused role?')))
-                    router.post('/admin/roles/' + definition?.key + '/delete', {
+                    router.post(`/admin/roles/${definition?.key}/delete`, {
                       _token: csrfToken,
                     });
                 }}

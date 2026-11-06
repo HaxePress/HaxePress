@@ -25,7 +25,7 @@ typedef ContentFieldFilter = {
 /** Bounded custom values stay out of list projections and participate in native queries. */
 class ContentFields {
     static function alias(key:String):String {
-        return "__cms_field_" + key;
+        return '__cms_field_${key}';
     }
 
     public static function projectList(query:QueryBuilder<ContentItem>,
@@ -142,7 +142,7 @@ class ContentFields {
         switch (field.kind) {
             case "boolean":
                 if (!Std.isOfType(value, Bool)) {
-                    throw new Exception("Choose a valid boolean value for " + field.label + ".");
+                    throw new Exception('Choose a valid boolean value for ${field.label}.');
                 }
                 return value;
             case "number":
@@ -152,29 +152,29 @@ class ContentFields {
                     || Math.abs(number) > 1000000000000.0
                     || (!(value is Int) && !(value is Float)
                         && !~/^-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$/.match(Std.string(value)))) {
-                    throw new Exception("Enter a valid number for " + field.label + ".");
+                    throw new Exception('Enter a valid number for ${field.label}.');
                 }
                 return number;
             default:
                 if (!(value is String)) {
-                    throw new Exception("Enter text for " + field.label + ".");
+                    throw new Exception('Enter text for ${field.label}.');
                 }
                 var maximum = field.kind == "textarea" ? 4000 : field.kind == "image" ? 300 : 240;
                 var text = StringTools.trim(value);
                 if (text.length > maximum) {
-                    throw new Exception("The value for " + field.label + " is too long.");
+                    throw new Exception('The value for ${field.label} is too long.');
                 }
                 if (field.kind == "date") {
                     var valid = ~/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.match(text);
                     try {
                         valid = valid
-                            && DateTools.format(Date.fromString(text + " 12:00:00"),
+                            && DateTools.format(Date.fromString('${text} 12:00:00'),
                                 "%Y-%m-%d") == text;
                     } catch (_:Dynamic) {
                         valid = false;
                     }
                     if (!valid) {
-                        throw new Exception("Enter a valid date for " + field.label + ".");
+                        throw new Exception('Enter a valid date for ${field.label}.');
                     }
                 }
                 if (field.kind == "select") {
@@ -186,11 +186,11 @@ class ContentFields {
                         }
                     }
                     if (!allowed) {
-                        throw new Exception("Choose an existing option for " + field.label + ".");
+                        throw new Exception('Choose an existing option for ${field.label}.');
                     }
                 }
                 if (field.kind == "image" && text != "" && !MediaReferences.storedImage(text)) {
-                    throw new Exception("Choose an uploaded image for " + field.label + ".");
+                    throw new Exception('Choose an uploaded image for ${field.label}.');
                 }
                 return text == "" ? null : text;
         }
@@ -205,13 +205,13 @@ class ContentFields {
             known.set(field.key, true);
             var value = validateValue(field, Reflect.field(source, field.key));
             if (requireFields && field.required && value == null) {
-                throw new Exception("Complete the required field: " + field.label + ".");
+                throw new Exception('Complete the required field: ${field.label}.');
             }
             Reflect.setField(result, field.key, value);
         }
         for (key in Reflect.fields(source)) {
             if (!known.exists(key)) {
-                throw new Exception("This collection does not define the field: " + key + ".");
+                throw new Exception('This collection does not define the field: ${key}.');
             }
         }
         return result;
@@ -250,7 +250,7 @@ class ContentFields {
             if (!field.filterable || !field.publicVisible) {
                 continue;
             }
-            var input = request.query("field_" + field.key, "");
+            var input = request.query('field_${field.key}', "");
             if (input == "") {
                 continue;
             }

@@ -12,7 +12,7 @@ import hx.well.facades.Storage;
 
 class ManagedCategories {
     public static function run():Void {
-        if (Setting.query.find("managed_categories_v1") != null) {
+        if (Setting.query.where("key", "managed_categories_v1").exists()) {
             Connection.free();
             return;
         }
@@ -34,7 +34,7 @@ class ManagedCategories {
                 importNames(batch);
                 after = batch[batch.length - 1];
             }
-            Setting.query.create(["key" => "managed_categories_v1", "value" => "1"]);
+            Setting.query.insert(["key" => "managed_categories_v1", "value" => "1"]);
         });
         Connection.free();
         ContentCache.categoriesChanged();
@@ -46,7 +46,7 @@ class ManagedCategories {
             var key = CategoryData.key(name);
             var category = Category.query.where("name_key", key).limit(1).first();
             if (category == null) {
-                Category.query.create([
+                Category.query.insert([
                     "name" => name,
                     "name_key" => key,
                     "created_at" => SiteSettingsStore.timestamp(),

@@ -27,7 +27,7 @@ export default function DesignOverlay({
       return;
     }
     const id = selection.block || selection.section;
-    const element = document.querySelector<HTMLElement>('[data-design-node="' + id + '"]');
+    const element = document.querySelector<HTMLElement>(`[data-design-node="${id}"]`);
     if (!element) {
       setBox(null);
       return;

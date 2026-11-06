@@ -50,11 +50,11 @@ class ThemeAssets {
         if (!validThemeId(id)) {
             throw new Exception("Choose a valid theme.");
         }
-        return "/theme-assets/" + id + "/";
+        return '/theme-assets/${id}/';
     }
 
     public static function url(id:String, filename:String):String {
-        return prefix(id) + filename;
+        return '${prefix(id)}${filename}';
     }
 
     public static function validFilename(filename:String):Bool {
@@ -65,7 +65,8 @@ class ThemeAssets {
         if (validFilename(filename)) {
             return filename;
         }
-        return "ta_" + Sha256.encode("theme-asset:" + filename).substr(0, 32) + filename.substr(32);
+        var hash = Sha256.encode('theme-asset:${filename}').substr(0, 32);
+        return 'ta_${hash}${filename.substr(32)}';
     }
 
     public static function imageUrl(value:String):Bool {
@@ -75,15 +76,13 @@ class ThemeAssets {
 
     public static function rules(id:String):Dynamic {
         var rules:Dynamic = MediaReferences.rules();
-        rules.uploadUrl = "/admin/themes/" + id + "/assets";
-        rules.imagePattern = "^(?:/media/[A-Za-z0-9_-]{32}|"
-            + prefix(id)
-            + "ta_[A-Za-z0-9_-]{32})\\.(jpg|png|webp|gif)$";
+        rules.uploadUrl = '/admin/themes/${id}/assets';
+        rules.imagePattern = '^(?:/media/[A-Za-z0-9_-]{32}|${prefix(id)}ta_[A-Za-z0-9_-]{32})\\.(jpg|png|webp|gif)$$';
         return rules;
     }
 
     static function domain(id:String):String {
-        return "theme-assets:" + id;
+        return 'theme-assets:${id}';
     }
 
     public static function changed(id:String):Void {
@@ -110,12 +109,12 @@ class ThemeAssets {
             }
             requireBudget(id, 1, bytes.length);
             var disk = Storage.disk("theme_assets");
-            var filename = "ta_" + SecureToken.generate(32) + "." + info.extension;
-            var path = id + "/" + filename;
+            var filename = 'ta_${SecureToken.generate(32)}.${info.extension}';
+            var path = '${id}/${filename}';
             disk.put(path, bytes);
             var registered = false;
             try {
-                var asset = ThemeAsset.query.create([
+                var assetId = ThemeAsset.query.insert([
                     "theme_id" => id,
                     "filename" => filename,
                     "title" => title == "" ? filename : title.substr(0, 180),
@@ -130,7 +129,7 @@ class ThemeAssets {
                 registered = true;
                 changed(id);
                 return {
-                    id: asset.id,
+                    id: assetId,
                     filename: filename,
                     url: url(id, filename),
                     contentType: info.contentType,
@@ -165,7 +164,7 @@ class ThemeAssets {
                     var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search,
                         "!", "!!"), "%", "!%"),
                         "_", "!_");
-                    query.whereLike("title", "%" + escaped + "%");
+                    query.whereLike("title", '%${escaped}%');
                 }
                 if (cursor != null) {
                     query.where("id", cursor.before ? ">" : "<", cursor.id);
@@ -186,7 +185,7 @@ class ThemeAssets {
                 var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search,
                     "!", "!!"), "%", "!%"), "_",
                     "!_");
-                query.whereLike("title", "%" + escaped + "%");
+                query.whereLike("title", '%${escaped}%');
             }
             return query.count();
         });
@@ -240,7 +239,7 @@ class ThemeAssets {
         }
         var disk = Storage.disk("theme_assets");
         for (filename in available) {
-            if (!disk.fileExists(id + "/" + filename)) {
+            if (!disk.fileExists('${id}/${filename}')) {
                 throw new Exception("A theme image file is missing.");
             }
         }
@@ -279,8 +278,8 @@ class ThemeAssets {
                 throw new Exception("Remove this image from the draft and published design before deleting it.");
             }
             var disk = Storage.disk("theme_assets");
-            var path = id + "/" + asset.filename;
-            var quarantine = id + "/." + asset.filename + ".deleting";
+            var path = '${id}/${asset.filename}';
+            var quarantine = '${id}/.${asset.filename}.deleting';
             var exists = disk.fileExists(path);
             if (exists) {
                 disk.move(path, quarantine);

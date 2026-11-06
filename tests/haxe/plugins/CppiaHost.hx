@@ -56,11 +56,10 @@ class CppiaHost {
         var output = Path.withoutDirectory(arguments[2]);
         check(PackageManifest.serverTarget() == "cpp", "C++ runtime selection");
         var inspected = SafePackageArchive.extract(archives.getBytes(Path.withoutDirectory(arguments[0])),
-            output
-            + "/valid", work);
+            '${output}/valid', work);
         var artifact = PackageManifest.serverArtifact(inspected.manifest);
         check(artifact == "server.cppia", "C++ selected a non-CPPIA artifact");
-        var first = new PluginModule(work.path(inspected.root + "/" + artifact),
+        var first = new PluginModule(work.path('${inspected.root}/${artifact}'),
             inspected.manifest.entrypoint);
         Sys.println("CPPIA test: module loaded");
         var host = new NativePluginHost();
@@ -124,11 +123,9 @@ class CppiaHost {
         check(Subscriber.query != null, "Native subscriber model metadata");
         Sys.println("CPPIA test: feature modules");
         var rss = SafePackageArchive.extract(packages.getBytes(Path.withoutDirectory(arguments[5])),
-            output
-            + "/rss", work);
-        var feed = new PluginModule(work.path(rss.root
-            + "/"
-            + PackageManifest.serverArtifact(rss.manifest)),
+            '${output}/rss', work);
+        var rssArtifact = PackageManifest.serverArtifact(rss.manifest);
+        var feed = new PluginModule(work.path('${rss.root}/${rssArtifact}'),
             rss.manifest.entrypoint);
         Route.batch(() -> feed.create(host, {settings: {}, packageInfo: {id: "plugin-rss"}}));
         var feedRoute = Route.routes.filter(route -> route.value == "/rss.xml")[0];
@@ -139,10 +136,9 @@ class CppiaHost {
         Route.batch(() -> feed.destroy());
         check(!Route.routes.contains(feedRoute), "CPPIA onDestroy did not remove RSS");
         feed.close();
-        var newsletterDirectory = "native-newsletter-" + Path.withoutDirectory(arguments[2]);
+        var newsletterDirectory = 'native-newsletter-${Path.withoutDirectory(arguments[2])}';
         var newsletter = SafePackageArchive.extract(packages.getBytes(Path.withoutDirectory(arguments[6])),
-            "installed/"
-            + newsletterDirectory);
+            'installed/${newsletterDirectory}');
         InstalledPackage.query.updateOrCreate(["id" => "plugin-newsletter"], [
             "id" => "plugin-newsletter",
             "kind" => "plugin",
@@ -153,7 +149,7 @@ class CppiaHost {
             "name_key" => "newsletter",
             "version" => "2.16.0",
             "directory" => newsletterDirectory,
-            "manifest" => Storage.disk("extensions").get(newsletter.root + "/cms-package.json"),
+            "manifest" => Storage.disk("extensions").get('${newsletter.root}/cms-package.json'),
             "settings" => "{}",
             "enabled" => 1,
             "setting_count" => 1,
@@ -162,8 +158,9 @@ class CppiaHost {
             "updated_at" => "2026-11-04"
         ]);
         ContentCache.changed("extensions");
+        var newsletterArtifact = PackageManifest.serverArtifact(newsletter.manifest);
         var subscriptions = new PluginModule(Storage.disk("extensions")
-            .path(newsletter.root + "/" + PackageManifest.serverArtifact(newsletter.manifest)),
+            .path('${newsletter.root}/${newsletterArtifact}'),
             newsletter.manifest.entrypoint);
         Route.batch(() -> subscriptions.create(host,
             {settings: {title: "Native newsletter"}, packageInfo: {id: "plugin-newsletter"}}));
@@ -180,19 +177,19 @@ class CppiaHost {
             "CPPIA newsletter admin route");
         Route.batch(() -> subscriptions.destroy());
         subscriptions.close();
-        PluginDatabaseChecks.run(host, packages, work, output + "/database");
+        PluginDatabaseChecks.run(host, packages, work, '${output}/database');
         Connection.free();
         var cases:Array<Dynamic> = work.json(Path.withoutDirectory(arguments[4]));
         for (index in 0...cases.length) {
             var rejected = false;
-            var destination = output + "/rejected-" + index;
+            var destination = '${output}/rejected-${index}';
             try {
                 SafePackageArchive.extract(Base64.decode(cases[index].archive), destination, work);
             } catch (error:Dynamic) {
                 rejected = true;
             }
             check(rejected && !work.exists(destination),
-                "CPPIA archive validation: " + cases[index].name);
+                'CPPIA archive validation: ${cases[index].name}');
         }
         Sys.println("PASS Native C++/CPPIA: shared interface, hooks, validation, replacement, isolation and close");
         Sys.println("PASS C++ ZIP inspection: target selection, paths, duplicates, checksums and bounded streaming");

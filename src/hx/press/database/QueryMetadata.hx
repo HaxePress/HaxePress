@@ -15,9 +15,9 @@ class QueryMetadata {
             Schema.table("content_items",
                 table -> table.integer("reading_minutes").defaultValue(0));
         }
-        if (Setting.query.find("query_metadata_v1") == null) {
+        if (!Setting.query.where("key", "query_metadata_v1").exists()) {
             backfillReadingTime();
-            Setting.query.create(["key" => "query_metadata_v1", "value" => "1"]);
+            Setting.query.insert(["key" => "query_metadata_v1", "value" => "1"]);
             ContentCache.contentChanged();
         }
         var indexes = [

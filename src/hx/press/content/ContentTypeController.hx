@@ -47,7 +47,7 @@ class ContentTypeController {
             return SiteController.notFound(request);
         }
         var redirect = AdminController.validationRedirect(request, "structure", error,
-            creating ? "/admin/content-types/new" : "/admin/content-types/" + key + "/edit");
+            creating ? "/admin/content-types/new" : '/admin/content-types/${key}/edit');
         if (redirect != null) {
             return redirect;
         }
@@ -99,11 +99,9 @@ class ContentTypeController {
             query.where("has_archive", 1);
         }
         if (search != "") {
-            var pattern = "%"
-                + StringTools.replace(StringTools.replace(StringTools.replace(search, "!", "!!"),
-                    "%", "!%"), "_",
-                    "!_")
-                + "%";
+            var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search, "!",
+                "!!"), "%", "!%"), "_", "!_");
+            var pattern = '%${escaped}%';
             query.whereLike("name", pattern);
         }
         var types:Array<Dynamic> = query.orderBy("name")

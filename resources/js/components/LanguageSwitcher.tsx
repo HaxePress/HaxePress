@@ -11,7 +11,7 @@ export default function LanguageSwitcher() {
       <input
         type="hidden"
         name="return_to"
-        value={destination.pathname + destination.search + destination.hash}
+        value={`${destination.pathname}${destination.search}${destination.hash}`}
       />
       <label>
         <span className="sr-only">{t('Language')}</span>

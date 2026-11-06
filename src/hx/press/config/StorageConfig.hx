@@ -27,7 +27,7 @@ class StorageConfig extends FilesystemsConfig {
             },
             "media" => {
                 driver: "local",
-                root: storage + "/media",
+                root: '${storage}/media',
                 url: "/media",
                 visibility: "private",
                 throw_errors: true

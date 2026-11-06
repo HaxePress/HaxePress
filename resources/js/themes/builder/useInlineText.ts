@@ -15,9 +15,7 @@ export default function useInlineText(
   function finish(save: boolean) {
     const current = active.current;
     if (!current) return;
-    const element = document.querySelector<HTMLElement>(
-      '[data-design-node="' + current.node.id + '"]',
-    );
+    const element = document.querySelector<HTMLElement>(`[data-design-node="${current.node.id}"]`);
     const text = (element?.innerText || '').slice(0, 16000);
     active.current = null;
     if (save && text !== original.current) commit.current(current.target, text);
@@ -29,7 +27,7 @@ export default function useInlineText(
   }
   useEffect(() => {
     if (!id) return;
-    const element = document.querySelector<HTMLElement>('[data-design-node="' + id + '"]');
+    const element = document.querySelector<HTMLElement>(`[data-design-node="${id}"]`);
     if (!element) return;
     element.focus();
     const range = document.createRange();

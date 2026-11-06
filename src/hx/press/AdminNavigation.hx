@@ -35,10 +35,12 @@ typedef AdminRouteNavigation = {
 
 /** Navigation follows native route metadata and the current collection definitions. */
 class AdminNavigation {
-    public static function groups(request:Request,
-            pluginLinks:Array<Dynamic>):Array<AdminNavigationGroup> {
+    public static function groups(request:Request, pluginLinks:Array<Dynamic>,
+            grants:Array<String>):Array<AdminNavigationGroup> {
         var groups:Map<String, AdminNavigationGroup> = [];
         var known:Map<String, Bool> = [];
+        var allCapabilities = grants.contains("*");
+        var contentAccess = CmsAccess.hasAccessibleCollections(grants);
 
         function append(group:String, groupPosition:Int, link:AdminNavigationLink):Void {
             if (known.exists(link.href)) {
@@ -62,11 +64,11 @@ class AdminNavigation {
                 continue;
             }
             var capability:String = entry.capability ?? "";
-            var permitted = capability == "content" ? CmsAccess.hasContentAccess() : capability == ""
-                || CmsAccess.can(capability);
+            var permitted = capability == "content" ? contentAccess : capability == ""
+                || allCapabilities || grants.contains(capability);
             var alternatives:Array<String> = entry.anyCapabilities ?? [];
             for (permission in alternatives) {
-                permitted = permitted || CmsAccess.can(permission);
+                permitted = permitted || allCapabilities || grants.contains(permission);
             }
             if (!permitted) {
                 continue;
@@ -80,11 +82,10 @@ class AdminNavigation {
                 position: entry.position ?? 50
             });
         }
-        if (CmsAccess.hasContentAccess()) {
-            var grants = CmsAccess.capabilities(CmsAccess.current().role);
+        if (contentAccess) {
             for (type in ContentTypes.navigation(request.route("kind") ?? "", grants)) {
                 append("Content", 0, {
-                    href: "/admin/" + type.admin_path,
+                    href: '/admin/${type.admin_path}',
                     label: I18n.t(type.name, null, type.owner == "" ? "cms" : type.owner),
                     icon: type.icon,
                     exact: false,

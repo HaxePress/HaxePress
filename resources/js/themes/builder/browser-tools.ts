@@ -107,7 +107,7 @@ export function installBrowserTools(
     const controller = new AbortController();
     registration = controller;
     for (const tool of tools) {
-      const name = 'haxepress_' + tool.name;
+      const name = `haxepress_${tool.name}`;
       await context.registerTool(
         {
           name,

@@ -53,7 +53,7 @@ def main():
                     raise RuntimeError("The Inertia SSR renderer could not start.")
                 try:
                     with urllib.request.urlopen(
-                        "http://127.0.0.1:" + env["INERTIA_SSR_PORT"] + "/health", timeout=0.5
+                        f"http://127.0.0.1:{env['INERTIA_SSR_PORT']}/health", timeout=0.5
                     ) as response:
                         if response.status == 200:
                             break

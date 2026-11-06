@@ -67,7 +67,7 @@ class CategoryData {
     static function prefixFilter(query:QueryBuilder<Category>, prefix:String):Void {
         if (prefix != "") {
             query.where("name_key", ">=", prefix);
-            query.where("name_key", "<", prefix + String.fromCharCode(0x10FFFF));
+            query.where("name_key", "<", '${prefix}${String.fromCharCode(0x10FFFF)}');
         }
     }
 

@@ -100,11 +100,12 @@ class ThemeDesignSchema {
             };
             var blocks = [
                 for (index in 0...types.length)
-                    block(name + "-block-" + index, types[index],
+                    block('${name}-block-${index}', types[index],
                         index == 0 ? title : name == "NotFound" ? "This page could not be found." : "")
             ];
-            Reflect.setField(pages, name, blank && name == "Home" ? [] : [section(name
-                + "-section", title == "" ? "Content" : title, blocks)]);
+            Reflect.setField(pages,
+                name, blank && name == "Home" ? [] : [section('${name}-section',
+                    title == "" ? "Content" : title, blocks)]);
         }
         var header = section("header", "Header",
             [block("brand", "brand"), block("header-nav", "navigation")], 24);

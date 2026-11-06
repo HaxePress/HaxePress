@@ -24,8 +24,8 @@ class ThemeStudio {
         var created = false;
         PackageManager.writes.acquire("packages");
         try {
-            var slug = "studio-" + Md5.encode(SecureToken.generate(32)).substr(0, 12);
-            var id = "theme-" + slug;
+            var slug = 'studio-${Md5.encode(SecureToken.generate(32)).substr(0, 12)}';
+            var id = 'theme-${slug}';
             var now = SiteSettingsStore.timestamp();
             var manifest = {
                 apiVersion: CmsVersion.pluginApiVersion,
@@ -47,7 +47,7 @@ class ThemeStudio {
             dependencies = MediaDependencies.forTheme(slug);
             dependencies.withValue("design-draft", design, () -> {
                 DBStatic.transaction(() -> {
-                    InstalledPackage.query.create([
+                    InstalledPackage.query.insert([
                         "id" => id,
                         "kind" => "theme",
                         "slug" => slug,
@@ -66,7 +66,7 @@ class ThemeStudio {
                         "installed_at" => now,
                         "updated_at" => now
                     ]);
-                    ThemeDesign.query.create([
+                    ThemeDesign.query.insert([
                         "id" => id,
                         "draft" => Json.stringify(design),
                         "published" => "",
@@ -78,7 +78,7 @@ class ThemeStudio {
                 });
                 created = true;
                 return true;
-            }, name + " (design draft)");
+            }, '${name} (design draft)');
             ContentCache.changed("extensions");
             PackageManager.writes.release("packages");
             return id;
@@ -151,8 +151,8 @@ class ThemeStudio {
             };
             dependencies.withValue("design-draft", document, () -> {
                 return publish ? dependencies.withValue("design-published", document, write,
-                    name + " (published design)") : write();
-            }, name + " (design draft)");
+                    '${name} (published design)') : write();
+            }, '${name} (design draft)');
             ContentCache.changed("extensions");
             var result = {
                 version: nextVersion,

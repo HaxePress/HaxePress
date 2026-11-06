@@ -36,16 +36,16 @@ class PackageManager {
             throw new Exception("Finish or discard your previous package uploads before uploading another.");
         }
         var token = SecureToken.generate(32);
-        var destination = PackageStorage.STAGING + "/" + token;
+        var destination = '${PackageStorage.STAGING}/${token}';
         var inspected = SafePackageArchive.extract(bytes, destination);
         try {
             if (inspected.manifest.kind != kind) {
-                throw new Exception("Upload a " + kind + " package in this section.");
+                throw new Exception('Upload a ${kind} package in this section.');
             }
-            BuiltInTheme.requireUploadable(kind + "-" + inspected.manifest.slug);
+            BuiltInTheme.requireUploadable('${kind}-${inspected.manifest.slug}');
             var source = Storage.disk("extensions")
-                .get(inspected.root + "/" + PackageManifest.FILENAME);
-            PackageUpload.query.create([
+                .get('${inspected.root}/${PackageManifest.FILENAME}');
+            PackageUpload.query.insert([
                 "key" => token,
                 "user_id" => userId,
                 "kind" => kind,
@@ -53,7 +53,7 @@ class PackageManager {
                 "manifest" => source,
                 "expires_epoch" => Date.now().getTime() + 3600000
             ]);
-            var id = kind + "-" + inspected.manifest.slug;
+            var id = '${kind}-${inspected.manifest.slug}';
             var existing = InstalledPackage.query.select(["version"])
                 .where("id", id)
                 .limit(1)
@@ -121,7 +121,7 @@ class PackageManager {
             }
             var manifest = PackageManifest.parse(upload.manifest);
             PackageManifest.requireCompatible(manifest);
-            var id = kind + "-" + manifest.slug;
+            var id = '${kind}-${manifest.slug}';
             BuiltInTheme.requireUploadable(id);
             var previous = InstalledPackage.query.where("id", id).limit(1).first();
             if (previous != null && !replace) {
@@ -173,7 +173,7 @@ class PackageManager {
                     enabled = 0;
                 }
             }
-            var directory = id + "-" + manifest.version + "-" + SecureToken.generate(16);
+            var directory = '${id}-${manifest.version}-${SecureToken.generate(16)}';
             moved = PackageStorage.installed(directory);
             PackageStorage.installFrom(upload.directory, moved);
             var now = SiteSettingsStore.timestamp();
@@ -199,13 +199,13 @@ class PackageManager {
             MediaLocks.run(() -> {
                 DBStatic.transaction(() -> {
                     if (previous == null) {
-                        InstalledPackage.query.create(values);
+                        InstalledPackage.query.insert(values);
                     } else {
                         previous.update(values);
                         PackageHook.query.where("package_id", id).delete();
                     }
                     for (event in manifest.hooks) {
-                        PackageHook.query.create(["package_id" => id, "event" => event]);
+                        PackageHook.query.insert(["package_id" => id, "event" => event]);
                     }
                     upload.delete();
                     Activity.append(userId, name, previous == null ? "installed" : "updated",
@@ -218,7 +218,7 @@ class PackageManager {
             if (previous != null) {
                 PackageStorage.remove(PackageStorage.installed(previousDirectory));
             }
-            PackageStorage.remove(PackageStorage.STAGING + "/" + token);
+            PackageStorage.remove('${PackageStorage.STAGING}/${token}');
             if (enabled == 1 && PluginRuntime.ready) {
                 PluginRuntime.start(record(id));
             }
@@ -228,7 +228,7 @@ class PackageManager {
             if (!committed && moved != null && Storage.disk("extensions").directoryExists(moved)) {
                 PackageStorage.remove(moved);
                 PackageUpload.query.where("key", token).where("user_id", userId).delete();
-                PackageStorage.remove(PackageStorage.STAGING + "/" + token);
+                PackageStorage.remove('${PackageStorage.STAGING}/${token}');
             }
             writes.release("packages");
             throw error;

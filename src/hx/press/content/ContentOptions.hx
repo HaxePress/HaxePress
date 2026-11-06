@@ -21,11 +21,9 @@ class ContentOptions {
             query.where("content_type", kind);
         }
         if (search != "") {
-            var pattern = "%"
-                + StringTools.replace(StringTools.replace(StringTools.replace(search, "!", "!!"),
-                    "%", "!%"), "_",
-                    "!_")
-                + "%";
+            var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search, "!",
+                "!!"), "%", "!%"), "_", "!_");
+            var pattern = '%${escaped}%';
             query.whereLike("title", pattern);
         }
         var rows:Array<{

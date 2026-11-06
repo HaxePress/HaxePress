@@ -21,7 +21,7 @@ class ExportSubscribersHandler extends AbstractHandler {
             return ResponseBuilder.asString("Access restricted.", 403);
         }
         var disk = Storage.disk("exports");
-        var path = SecureToken.generate(32) + ".csv";
+        var path = '${SecureToken.generate(32)}.csv';
         var source = new CsvExportInput();
         try {
             disk.writeStream(path, source);

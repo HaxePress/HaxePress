@@ -20,8 +20,8 @@ class CmsAccess {
         var admin:Admin = guard.user();
         if (admin == null
             || admin.active != 1
-            || Roles.find(admin.role) == null
-            || request.session.get("auth_version", "") != admin.password) {
+            || request.session.get("auth_version", "") != admin.password
+            || !Roles.exists(admin.role)) {
             return null;
         }
         return admin;
@@ -32,25 +32,36 @@ class CmsAccess {
         if (admin == null) {
             return false;
         }
-        var grants = capabilities(admin.role);
+        var grants = Roles.grants(admin.role);
         return grants.contains("*") || grants.contains(capability);
     }
 
     public static function capabilities(role:String):Array<String> {
-        return Roles.find(role) == null ? [] : Roles.grants(role);
+        return Roles.exists(role) ? Roles.grants(role) : [];
     }
 
     public static function canCollection(kind:String):Bool {
-        var type = ContentTypes.find(kind);
-        return type != null && can(type.capability);
-    }
-
-    public static function hasContentAccess():Bool {
+        if (!ContentTypes.validKey(kind)) {
+            return false;
+        }
         var admin = current();
         if (admin == null) {
             return false;
         }
-        var grants = capabilities(admin.role);
+        var grants = Roles.grants(admin.role);
+        return ContentCache.remember("structure", "collection-access",
+            [kind, grants, ContentTypes.revision()], () -> {
+                var query = ContentType.query.where("key", kind);
+                return ContentTypes.accessible(query, grants).exists();
+            });
+    }
+
+    public static function hasContentAccess():Bool {
+        var admin = current();
+        return admin != null && hasAccessibleCollections(Roles.grants(admin.role));
+    }
+
+    public static function hasAccessibleCollections(grants:Array<String>):Bool {
         if (grants.contains("*")) {
             return true;
         }

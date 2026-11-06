@@ -41,7 +41,7 @@ class FixtureStore:
         self.guard_path = self.work / "query-guard.json"
         self.buffer = b""
         self.log = (self.work / "fixtures.log").open("ab")
-        classpath = str(TEST_BINARY) + os.pathsep + str(TEST_BINARY.parent / "lib/*")
+        classpath = f"{str(TEST_BINARY)}{os.pathsep}{str(TEST_BINARY.parent / 'lib/*')}"
         self.process = subprocess.Popen(
             [
                 "java",
@@ -99,11 +99,11 @@ class FixtureStore:
             remaining = deadline - time.monotonic()
             if remaining <= 0 or not self.selector.select(remaining):
                 raise RuntimeError(
-                    "Fixture process timed out; see " + str(self.work / "fixtures.log")
+                    f"Fixture process timed out; see {str(self.work / 'fixtures.log')}"
                 )
             chunk = os.read(self.process.stdout.fileno(), 65536)
             if not chunk:
-                raise RuntimeError("Fixture process exited; see " + str(self.work / "fixtures.log"))
+                raise RuntimeError(f"Fixture process exited; see {str(self.work / 'fixtures.log')}")
             self.buffer += chunk
 
     def call(self, action, entity=None, **parameters):

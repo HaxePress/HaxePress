@@ -25,7 +25,7 @@ class NavigationData {
     public static inline var MAX_LINKS = 12;
 
     public static function ensure():Void {
-        if (Setting.query.find("cms_navigation_v1") != null) {
+        if (Setting.query.where("key", "cms_navigation_v1").exists()) {
             return;
         }
         DBStatic.transaction(() -> {
@@ -36,7 +36,7 @@ class NavigationData {
                     {label: "Content", url: "/content", collection: "entry"},
                     {label: "About", url: "/about", collection: ""}
                 ]) {
-                    MenuLink.query.create([
+                    MenuLink.query.insert([
                         "location" => location,
                         "label" => link.label,
                         "url" => link.url,
@@ -49,7 +49,7 @@ class NavigationData {
                     ]);
                 }
             }
-            Setting.query.create(["key" => "cms_navigation_v1", "value" => "1"]);
+            Setting.query.insert(["key" => "cms_navigation_v1", "value" => "1"]);
         });
         ContentCache.changed("navigation");
     }

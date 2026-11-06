@@ -20,11 +20,8 @@ class DeleteSubscriberHandler extends AbstractHandler {
         if (!host.can("subscribers")) {
             return ResponseBuilder.asString("Access restricted.", 403);
         }
-        var subscriber = Subscriber.query.select(["id"])
-            .where("id", Std.parseInt(request.route("id")))
-            .limit(1)
-            .first();
-        if (subscriber != null) {
+        var subscriber = Subscriber.query.where("id", Std.parseInt(request.route("id")));
+        if (subscriber.exists()) {
             subscriber.delete();
             ContentCache.changed("subscribers");
         }

@@ -20,7 +20,7 @@ export default function TagPicker({
     const controller = new AbortController();
     const timeout = setTimeout(async () => {
       try {
-        const response = await fetch('/admin/tags/options?q=' + encodeURIComponent(search), {
+        const response = await fetch(`/admin/tags/options?q=${encodeURIComponent(search)}`, {
           signal: controller.signal,
           headers: { Accept: 'application/json' },
         });
@@ -57,7 +57,7 @@ export default function TagPicker({
               {tag.name}
               <button
                 type="button"
-                aria-label={'Remove ' + tag.name}
+                aria-label={`Remove ${tag.name}`}
                 onClick={() => onChange(value.filter((item) => item.id !== tag.id))}
               >
                 ×

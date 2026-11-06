@@ -68,11 +68,11 @@ class PackageManifest {
             return "";
         }
         if (!Std.isOfType(value, String)) {
-            throw new Exception("The package field " + field + " must contain text.");
+            throw new Exception('The package field ${field} must contain text.');
         }
         var result = StringTools.trim(value);
         if (result.length > maximum || (required && result == "")) {
-            throw new Exception("The package field " + field + " has an invalid length.");
+            throw new Exception('The package field ${field} has an invalid length.');
         }
         return result;
     }
@@ -337,9 +337,7 @@ class PackageManifest {
             default: "";
         };
         if (artifact == "" && hasServer(manifest)) {
-            throw new Exception("This package does not include a server module for the "
-                + serverTarget()
-                + " target.");
+            throw new Exception('This package does not include a server module for the ${serverTarget()} target.');
         }
         return artifact;
     }
@@ -361,16 +359,12 @@ class PackageManifest {
             return;
         }
         if (manifest.apiVersion != CmsVersion.pluginApiVersion) {
-            throw new Exception("This plugin requires CMS plugin API "
-                + CmsVersion.pluginApiVersion
-                + ". Rebuild it for this CMS release.");
+            throw new Exception('This plugin requires CMS plugin API ${CmsVersion.pluginApiVersion}. Rebuild it for this CMS release.');
         }
         if (manifest.cmsVersion != CmsVersion.version) {
-            throw new Exception("This plugin targets CMS "
-                + (manifest.cmsVersion == "" ? "an unspecified version" : manifest.cmsVersion)
-                + "; this server runs CMS "
-                + CmsVersion.version
-                + ". An exact version match is required.");
+            var target = manifest.cmsVersion == "" ? "an unspecified version" : manifest.cmsVersion;
+            var message = 'This plugin targets CMS ${target}; this server runs CMS ${CmsVersion.version}.';
+            throw new Exception('${message} An exact version match is required.');
         }
         if (manifest.serverJar == "" || manifest.serverCppia == "") {
             throw new Exception("Every plugin ZIP must contain both a JAR and a CPPIA server module.");

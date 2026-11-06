@@ -45,7 +45,7 @@ def verify(owner, public, fixtures):
     )
     check(image_response[0] == 201, "Validation fixture image upload")
     image_id = json.loads(image_response[2])["id"]
-    media_path = "/admin/media/" + str(image_id) + "/save"
+    media_path = f"/admin/media/{str(image_id)}/save"
     media_before = fixtures.rows("media_assets", ["title", "alt"], [("id", "=", image_id)], limit=1)
     entities = [
         "items",
@@ -90,7 +90,7 @@ def verify(owner, public, fixtures):
             status, _, body = post_json(owner, path, values)
             check(
                 status == 422,
-                path + " did not reject invalid fields: " + str(status) + " " + body[:120],
+                f"{path} did not reject invalid fields: {str(status)} {body[:120]}",
             )
         for path in [
             "/admin/content/working-copy",
@@ -249,7 +249,7 @@ def verify(owner, public, fixtures):
             "Reactivated plugin validation did not return",
         )
     finally:
-        owner.request("/admin/media/" + str(image_id) + "/delete", "POST", {})
+        owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})
         owner.request("/admin/logout", "POST", {})
     print(
         "PASS Native validation: all write handlers, plugin forwarding, JSON/Inertia responses, no writes, byte limits, permissions and 404/409 precedence",
@@ -258,7 +258,7 @@ def verify(owner, public, fixtures):
 
 
 def verify_permissions(owner, fixtures):
-    email = "validation-writer-" + secrets.token_hex(5) + "@example.test"
+    email = f"validation-writer-{secrets.token_hex(5)}@example.test"
     password = secrets.token_urlsafe(18)
     check(
         owner.request(
@@ -289,7 +289,7 @@ def verify_permissions(owner, fixtures):
             check(
                 post_json(writer, path, {"name": [], "label": [], "site_name": [], "title": []})[0]
                 == 403,
-                "Invalid fields bypassed permission precedence: " + path,
+                f"Invalid fields bypassed permission precedence: {path}",
             )
     finally:
         writer.request("/admin/logout", "POST", {})

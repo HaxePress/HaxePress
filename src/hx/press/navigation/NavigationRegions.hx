@@ -61,7 +61,7 @@ class NavigationRegions {
         if (!validKey(key) || name == "" || name.length > 100 || maximum < 1 || maximum > 50) {
             throw new Exception("Choose a navigation region key, label and a limit from 1 to 50.");
         }
-        NavigationRegion.query.create([
+        NavigationRegion.query.insert([
             "key" => key,
             "name" => name,
             "max_links" => maximum,
@@ -77,11 +77,10 @@ class NavigationRegions {
             "region-options", [search, 20], () -> {
                 var query = NavigationRegion.query.select(columns);
                 if (search != "") {
-                    var pattern = "%"
-                        + StringTools.replace(StringTools.replace(StringTools.replace(search, "!",
-                            "!!"), "%", "!%"),
-                            "_", "!_")
-                        + "%";
+                    var escaped = StringTools.replace(StringTools.replace(StringTools.replace(search,
+                        "!", "!!"), "%", "!%"),
+                        "_", "!_");
+                    var pattern = '%${escaped}%';
                     query.whereLike("name", pattern);
                 }
                 return query.orderBy("key").limit(20).get().map(model -> cast model.toObject());

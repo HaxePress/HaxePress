@@ -27,7 +27,7 @@ class ServerSettings {
     static function positiveInt(key:String, fallback:Int, max:Int):Int {
         var value = Std.parseInt(Environment.env(key, Std.string(fallback)));
         if (value == null || value < 1 || value > max)
-            throw key + " must be between 1 and " + max + ".";
+            throw '${key} must be between 1 and ${max}.';
         return value;
     }
 }

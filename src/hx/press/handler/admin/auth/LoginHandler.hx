@@ -32,7 +32,7 @@ class LoginHandler extends AbstractHandler {
         var email = CategoryData.key(credentials.get("email"));
         credentials.set("email", email);
         var password:String = credentials.get("password");
-        var key = Sha256.encode("login:" + request.ip);
+        var key = Sha256.encode('login:${request.ip}');
         var now = Date.now().getTime() / 1000;
         var allowed = true;
         attemptLocks.acquire(key);
@@ -44,8 +44,8 @@ class LoginHandler extends AbstractHandler {
                 var expired = attempt == null || attempt.expires_at < now;
                 var attemptCount = expired ? 1 : attempt.attempts + 1;
                 var expiresAt = expired ? now + 900 : attempt.expires_at;
-                LoginAttempt.query.updateOrCreate(["key" => key],
-                    ["attempts" => attemptCount, "expires_at" => expiresAt]);
+                LoginAttempt.query.upsert(["key" => key, "attempts" => attemptCount, "expires_at" => expiresAt],
+                    ["key"], ["attempts", "expires_at"]);
             }
             attemptLocks.release(key);
         } catch (error:Dynamic) {
@@ -63,7 +63,7 @@ class LoginHandler extends AbstractHandler {
         }
         if (candidate == null
             || candidate.active != 1
-            || Roles.find(candidate.role) == null
+            || !Roles.exists(candidate.role)
             || !adminAuth.attempt(credentials)) {
             return AdminController.loginForm(request, "The email or password is incorrect.", 401);
         }

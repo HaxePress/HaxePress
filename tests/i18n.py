@@ -55,7 +55,7 @@ def run():
             "subscribers",
             [
                 {
-                    "email": "translated-pagination-" + str(index) + "@example.test",
+                    "email": f"translated-pagination-{str(index)}@example.test",
                     "created_at": "2026-11-04 00:00:00",
                 }
                 for index in range(31)
@@ -78,7 +78,7 @@ def run():
         )
 
         def render(locale):
-            status, headers, html = Client().request("/?lang=" + locale)
+            status, headers, html = Client().request(f"/?lang={locale}")
             expected = "Son içerikler" if locale == "tr" else "The latest content"
             return status == 200 and expected in html and headers["content-language"] == locale
 
@@ -166,8 +166,7 @@ def run():
             ]:
                 install(owner, "plugins", package(slug, text))
                 check(
-                    owner.request("/admin/plugins/plugin-" + slug + "/enable", "POST", {})[0]
-                    == 303,
+                    owner.request(f"/admin/plugins/plugin-{slug}/enable", "POST", {})[0] == 303,
                     "activate translation package",
                 )
             catalogues = props(Client(), "/?lang=tr")["i18n"]["catalogues"]
@@ -221,12 +220,12 @@ def run():
                 == "Güncel çeviri",
                 "replacement kept a stale catalogue",
             )
-            owner.request("/admin/plugins/" + first_id + "/disable", "POST", {})
+            owner.request(f"/admin/plugins/{first_id}/disable", "POST", {})
             check(
                 first_id not in props(Client(), "/?lang=tr")["i18n"]["catalogues"],
                 "disabled translations remain public",
             )
-            owner.request("/admin/plugins/" + first_id + "/enable", "POST", {})
+            owner.request(f"/admin/plugins/{first_id}/enable", "POST", {})
 
             invalid = [
                 ({**base, "slug": "bad-catalogue", "translations": {"tr": "../escape.json"}}, {}),
@@ -250,7 +249,7 @@ def run():
                 check(status == 422, "invalid translation catalogue was accepted")
         finally:
             for identifier in [first_id, second_id]:
-                owner.request("/admin/plugins/" + identifier + "/uninstall", "POST", {})
+                owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
 
         original_settings = props(owner, "/admin/settings")["site"]
         try:
