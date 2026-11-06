@@ -2,6 +2,7 @@ package fixtures;
 
 import haxe.Exception;
 import haxe.Json;
+import haxe.crypto.Sha256;
 import haxe.Log;
 import haxe.ds.StringMap;
 import haxe.io.Bytes;
@@ -211,6 +212,29 @@ class FixtureProcess {
             ImageUploads.expire();
             return true;
         }
+        if (command.action == "legacy_status_check") {
+            // Early SQLite releases limited content status to two states.
+            Schema.table("content_items", table -> {
+                table.string("status")
+                    .defaultValue("draft")
+                    .check("status IN ('draft', 'published')")
+                    .change();
+            });
+            Setting.query.where("key", CmsSchema.PORTABLE_STATUS).delete();
+            return Schema.hasPortableDefinition("content_items");
+        }
+        if (command.action == "portable_definition") {
+            return Schema.hasPortableDefinition(command.table);
+        }
+        if (command.action == "table_digests") {
+            var skipped:Array<String> = command.skip == null ? [] : command.skip;
+            return tableDigests(skipped);
+        }
+        if (command.action == "table_rows") {
+            var rows:Array<String> = [];
+            visitRows(command.table, Std.int(command.limit), row -> rows.push(row));
+            return rows;
+        }
         return switch (command.entity) {
             case "items": execute(ContentItem.query, command);
             case "content_types": execute(ContentType.query, command);
@@ -349,6 +373,58 @@ class FixtureProcess {
                 readRows(query);
             default: throw new Exception("Unknown fixture operation");
         };
+    }
+
+    /**
+        Each table's columns, row count and a SHA-256 digest of its rows. Rows
+        are read as text in a fixed column and row order, so two databases with
+        the same data give the same digests.
+    **/
+    static function tableDigests(skipped:Array<String>):Array<Dynamic> {
+        var tables = Schema.getTableListing().filter(table -> !skipped.contains(table));
+        tables.sort(Reflect.compare);
+        var digests:Array<Dynamic> = [];
+        for (table in tables) {
+            var text = new StringBuf();
+            var count = 0;
+            visitRows(table, null, row -> {
+                text.add(row);
+                text.add("\n");
+                count++;
+            });
+            var columns = Schema.getColumnListing(table);
+            columns.sort(Reflect.compare);
+            digests.push({
+                name: table,
+                columns: columns,
+                rows: count,
+                digest: Sha256.encode(text.toString())
+            });
+        }
+        return digests;
+    }
+
+    static function visitRows(table:String, limit:Null<Int>, visit:String->Void):Void {
+        var columns = Schema.getColumnListing(table);
+        columns.sort(Reflect.compare);
+        var model = new BaseModel<Dynamic>();
+        model.setTable(table);
+        var query = new QueryBuilder(model).select(columns);
+        for (column in columns) {
+            query.orderBy(column);
+        }
+        if (limit != null) {
+            query.limit(limit);
+        }
+        var result = query.getResultSet();
+        while (result.hasNext()) {
+            result.next();
+            var values:Array<Null<String>> = [
+                for (index in 0...columns.length)
+                    result.getResult(index + 1)
+            ];
+            visit(Json.stringify(values));
+        }
     }
 
     static function attributes(input:Dynamic):StringMap<Dynamic> {

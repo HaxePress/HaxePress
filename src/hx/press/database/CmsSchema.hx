@@ -6,6 +6,9 @@ import hx.well.facades.Schema;
 import hx.press.model.Setting;
 
 class CmsSchema {
+    /** Set once the content status column has its portable definition. **/
+    public static inline var PORTABLE_STATUS = "portable_content_status_v1";
+
     public static function up():Void {
         PluginSchema.up();
         var fields:Array<{name:String, add:Blueprint->Void}> = [
@@ -56,6 +59,17 @@ class CmsSchema {
             if (!Schema.hasColumn("content_items", field.name)) {
                 Schema.table("content_items", field.add);
             }
+        }
+        // Early SQLite releases limited `status` to draft and published with a
+        // CHECK constraint. It rejects trash and scheduled items, and logical
+        // backups cannot carry it, so the column is defined again without it.
+        if (!Setting.query.where("key", PORTABLE_STATUS).exists()) {
+            if (!Schema.hasPortableDefinition("content_items")) {
+                Schema.table("content_items", table -> {
+                    table.string("status").defaultValue("draft").change();
+                });
+            }
+            Setting.query.insert(["key" => PORTABLE_STATUS, "value" => "1"]);
         }
         if (!Schema.hasColumn("admins", "role")) {
             Schema.table("admins", table -> table.string("role").defaultValue("owner"));

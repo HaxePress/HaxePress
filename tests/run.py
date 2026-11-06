@@ -27,6 +27,7 @@ parser.add_argument(
         "e2e",
         "installation",
         "site_backup",
+        "backup_roundtrip",
         "auth",
         "validation",
         "native_api",
@@ -363,6 +364,37 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                 "PASS Startup removes themes built for the former browser renderer; the built-in theme takes over",
                 flush=True,
             )
+            stop(process)
+            # Early SQLite releases limited content status to draft and published.
+            if fixtures.call("legacy_status_check") is not False:
+                raise RuntimeError("The legacy content status constraint was not reproduced.")
+            trashed, scheduled = [row["id"] for row in fixtures.rows("items", ["id"], limit=2)]
+            try:
+                fixtures.update("items", {"status": "trash"}, [("id", "=", trashed)])
+            except RuntimeError as error:
+                if "CHECK" not in str(error):
+                    raise
+            else:
+                raise RuntimeError("The legacy content status constraint accepted a trashed item.")
+            legacy_content = list(fixtures.scan("items", CONTENT_COLUMNS))
+            process = subprocess.Popen(COMMAND, cwd=work, stdout=log, stderr=subprocess.STDOUT)
+            wait_ready(port, process)
+            if fixtures.call("portable_definition", table="content_items") is not True:
+                raise RuntimeError("Startup kept the legacy content status constraint.")
+            if list(fixtures.scan("items", CONTENT_COLUMNS)) != legacy_content:
+                raise RuntimeError("The content status migration changed content item data.")
+            fixtures.update("items", {"status": "trash"}, [("id", "=", trashed)])
+            fixtures.update("items", {"status": "scheduled"}, [("id", "=", scheduled)])
+            print(
+                "PASS Startup lifts the legacy content status constraint without changing content",
+                flush=True,
+            )
+            # The backup round trip runs here, on the upgraded database with every status.
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "tests/backup_roundtrip.py")], cwd=ROOT, env=env
+            )
+            if result.returncode:
+                raise RuntimeError("backup_roundtrip integration suite failed.")
         except Exception:
             log.flush()
             log.seek(0)

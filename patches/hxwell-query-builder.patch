@@ -855,6 +855,30 @@ diff --git a/src/hx/well/database/query/SelectQueryBuilder.hx b/src/hx/well/data
 -}
 \ No newline at end of file
 +}
+diff --git a/src/hx/well/database/schema/ColumnDefinition.hx b/src/hx/well/database/schema/ColumnDefinition.hx
+--- a/src/hx/well/database/schema/ColumnDefinition.hx
++++ b/src/hx/well/database/schema/ColumnDefinition.hx
+@@ -33,6 +33,7 @@
+     public var collationName:Null<String>;
+     public var storedAsExpr:Null<String>;
+     public var virtualAsExpr:Null<String>;
++    public var checkExpr:Null<String>;
+     public var isChange:Bool = false;
+ 
+     public function new(name:String, type:ColumnType) {
+@@ -135,6 +136,12 @@
+         return this;
+     }
+ 
++    /** Adds a CHECK constraint. Logical backups do not carry it, so portable schemas avoid it. **/
++    public function check(expression:String):ColumnDefinition {
++        checkExpr = expression;
++        return this;
++    }
++
+     public function change():ColumnDefinition {
+         isChange = true;
+         return this;
 diff --git a/src/hx/well/database/schema/ForeignKeyInfo.hx b/src/hx/well/database/schema/ForeignKeyInfo.hx
 new file mode 100644
 --- /dev/null
@@ -1025,7 +1049,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
  
 @@ -37,9 +40,17 @@
      }
-
+ 
      public function create(table:String, callback:Blueprint->Void):Void {
 +        createTracked(table, callback);
 +    }
@@ -1040,7 +1064,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
 +            created();
 +        execute(statements);
      }
-
+ 
      public function table(table:String, callback:Blueprint->Void):Void {
 @@ -100,11 +111,12 @@
      }
@@ -1057,7 +1081,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      }
  
      public function hasColumns(table:String, columns:Array<String>):Bool {
-@@ -117,11 +129,58 @@
+@@ -117,11 +129,72 @@
      }
  
      public function hasIndex(table:String, index:String):Bool {
@@ -1076,11 +1100,25 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
 +            || intValue(row.hidden) == 0) Std.string(Reflect.field(row, "name"))];
 +    }
 +
++    /**
++        Whether a SQLite table's definition fits the portable format of
++        logical backups: no CHECK, COLLATE or DEFERRABLE clauses and no table
++        options such as STRICT or WITHOUT ROWID. Other drivers keep these
++        constraints in their catalog, which requirePortableTables() checks,
++        so their definitions are always portable here.
++    **/
++    public function hasPortableDefinition(table:String):Bool {
++        if (!isSqlite())
++            return true;
++        var definition = SqliteTableDefinition.parse(sqliteTableSql(table));
++        return definition.suffix == ""
++            && !definition.hasKeyword(["CHECK", "COLLATE", "DEFERRABLE"]);
++    }
++
 +    /** Column metadata for logical schema readers. */
 +    public function getColumnDetails(table:String):Array<Dynamic> {
 +        if (isSqlite()) {
-+            var definition = SqliteTableDefinition.parse(sqliteTableSql(table));
-+            if (definition.suffix != "" || definition.hasKeyword(["CHECK", "COLLATE", "DEFERRABLE"]))
++            if (!hasPortableDefinition(table))
 +                throw new Exception('Table ${table} has constraints outside the portable format.');
 +            return columnRows(table);
 +        }
@@ -1118,12 +1156,10 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      }
  
      public function getIndexListing(table:String):Array<String> {
-@@ -130,6 +189,37 @@
- 
-     public function getTableListing():Array<String> {
+@@ -132,12 +205,44 @@
          return readNames(grammar().compileTableListing());
-+    }
-+
+     }
+ 
 +    public function getForeignKeys(table:String):Array<ForeignKeyInfo> {
 +        var grouped:Map<String, ForeignKeyInfo> = [];
 +        var rows = request(grammar().compileForeignKeyListing(table)).results();
@@ -1153,10 +1189,10 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
 +            current.foreignColumns[position] = foreignColumn == null ? "" : Std.string(foreignColumn);
 +        }
 +        return [for (entry in grouped) entry];
-     }
- 
++    }
++
      public function whenTableHasColumn(table:String, column:String, callback:Blueprint->Void):Void {
-@@ -137,7 +227,8 @@
+         if (hasColumn(table, column))
              this.table(table, callback);
      }
  
@@ -1166,7 +1202,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          if (!hasColumn(table, column))
              this.table(table, callback);
      }
-@@ -170,7 +261,7 @@
+@@ -170,7 +275,7 @@
          execute([grammar().compileDisableForeignKeyConstraints()]);
      }
  
@@ -1175,10 +1211,10 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          disableForeignKeyConstraints();
          try {
              callback();
-@@ -181,6 +272,90 @@
+@@ -181,6 +286,90 @@
          enableForeignKeyConstraints();
      }
-
+ 
 +    public function startReadSnapshot():Void {
 +        if (!isSqlite())
 +            request("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
@@ -1266,7 +1302,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      private function readNames(statement:String):Array<String> {
          var resultSet = request(statement);
          return [for (row in resultSet.results()) Std.string(Reflect.field(row, "name"))];
-@@ -191,7 +366,7 @@
+@@ -191,7 +380,7 @@
      }
  
      private function quote(identifier:String):String {
@@ -1275,7 +1311,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      }
  
      private function sqliteRenameIndex(table:String, from:String, to:String):Void {
-@@ -205,7 +380,8 @@
+@@ -205,7 +394,8 @@
              throw new Exception('Index ${from} does not exist on table ${table}.');
  
          var createSql:Null<String> = null;
@@ -1285,7 +1321,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
              if (Reflect.field(row, "sql") != null)
                  createSql = Std.string(Reflect.field(row, "sql"));
          }
-@@ -219,14 +395,20 @@
+@@ -219,14 +409,20 @@
          });
      }
  
@@ -1312,7 +1348,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          for (column in changedColumns) {
              if (!existingColumns.contains(SchemaGrammar.asciiLower(column.name)))
                  throw new Exception('Column ${column.name} does not exist on table ${table}.');
-@@ -258,20 +440,24 @@
+@@ -258,20 +454,24 @@
              }
              if (!isGeneratedColumn(changed))
                  copyColumns.push(name);
@@ -1340,7 +1376,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
  
          var temporaryTable = '__tmp_${table}';
          var quotedColumns = copyColumns.map(quote).join(", ");
-@@ -282,7 +468,9 @@
+@@ -282,7 +482,9 @@
              if (copyColumns.length > 0)
                  request('INSERT INTO ${quote(temporaryTable)} (${quotedColumns}) SELECT ${quotedColumns} FROM ${quote(table)}');
              // Keep AUTOINCREMENT's high-water mark even when the highest rows were deleted.
@@ -1351,7 +1387,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
                  request('UPDATE sqlite_sequence SET seq = MAX(seq, COALESCE((SELECT seq FROM sqlite_sequence WHERE name = \'${table.replace("'", "''")}\'), 0)) WHERE name = \'${temporaryTable.replace("'", "''")}\'');
              request('DROP TABLE ${quote(table)}');
              request('ALTER TABLE ${quote(temporaryTable)} RENAME TO ${quote(table)}');
-@@ -298,12 +486,13 @@
+@@ -298,12 +500,13 @@
      }
  
      private function sqliteTableSql(table:String):String {
@@ -1367,7 +1403,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          request("SAVEPOINT hxwell_schema");
          try {
              callback();
-@@ -315,7 +504,7 @@
+@@ -315,7 +518,7 @@
          request("RELEASE SAVEPOINT hxwell_schema");
      }
  
@@ -1430,7 +1466,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
                      statements.push(compileDropIndex(blueprint.table, name));
                  case DropPrimary:
                      statements.push(compileDropPrimary(blueprint.table));
-@@ -94,12 +100,28 @@
+@@ -94,6 +100,18 @@
          throw new Exception("Not implemented");
      }
  
@@ -1449,16 +1485,17 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
      public function compileTableListing():String {
          throw new Exception("Not implemented");
      }
-
-     public function compileIndexListing(table:String):String {
+@@ -102,6 +120,10 @@
          throw new Exception("Not implemented");
-+    }
-+
+     }
+ 
 +    public function compileForeignKeyListing(table:String):String {
 +        throw new Exception("Foreign key introspection is not implemented by this driver.");
-     }
-
++    }
++
      public function compileCreateDatabase(name:String):String {
+         throw new Exception("Not implemented");
+     }
 @@ -125,13 +147,17 @@
      public function compileColumnIndexes(table:String, column:ColumnDefinition):Array<String> {
          var statements:Array<String> = [];
@@ -1503,7 +1540,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
                  default:
              }
          }
-@@ -172,10 +202,7 @@
+@@ -172,17 +202,23 @@
          sql += collateModifier(column);
          sql += generatedModifier(column);
          sql += nullableModifier(column);
@@ -1515,7 +1552,8 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
          sql += onUpdateModifier(column);
          sql += incrementModifier(column, blueprint);
          sql += commentModifier(column);
-@@ -183,6 +210,14 @@
++        sql += checkModifier(column);
+         sql += placementModifier(column);
          return sql;
      }
  
@@ -1530,7 +1568,20 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
      private function charsetModifier(column:ColumnDefinition):String {
          return "";
      }
-@@ -249,7 +284,8 @@
+@@ -193,6 +229,12 @@
+         return "";
+     }
+ 
++    private function checkModifier(column:ColumnDefinition):String {
++        if (column.checkExpr != null)
++            return ' CHECK (${column.checkExpr})';
++        return "";
++    }
++
+     private function generatedModifier(column:ColumnDefinition):String {
+         if (column.virtualAsExpr != null)
+             return ' AS (${column.virtualAsExpr}) VIRTUAL';
+@@ -249,7 +291,8 @@
          throw new Exception("Not implemented");
      }
  
@@ -1540,7 +1591,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
          throw new Exception("Not implemented");
      }
  
-@@ -283,7 +319,8 @@
+@@ -283,7 +326,8 @@
      }
  
      public function isIncrementsColumn(column:ColumnDefinition):Bool {
@@ -1550,7 +1601,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
      }
  
      private function hasPrimaryCommand(blueprint:Null<Blueprint>):Bool {
-@@ -291,7 +328,8 @@
+@@ -291,7 +335,8 @@
              return false;
          for (command in blueprint.commands) {
              switch (command) {
@@ -1560,14 +1611,14 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
                  default:
              }
          }
-@@ -309,7 +347,7 @@
+@@ -309,7 +354,7 @@
              return (value : Bool) ? "1" : "0";
          if (value is Int || value is Float)
              return Std.string(value);
 -        return "'" + Std.string(value).replace("'", "''") + "'";
 +        return "'" + escapeString(Std.string(value)) + "'";
      }
-
+ 
      public static function asciiUpper(value:String):String {
 diff --git a/src/hx/well/database/schema/SqliteSchemaGrammar.hx b/src/hx/well/database/schema/SqliteSchemaGrammar.hx
 --- a/src/hx/well/database/schema/SqliteSchemaGrammar.hx
@@ -1762,7 +1813,18 @@ diff --git a/src/hx/well/facades/Schema.hx b/src/hx/well/facades/Schema.hx
  
  class Schema {
      public static function connection(key:String):SchemaBuilder {
-@@ -68,11 +69,17 @@
+@@ -56,6 +57,10 @@
+         return new SchemaBuilder().hasIndex(table, index);
+     }
+ 
++    public static function hasPortableDefinition(table:String):Bool {
++        return new SchemaBuilder().hasPortableDefinition(table);
++    }
++
+     public static function getColumnListing(table:String):Array<String> {
+         return new SchemaBuilder().getColumnListing(table);
+     }
+@@ -68,11 +73,17 @@
          return new SchemaBuilder().getTableListing();
      }
  
@@ -1782,7 +1844,7 @@ diff --git a/src/hx/well/facades/Schema.hx b/src/hx/well/facades/Schema.hx
          new SchemaBuilder().whenTableDoesntHaveColumn(table, column, callback);
      }
  
-@@ -92,7 +99,7 @@
+@@ -92,7 +103,7 @@
          new SchemaBuilder().disableForeignKeyConstraints();
      }
  
