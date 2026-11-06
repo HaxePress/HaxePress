@@ -110,7 +110,16 @@ def refresh_source(source, destination):
         temporary = Path(directory)
         staging = temporary / "source"
         staging.mkdir()
-        for folder in ("src", "std", "compat", "resource", "resources", "template", "tools"):
+        for folder in (
+            "src",
+            "std",
+            "compat",
+            "resource",
+            "resources",
+            "template",
+            "tools",
+            "client",
+        ):
             origin = source / folder
             if origin.exists():
                 shutil.copytree(origin, staging / folder)

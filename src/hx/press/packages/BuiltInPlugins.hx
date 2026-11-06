@@ -3,6 +3,7 @@ package hx.press.packages;
 import haxe.Exception;
 import haxe.crypto.Sha256;
 import hx.press.CmsVersion;
+import hx.press.model.InstalledPackage;
 import hx.press.model.Setting;
 import hx.press.packages.PackageManifest.ManifestData;
 import hx.well.facades.Storage;
@@ -60,7 +61,11 @@ class BuiltInPlugins {
             if (!disk.fileExists(path)) {
                 continue;
             }
-            var installed = PackageData.one(id);
+            // Read without the content cache: a restart must not rewrite cached entries.
+            var installed = InstalledPackage.query.select(["plugin_id", "manifest"])
+                .where("id", id)
+                .limit(1)
+                .first();
             if (installed != null && installed.plugin_id != bundle.identity) {
                 var manifest = PackageManifest.parse(installed.manifest);
                 if (installed.plugin_id != null || manifest.entrypoint != bundle.entrypoint) {
