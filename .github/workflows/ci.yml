@@ -62,6 +62,9 @@ jobs:
         run: make build
 
       - name: Run JVM integration tests
+        env:
+          # The theme preview tool drives the runner's Chrome, whose sandbox the runner may not allow.
+          HAXEPRESS_CHROME_ARGS: --no-sandbox
         run: |
           python3 tests/build.py
           python3 tests/run.py --skip-build

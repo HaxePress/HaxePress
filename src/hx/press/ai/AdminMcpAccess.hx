@@ -26,6 +26,9 @@ private typedef AdminMcpTicket = {
     var browserSession:Null<String>;
     var expires:Float;
     var remaining:Int;
+
+    /** For a preview capture: the admin, and the theme whose preview pages it may read. */
+    var capture:Null<{adminId:Int, themeId:String}>;
 }
 
 private typedef RemoteSession = {
@@ -247,7 +250,8 @@ class AdminMcpAccess {
                 sessionId: sessionId,
                 browserSession: browserSession,
                 expires: Date.now().getTime() + 30 * 1000,
-                remaining: 6
+                remaining: 6,
+                capture: null
             });
             return true;
         });
@@ -274,6 +278,16 @@ class AdminMcpAccess {
         if (ticket == null) {
             return null;
         }
+        if (ticket.capture != null) {
+            if (request.method != "GET" || !captures(request.path, ticket.capture.themeId)) {
+                return null;
+            }
+            var reader = activeAdmin(ticket.capture.adminId);
+            return reader == null ? null : {
+                admin: reader,
+                sessionKey: Sha256.encode('admin-preview:${value}').substr(0, 32)
+            };
+        }
         if (ticket.browserSession != null) {
             var admin = browser(ticket.browserSession);
             return admin == null ? null : {admin: admin, sessionKey: ticket.browserSession};
@@ -283,6 +297,40 @@ class AdminMcpAccess {
             admin: actor.admin,
             sessionKey: Sha256.encode('admin-mcp:${actor.sessionId}').substr(0, 32)
         };
+    }
+
+    /**
+        A ticket a headless browser on this host sends to read one theme's
+        preview pages and their assets, as the admin, for one minute: GET
+        requests only, so an AI can look at the design it is editing.
+    **/
+    public static function captureTicket(adminId:Int, themeId:String):String {
+        var ticket = SecureToken.generate(32);
+        locked(() -> {
+            tickets.set(ticket, {
+                authorization: "",
+                sessionId: "",
+                browserSession: null,
+                expires: Date.now().getTime() + 60 * 1000,
+                remaining: 400,
+                capture: {
+                    adminId: adminId,
+                    themeId: themeId
+                }
+            });
+            return true;
+        });
+        return ticket;
+    }
+
+    static function captures(path:String, themeId:String):Bool {
+        if (path.indexOf("..") >= 0 || path.indexOf("//") >= 0) {
+            return false;
+        }
+        var frame = '/admin/themes/${themeId}/preview/frame';
+        return path == frame
+            || StringTools.startsWith(path, '${frame}/')
+            || StringTools.startsWith(path, '/admin/extension-assets/${themeId}/');
     }
 
     public static function discardTicket(ticket:String):Void {

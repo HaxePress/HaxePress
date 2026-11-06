@@ -13,6 +13,7 @@ class ThemeAiRoutes {
     public static function register():Void {
         Route.path("/api/theme-designer/{id}").middleware([ThemeAiMiddleware]).group(() -> {
             Route.get("/design", ThemeAiController.read);
+            Route.get("/preview", ThemeAiController.preview);
             Route.post("/design", new SaveAiThemeDesignHandler());
             Route.get("/assets", ThemeAssetController.listing);
             Route.post("/assets", new UploadThemeImageHandler(true));

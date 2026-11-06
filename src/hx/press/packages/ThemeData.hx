@@ -8,7 +8,9 @@ class ThemeData {
         return info(PackageData.activeTheme());
     }
 
-    public static function info(record:Null<PackageRecord>, preview:Bool = false):Dynamic {
+    /** `draft` shows a builder theme's saved draft instead of its published design. **/
+    public static function info(record:Null<PackageRecord>, preview:Bool = false,
+            draft:Bool = false):Dynamic {
         if (record == null) {
             return {
                 id: BuiltInTheme.ID,
@@ -44,8 +46,8 @@ class ThemeData {
                     if (region.key != "header" && region.key != "footer") region.key
             ]),
             preview: preview,
-            design: manifest.layout == "builder" ? ThemeDesignData.published(record.id,
-                preview) : null
+            design: manifest.layout != "builder" ? null : draft ? ThemeDesignData.draft(record.id) : ThemeDesignData.published(record.id,
+                preview)
         };
     }
 }

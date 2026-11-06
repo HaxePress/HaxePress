@@ -15,6 +15,7 @@ const globalNames = {
   search_media: 'search_media_for_theme',
   get_collection_schema: 'get_theme_collection_schema',
   read_media_image: 'read_media_for_theme',
+  preview_theme: 'preview_theme_design',
 };
 let latestVersion;
 for (const mode of ['legacy', { pin: '2026-07-28' }]) {
@@ -137,6 +138,23 @@ for (const mode of ['legacy', { pin: '2026-07-28' }]) {
       'Designed through MCP',
     );
     assert.equal(scoped.document, undefined);
+    // The AI looks at its saved draft: the whole home page on a phone, then a missing page.
+    const look = await call('preview_theme', { path: '/', device: 'mobile', fullPage: true });
+    assert.ok(!look.isError, look.content?.[0]?.text);
+    assert.ok(
+      look.content.some(
+        (item) =>
+          item.type === 'image' && item.mimeType === 'image/jpeg' && item.data.length > 1000,
+      ),
+    );
+    assert.equal(look.structuredContent.status, 200);
+    assert.ok(
+      look.structuredContent.headings.includes('Designed through MCP'),
+      JSON.stringify(look.structuredContent.headings),
+    );
+    assert.ok(look.structuredContent.links.some((link) => link.path.startsWith('/content')));
+    const missingPage = data(await call('preview_theme', { path: '/no-such-page' }));
+    assert.equal(missingPage.status, 404);
     const replacement = structuredClone(snapshot.theme.document);
     replacement.templates.AIPage = [];
     replacement.templateMeta.AIPage = { label: 'AI page', fallback: 'Page' };

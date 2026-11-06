@@ -1,7 +1,9 @@
 package hx.press.themes;
 
 import hx.press.CmsAccess;
+import hx.press.ai.AdminMcpAccess;
 import hx.press.ai.AdminMcpMedia;
+import hx.press.packages.PackageData;
 import hx.press.CmsController;
 import hx.press.MediaCatalog;
 import hx.press.Pagination;
@@ -32,6 +34,24 @@ class ThemeAiController {
             browserPath: '/admin/themes/${id}/ai/ws',
             hosted: ThemeMcpHost.available()
         }).header("Cache-Control", "private, no-store");
+    }
+
+    /**
+        A one-minute pass for the MCP host's headless browser to load this
+        theme's preview pages as the connected admin, so an AI can look at
+        the design: the frame address and the ticket it sends.
+    **/
+    public static function preview(request:Request):AbstractResponse {
+        var actor:ThemeAiActor = request.getAttribute(ThemeAiAccess.ACTOR);
+        var id = request.route("id");
+        var theme = PackageData.one(id);
+        if (theme == null || theme.kind != "theme") {
+            return ResponseBuilder.asJson({error: "This theme is not installed."}, 404);
+        }
+        return ResponseBuilder.asJson({
+            frame: '/admin/themes/${id}/preview/frame',
+            ticket: AdminMcpAccess.captureTicket(actor.id, id)
+        });
     }
 
     public static function status(request:Request):AbstractResponse {

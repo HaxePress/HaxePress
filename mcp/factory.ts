@@ -1,5 +1,5 @@
 import { McpServer, type CallToolResult, type ToolAnnotations } from '@modelcontextprotocol/server';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import * as z from 'zod/v4';
 import { applyOperations, type Operation } from './operations';
 import {
@@ -15,6 +15,7 @@ import {
 } from '../resources/js/themes/builder/types';
 import { layoutPresets } from '../resources/js/themes/builder/presets';
 import { sectionChoices } from '../resources/js/themes/builder/friendly-presets';
+import { capture } from './preview-browser';
 import {
   attachedFile,
   encodedImage,
@@ -56,7 +57,15 @@ const adminNames: Record<string, string> = {
   read_theme_asset_image: 'read_theme_asset_image',
   upload_theme_image: 'upload_theme_image',
   verify_theme_image: 'verify_theme_image',
+  preview_theme: 'preview_theme_design',
 };
+
+/** Viewports of the preview tool, as the theme preview's device buttons show them. */
+const devices = {
+  desktop: { width: 1280, height: 800, mobile: false },
+  tablet: { width: 834, height: 1112, mobile: true },
+  mobile: { width: 390, height: 844, mobile: true },
+} as const;
 
 export function registerThemeTools(server: McpServer, options: ThemeServerOptions) {
   const { themeId, token, ticket } = options;
@@ -274,6 +283,90 @@ export function registerThemeTools(server: McpServer, options: ThemeServerOption
             collections: data.collections,
           };
         }),
+    );
+    register(
+      'preview_theme',
+      {
+        description:
+          'Look at the theme as visitors see it. Renders a page of the site with this theme in a browser and returns a screenshot, its title and the internal links to open next. Check the saved draft after editing, on desktop, tablet and mobile, and full pages for spacing further down.',
+        inputSchema: z.object({
+          path: z
+            .string()
+            .max(300)
+            .regex(/^\/(?!\/)\S*$/)
+            .default('/')
+            .describe('A site path, such as /, /about, /content/a-post or /content?category=News.'),
+          device: z.enum(['desktop', 'tablet', 'mobile']).default('desktop'),
+          fullPage: z
+            .boolean()
+            .default(false)
+            .describe(
+              'Capture the whole page, up to 8,000 pixels tall, instead of the first screen.',
+            ),
+          design: z
+            .enum(['draft', 'published'])
+            .default('draft')
+            .describe('Show the saved draft or the published design.'),
+        }),
+        annotations: readOnly,
+      },
+      async ({ path, device, fullPage, design }, endpoint) => {
+        try {
+          const pass = await api(endpoint, '/preview');
+          const frame: string = pass.frame;
+          const requested = new URL(path, address.origin);
+          const suffix = requested.pathname === '/' ? '' : requested.pathname;
+          const url = new URL(`${frame}${suffix}`, address.origin);
+          requested.searchParams.forEach((value, key) => url.searchParams.append(key, value));
+          if (design === 'draft') url.searchParams.set('design', 'draft');
+          const shot = await capture(
+            url.href,
+            {
+              'X-HaxePress-Admin-Request': pass.ticket,
+              'X-CSRF-TOKEN': randomBytes(24).toString('base64url'),
+            },
+            devices[device],
+            fullPage,
+          );
+          // Links inside the preview point at the preview frame; report them as site paths.
+          const paths = new Map<string, string>();
+          for (const link of shot.links) {
+            const target = new URL(link.href, address.origin);
+            if (target.pathname !== frame && !target.pathname.startsWith(`${frame}/`)) continue;
+            target.searchParams.delete('design');
+            const site = (target.pathname.slice(frame.length) || '/') + target.search;
+            if (!paths.has(site)) paths.set(site, link.text);
+          }
+          const links = [...paths].map(([path, text]) => ({ path, text }));
+          const summary = {
+            path,
+            device,
+            design,
+            status: shot.status,
+            title: shot.title,
+            pageHeight: shot.height,
+            headings: shot.headings,
+            links,
+          };
+          return {
+            content: [
+              { type: 'image' as const, data: shot.image, mimeType: 'image/jpeg' },
+              { type: 'text' as const, text: JSON.stringify(summary) },
+            ],
+            structuredContent: summary,
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: error instanceof Error ? error.message : 'The preview could not be captured.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      },
     );
   }
   if (options.permissions.edit) {

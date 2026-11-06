@@ -356,7 +356,9 @@ class PackageController {
         }
         var previewBase = '/admin/themes/${theme.id}/preview/frame';
         request.setAttribute("hx.press.preview.base", previewBase);
-        var themeInfo = ThemeData.info(theme, true);
+        // `design=draft` shows a builder theme's saved draft, as AI design checks need.
+        var draftDesign = request.query("design", "") == "draft";
+        var themeInfo = ThemeData.info(theme, true, draftDesign);
         themeInfo.preview = false;
         themeInfo.previewBase = previewBase;
         var session = request.query("customizeSession", "");

@@ -60,6 +60,15 @@ class ThemeDesignData {
         return model == null ? null : cast model.toObject();
     }
 
+    /** A builder theme's saved draft, read without caching, for previews of work in progress. **/
+    public static function draft(id:String):Dynamic {
+        var record = editor(id);
+        if (record == null || record.draft == "") {
+            return null;
+        }
+        return parsedDocument('${id}:draft', record.draft);
+    }
+
     public static function published(id:String, preview:Bool):Dynamic {
         var record:Null<{published:String, draft:String}> = ContentCache.remember("extensions",
             "theme-design", [id, preview], () -> {

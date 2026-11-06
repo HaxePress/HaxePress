@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { closeBrowser } from './preview-browser';
 import { timingSafeEqual } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import {
@@ -188,6 +189,7 @@ server.listen(0, '127.0.0.1', () => {
 });
 function stop() {
   for (const controller of activeRequests) controller.abort();
+  closeBrowser();
   server.close();
   server.closeAllConnections();
   lines.close();
