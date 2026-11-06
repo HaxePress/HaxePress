@@ -310,6 +310,59 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
             wait_ready(port, process)
             verify_migrations(fixtures, expected_migrations)
             print("PASS Repeated startup preserves completed ORM migrations", flush=True)
+            stop(process)
+            # An active theme built for the former browser renderer, as an older release left it.
+            legacy_manifest = {
+                "apiVersion": 2,
+                "cmsVersion": "2.10.0",
+                "kind": "theme",
+                "slug": "legacy-renderer",
+                "name": "Legacy renderer",
+                "version": "1.0.0",
+                "author": "Package author",
+                "layout": "legacy",
+                "assets": {"renderer": "theme.mjs", "stylesheet": "site.css"},
+            }
+            fixtures.update("cms_packages", {"enabled": 0}, [("kind", "=", "theme")])
+            fixtures.create(
+                "cms_packages",
+                [
+                    {
+                        "id": "theme-legacy-renderer",
+                        "kind": "theme",
+                        "slug": "legacy-renderer",
+                        "name": "Legacy renderer",
+                        "name_key": "",
+                        "version": "1.0.0",
+                        "description": "",
+                        "author": "Package author",
+                        "last_error": "",
+                        "restart_required": 0,
+                        "setting_count": 0,
+                        "directory": "theme-legacy-renderer-1-0-0",
+                        "manifest": json.dumps(legacy_manifest),
+                        "enabled": 1,
+                        "settings": "{}",
+                        "installed_at": "2026-01-01 00:00:00",
+                        "updated_at": "2026-01-01 00:00:00",
+                    }
+                ],
+            )
+            process = subprocess.Popen(COMMAND, cwd=work, stdout=log, stderr=subprocess.STDOUT)
+            wait_ready(port, process)
+            if fixtures.count("cms_packages", [("id", "=", "theme-legacy-renderer")]) != 0:
+                raise RuntimeError("A theme for the former browser renderer was kept.")
+            active = fixtures.rows(
+                "cms_packages", ["id"], [("kind", "=", "theme"), ("enabled", "=", 1)]
+            )
+            if [row["id"] for row in active] != ["theme-simple"]:
+                raise RuntimeError("The built-in theme did not replace a removed renderer theme.")
+            if page_data(port, "/")["props"]["theme"]["id"] != "theme-simple":
+                raise RuntimeError("The site still renders a removed renderer theme.")
+            print(
+                "PASS Startup removes themes built for the former browser renderer; the built-in theme takes over",
+                flush=True,
+            )
         except Exception:
             log.flush()
             log.seek(0)

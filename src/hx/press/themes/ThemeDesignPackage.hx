@@ -321,7 +321,7 @@ class ThemeDesignPackage {
             || ~/[\x00-\x1f\x7f]/.match(manifest.mediaPrefix)) {
             throw new Exception("A visual theme package requires its design, media list and source media prefix.");
         }
-        if (manifest.module != "" || manifest.renderer != "" || manifest.stylesheet != ""
+        if (manifest.module != "" || manifest.legacyRenderer || manifest.stylesheet != ""
             || PackageManifest.hasServer(manifest) || manifest.fields.length > 0
             || manifest.hooks.length > 0) {
             throw new Exception("Visual theme packages contain a design and images, without executable modules or package settings.");
@@ -359,7 +359,7 @@ class ThemeDesignPackage {
         var id = 'theme-${manifest.slug}';
         var current = ThemeDesign.query.select(["version"]).where("id", id).limit(1).first();
         if (previous != null && current == null) {
-            throw new Exception("A visual theme cannot replace a theme that uses a packaged renderer.");
+            throw new Exception("A visual theme cannot replace a packaged theme.");
         }
         inspect(upload.directory, manifest);
         var design = document(upload.directory, manifest);

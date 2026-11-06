@@ -128,7 +128,7 @@ All themes read the same data: site identity, collection details, content record
 
   Gallery and Notebook keep their CSS and settings and use the ported templates, so one port covers three themes.
 
-- **Third-party API 2 and 4 renderer themes:** cannot be converted automatically, because they contain arbitrary React code. Packages that only declare a JavaScript renderer are rejected at upload; authors port them to `*.well.html` views as Fieldnotes was.
+- **Third-party API 2 and 4 renderer themes:** cannot be converted automatically, because they contain arbitrary React code. Renderer support is removed: such packages are rejected at upload and removed from sites on startup, with the built-in theme taking over; authors port them to `*.well.html` views as Fieldnotes was.
 
 ### 5.3 Core component library
 
@@ -159,7 +159,7 @@ Theme settings stay typed. A colour becomes a CSS variable through a typed filte
 - **Activation:** activating or publishing a theme switches the compiled version atomically.
 - **Builder themes:** builder themes store IR version 3 and export as packages with the same layout.
 - **Settings:** theme settings are typed from their field kinds and readable as `theme.settings.*`. Secret fields are excluded.
-- **API 2 themes:** themes with only a JavaScript renderer are rejected with a migration message.
+- **API 2 themes:** themes that declare a JavaScript renderer are rejected with a migration message and removed on startup.
 
 ## 6. Migration plan
 
@@ -245,3 +245,4 @@ Measured on 2026-11-06 after phase 6, in a fresh JVM on a scratch copy of the si
 | Node.js process for rendering | Required                 | None            |
 
 Rendering itself allocates nothing in the steady state (Wellout's allocation test); the remaining 0.83 MB is spent in the request pipeline, data access and caches.
+

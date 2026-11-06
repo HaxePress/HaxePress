@@ -175,7 +175,7 @@ def run():
             )
             preview = props(admin, f"/admin/themes/{default}/preview/frame")["theme"]
             check(
-                preview["built_in"] and preview["stylesheet"] == "" and preview["renderer"] == "",
+                preview["built_in"] and preview["stylesheet"] == "" and "renderer" not in preview,
                 "Built-in preview still needs package assets",
             )
             check(

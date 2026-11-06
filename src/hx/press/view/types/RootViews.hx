@@ -116,7 +116,6 @@ typedef ThemeView = {
     var layout:String;
     var stylesheet:Url;
     var module:Url;
-    var renderer:Url;
     var assetBase:String;
     var settings:Map<String, String>;
     var preview:Bool;

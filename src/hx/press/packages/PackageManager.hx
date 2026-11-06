@@ -192,7 +192,7 @@ class PackageManager {
                 #end
             }
             if (ThemeDesign.query.where("id", id).exists()) {
-                throw new Exception("A packaged renderer cannot replace a visual theme design.");
+                throw new Exception("A packaged theme cannot replace a visual theme design.");
             }
             var settings = PackageSettings.defaults(manifest);
             var wasEnabled = previous != null && previous.enabled == 1;

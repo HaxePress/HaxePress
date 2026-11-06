@@ -34,7 +34,13 @@ typedef ManifestData = {
     var hooks:Array<String>;
     var fields:Array<PackageField>;
     var module:String;
-    var renderer:String;
+
+    /**
+        Whether the package was built for the former browser renderer
+        (`assets.renderer`). Such themes are rejected on installation and
+        removed or replaced on startup (`PackageBundles`).
+    **/
+    var legacyRenderer:Bool;
 
     /** The folder of the package's Wellout templates (`*.well.html`), relative to the package root. **/
     var views:String;
@@ -62,6 +68,7 @@ typedef ManifestData = {
 
 class PackageManifest {
     public static inline var FILENAME = "cms-package.json";
+    public static inline var RENDERER_UNSUPPORTED = "Browser theme renderers are no longer supported. Package the theme's pages as Wellout templates in a views folder.";
 
     public static function validPluginId(id:Null<String>):Bool {
         return id != null
@@ -163,11 +170,7 @@ class PackageManifest {
         }
         var assets = input.assets;
         var module = text(assets, "module", 240);
-        var renderer = text(assets, "renderer", 240);
-        if (renderer != ""
-            && (kind != "theme" || !safePath(renderer) || !~/\.(mjs|js)$/.match(renderer))) {
-            throw new Exception("A theme renderer must reference a JavaScript file in public/.");
-        }
+        var legacyRenderer = assets != null && Reflect.field(assets, "renderer") != null;
         var views = text(assets, "views", 240);
         if (views != "" && (!safePath(views) || views.indexOf(".") >= 0)) {
             throw new Exception("Package views must reference a folder of Wellout templates.");
@@ -254,7 +257,7 @@ class PackageManifest {
             hooks: hooks,
             fields: fields(input.fields),
             module: module,
-            renderer: renderer,
+            legacyRenderer: legacyRenderer,
             views: views,
             locks: locks,
             stylesheet: stylesheet,
@@ -402,10 +405,8 @@ class PackageManifest {
                 || manifest.cmsVersion != CmsVersion.version)) {
             throw new Exception("Export this visual theme for this exact CMS release.");
         }
-        if (manifest.renderer != ""
-            && (manifest.apiVersion != CmsVersion.pluginApiVersion
-                || manifest.cmsVersion != CmsVersion.version)) {
-            throw new Exception("Rebuild this theme renderer for this exact CMS release.");
+        if (manifest.legacyRenderer) {
+            throw new Exception(RENDERER_UNSUPPORTED);
         }
         var serverModule = hasServer(manifest);
         if (manifest.kind != "plugin" && !serverModule) {

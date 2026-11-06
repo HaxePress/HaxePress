@@ -214,7 +214,7 @@ def verify(fixtures):
                 'class="featured-content"' in rendered and 'class="hero"' not in rendered,
                 "packaged theme did not render its own pages",
             )
-            check(theme["renderer"] == "", "packaged theme still declares a browser renderer")
+            check("renderer" not in theme, "packaged theme still declares a browser renderer")
             check(
                 f'<link rel="stylesheet" href="{theme["stylesheet"]}">' in rendered
                 and "data-page=" not in rendered,

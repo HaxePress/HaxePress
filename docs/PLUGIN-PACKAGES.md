@@ -8,7 +8,7 @@ The example repository publishes a ready-to-install package for HaxePress 2.16.0
 
 Set `TEST_GITHUB_RELEASE=true` when running `python3 tests/run.py --only cms_packages` to include a live installation from the example release.
 
-CMS **2.16.0 / API 4** uses the `hx.press.*` application namespace, `ContentItem` / `content_items` for content storage, and the public renderer pages listed below. Rebuild older native plugins and renderer themes for this exact release. The bundled upgrade retains package settings, activation and the selected theme.
+CMS **2.16.0 / API 4** uses the `hx.press.*` application namespace, `ContentItem` / `content_items` for content storage, and the public pages listed below. Rebuild older native plugins for this exact release. The bundled upgrade retains package settings, activation and the selected theme.
 
 Simple is embedded in the application and is not distributed as a replaceable ZIP. Theme cards use real isolated preview frames; custom `simple` layouts may inherit the application's bundled CSS. See [themes](THEMES.md).
 
@@ -42,7 +42,7 @@ Simple is embedded in the application and is not distributed as a replaceable ZI
 }
 ```
 
-Place `cms-package.json` at the archive root or inside one enclosing folder. Frontend files live in `public/`; optional `assets.module` and `assets.stylesheet` refer to `.js`/`.mjs` and `.css` files there, and `assets.views` names a folder of Wellout templates for the plugin's pages (see [Plugin pages](#plugin-pages)). Optional `locks` lists the host locks the plugin holds while it runs (see [Upload limits and host locks](#upload-limits-and-host-locks)). The normal builder emits all three server targets. JAR and CPPIA remain required; PHP hosts also require `server.php` and its declared classes. `cmsVersion` is an exact release, rather than a version range. API 1/2/3 metadata can be read during upgrades; it does not authorize executing incompatible server modules or renderer themes.
+Place `cms-package.json` at the archive root or inside one enclosing folder. Frontend files live in `public/`; optional `assets.module` and `assets.stylesheet` refer to `.js`/`.mjs` and `.css` files there, and `assets.views` names a folder of Wellout templates for the plugin's pages (see [Plugin pages](#plugin-pages)). Optional `locks` lists the host locks the plugin holds while it runs (see [Upload limits and host locks](#upload-limits-and-host-locks)). The normal builder emits all three server targets. JAR and CPPIA remain required; PHP hosts also require `server.php` and its declared classes. `cmsVersion` is an exact release, rather than a version range. API 1/2/3 metadata can be read during upgrades; it does not authorize executing incompatible server modules.
 
 Generate one lowercase UUID for the plugin project and declare it in `pluginId`. Keep it across releases. Installation rejects a UUID owned by another package and updates must retain the installed UUID. An existing package that predates this field adopts the UUID from its first updated ZIP. Themes use their usual theme IDs.
 
@@ -346,7 +346,7 @@ Themes declare a stylesheet, a stable lowercase layout identifier and `assets.vi
 ['Home', 'ContentIndex', 'ContentDetail', 'Page', 'About', 'NotFound'];
 ```
 
-Templates are checked when the package is installed, against the same view contract the application uses: the props of each page, the shared values (`site`, `theme`, `navigation`, `i18n`, …), the helpers (`t`, `url`, `themeAsset`, `markdown`, …) and the application's components (`SiteLayout`, `ContentCard`, `Pagination`, `FieldValues`, `ContentFilters`, …). A package whose templates do not check is rejected with the first diagnostic. Theme templates are untrusted: they cannot use islands or raw HTML, and rendering is bounded in output size and component depth. `themeAsset(path)` links the package's `public/` files. Inside the owner-only preview frame, links to public pages keep the preview base, language and customization session. Packages that only declare a JavaScript `assets.renderer` are rejected.
+Templates are checked when the package is installed, against the same view contract the application uses: the props of each page, the shared values (`site`, `theme`, `navigation`, `i18n`, …), the helpers (`t`, `url`, `themeAsset`, `markdown`, …) and the application's components (`SiteLayout`, `ContentCard`, `Pagination`, `FieldValues`, `ContentFilters`, …). A package whose templates do not check is rejected with the first diagnostic. Theme templates are untrusted: they cannot use islands or raw HTML, and rendering is bounded in output size and component depth. `themeAsset(path)` links the package's `public/` files. Inside the owner-only preview frame, links to public pages keep the preview base, language and customization session. Browser renderers are not supported: a package that declares `assets.renderer` is rejected, and on startup HaxePress replaces such an installed example theme with its Wellout build and removes any other one, activating the built-in theme if it was active.
 
 ## Shared translations
 

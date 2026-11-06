@@ -132,7 +132,6 @@ export interface ThemeInfo {
   layout: string;
   stylesheet: string;
   module: string;
-  renderer: string;
   assetBase: string;
   settings: Record<string, string>;
   preview: boolean;

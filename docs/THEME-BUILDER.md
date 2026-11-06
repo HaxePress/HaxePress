@@ -1,6 +1,6 @@
 # Composable theme builder
 
-Open **Themes → Create theme**. Choose a content starter or an empty homepage. Existing ZIP themes keep their renderer and customization workflows.
+Open **Themes → Create theme**. Choose a content starter or an empty homepage. Packaged ZIP themes keep their Wellout views and customization workflows.
 
 The editor uses a nested document tree. Sections contain elements; containers, rows, columns, grids and repeaters can contain further elements. Reorder them before or after a sibling, move them into another container, or use the inspector's move controls. Descendant moves cannot introduce cycles. Deep branches can be collapsed. Canvas clicks select the innermost editable element. A resize handle supports dragging and arrow keys; Shift increases the keyboard step.
 
@@ -52,7 +52,7 @@ Draft changes save after a short idle period. Saves are serialized, retain optim
 
 The ZIP contains `cms-package.json`, `theme-design.json`, `theme-media.json` and only the managed images referenced by the design. The manifest declares the visual `builder` layout, the exact CMS/API release and the source media prefix. Custom templates, nested blocks, responsive states, components, classes, feeds and scoped CSS remain editable. Media titles and alternative descriptions are retained. Content records, accounts, site settings and connection keys are outside the archive.
 
-Upload the ZIP through **Themes → Upload theme**. The normal package inspection validates the bounded design, media manifest and each image. A new design is installed as an inactive, published snapshot that can be previewed, activated and edited. Replacing an existing visual theme is explicit, keeps its active status and advances its optimistic version. Referenced CMS templates cannot be removed by replacement. Visual and executable-renderer themes cannot replace one another.
+Upload the ZIP through **Themes → Upload theme**. The normal package inspection validates the bounded design, media manifest and each image. A new design is installed as an inactive, published snapshot that can be previewed, activated and edited. Replacing an existing visual theme is explicit, keeps its active status and advances its optimistic version. Referenced CMS templates cannot be removed by replacement. Visual and packaged themes cannot replace one another.
 
 Import rebases managed URLs to the destination disk. Identical existing files are reused; a conflicting filename gets a new managed name, and nested image/CSS references follow it. Images and design/package records commit together; failed transactions remove only newly created files. Draft and published media dependencies protect imported assets from library deletion.
 

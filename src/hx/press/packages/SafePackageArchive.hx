@@ -138,15 +138,15 @@ class SafePackageArchive {
 
     public static function inspect(disk:StorageDisk, root:String):InspectedPackage {
         var manifest = PackageManifest.parse(disk.get('${root}/${PackageManifest.FILENAME}'));
-        for (asset in [manifest.module, manifest.stylesheet, manifest.renderer]) {
+        for (asset in [manifest.module, manifest.stylesheet]) {
             if (asset != ""
                 && (!disk.fileExists('${root}/public/${asset}')
                     || disk.directoryExists('${root}/public/${asset}'))) {
                 throw new Exception("The package is missing a declared frontend asset.");
             }
         }
-        if (manifest.renderer != "" && manifest.views == "") {
-            throw new Exception("Browser theme renderers are no longer supported. Package the theme's pages as Wellout templates in a views folder.");
+        if (manifest.legacyRenderer) {
+            throw new Exception(PackageManifest.RENDERER_UNSUPPORTED);
         }
         if (manifest.views != "") {
             #if jvm

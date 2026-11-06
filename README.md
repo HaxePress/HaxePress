@@ -89,28 +89,28 @@ See [the API 4 package contract](docs/PLUGIN-PACKAGES.md) for native lifecycle, 
 
 The source is organized as follows:
 
-| Location | Purpose |
-| --- | --- |
-| `src/hx/press/` | Application services, controllers and content queries |
-| `src/hx/press/database/` | Schema, bounded migrations and query metadata |
-| `src/hx/press/plugins/` | Native loaders, lifecycle, plugin database APIs |
-| `src/hx/press/packages/` | ZIP inspection, installation, settings and themes |
-| `src/hx/press/routes/` | Route groups and legacy URL redirects |
-| `src/hx/press/i18n/` | Request-local translation catalogues |
-| `src/hx/press/model/` | Typed core ORM models |
-| `src/hx/press/config/` | Application configuration and provider registration |
-| `src/hx/press/handler/` | Public and guarded administration handlers |
-| `resources/views/` | Wellout pages, layouts and components |
-| `resources/js/` | Client islands, the theme builder and the content editor |
-| `resources/css/` | Scoped site and administration styles |
-| `examples/` | Native plugin and theme sources |
-| `tests/` | Isolated JVM/CPPIA/PHP checks and ORM fixtures |
+| Location                 | Purpose                                                  |
+| ------------------------ | -------------------------------------------------------- |
+| `src/hx/press/`          | Application services, controllers and content queries    |
+| `src/hx/press/database/` | Schema, bounded migrations and query metadata            |
+| `src/hx/press/plugins/`  | Native loaders, lifecycle, plugin database APIs          |
+| `src/hx/press/packages/` | ZIP inspection, installation, settings and themes        |
+| `src/hx/press/routes/`   | Route groups and legacy URL redirects                    |
+| `src/hx/press/i18n/`     | Request-local translation catalogues                     |
+| `src/hx/press/model/`    | Typed core ORM models                                    |
+| `src/hx/press/config/`   | Application configuration and provider registration      |
+| `src/hx/press/handler/`  | Public and guarded administration handlers               |
+| `resources/views/`       | Wellout pages, layouts and components                    |
+| `resources/js/`          | Client islands, the theme builder and the content editor |
+| `resources/css/`         | Scoped site and administration styles                    |
+| `examples/`              | Native plugin and theme sources                          |
+| `tests/`                 | Isolated JVM/CPPIA/PHP checks and ORM fixtures           |
 
 ## Upgrading an existing installation
 
 Back up `.env`, the database and managed `storage/` data before upgrading. The legacy naming migration renames the old content/tag tables and reference column through Schema APIs, preserves IDs/content/relationships, normalizes the old content type, working-copy keys and revision snapshots, and updates factory defaults only when they still match the original values. Existing custom site text is retained. The structure migration replaces the global slug constraint with `(content_type, slug)`, renames menu references to `content_id`, and adds registry/value/grant tables. Old public URLs redirect to canonical routes.
 
-Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Third-party native plugins must be rebuilt for the exact CMS 2.16.0 / API 4 release. Themes provide Wellout views; packages that only contain a JavaScript renderer are rejected. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. Keep custom `DB_PATH` values; the local project's original default filename is migrated to `storage/cms.sqlite` during deployment.
+Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Third-party native plugins must be rebuilt for the exact CMS 2.16.0 / API 4 release. Themes provide Wellout views. Browser renderer themes are no longer supported: they are rejected on upload and removed on startup, and the shipped example themes are replaced with their Wellout builds. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. Keep custom `DB_PATH` values; the local project's original default filename is migrated to `storage/cms.sqlite` during deployment.
 
 ## Verification
 
