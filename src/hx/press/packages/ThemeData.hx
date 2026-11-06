@@ -25,7 +25,7 @@ class ThemeData {
                 preview: false
             };
         }
-        var manifest = PackageManifest.parse(record.manifest);
+        var manifest = PackageManifest.stored(record.manifest);
         var builtIn = BuiltInTheme.isBuiltIn(record.id);
         return {
             id: record.id,

@@ -8,6 +8,11 @@ import hx.press.packages.BuiltInTheme;
 import haxe.Resource;
 import hx.well.facades.Storage;
 import hx.well.http.RequestStatic;
+#if (target.threaded)
+import sys.thread.Mutex;
+#else
+import hx.well.thread.FakeMutex as Mutex;
+#end
 
 typedef LocaleChoice = {
     var code:String;
@@ -106,12 +111,41 @@ class I18n {
             });
     }
 
+    /**
+        A package's catalogue for a locale over its fallback, merged once per
+        installed generation and cache revision: a new version installs into a
+        new directory. The map is shared; callers must not change it.
+    **/
     static function packageMessages(record:TranslationPackageRecord,
             selected:String):Map<String, Dynamic> {
+        // The extensions revision changes when catalogues are cached anew, such as after clearing the cache.
+        var revision = ContentCache.revision("extensions");
+        var key = '${revision}:${record.id}:${record.directory}:${selected}';
+        mergedLock.acquire();
+        var known = mergedPackages.get(key);
+        mergedLock.release();
+        if (known != null) {
+            return known;
+        }
         var fallback = packageCatalogue(record, FALLBACK);
-        return selected == FALLBACK ? fallback : merge(fallback,
+        var messages = selected == FALLBACK ? fallback : merge(fallback,
             packageCatalogue(record, selected));
+        mergedLock.acquire();
+        if (!mergedPackages.exists(key)) {
+            mergedOrder.push(key);
+            if (mergedOrder.length > MAX_MERGED_PACKAGES) {
+                mergedPackages.remove(mergedOrder.shift());
+            }
+        }
+        mergedPackages.set(key, messages);
+        mergedLock.release();
+        return messages;
     }
+
+    static inline var MAX_MERGED_PACKAGES = 128;
+    static final mergedPackages:Map<String, Map<String, Dynamic>> = [];
+    static final mergedOrder:Array<String> = [];
+    static final mergedLock = new Mutex();
 
     public static function t(key:String, ?parameters:Map<String, Dynamic>,
             namespace:String = "cms", ?selectedLocale:String):String {
@@ -176,6 +210,16 @@ class I18n {
             parameters);
     }
 
+    /** The writing direction of a locale: `ltr` or `rtl`. **/
+    public static function direction(selected:String):String {
+        for (choice in locales) {
+            if (choice.code == selected) {
+                return choice.direction;
+            }
+        }
+        return "ltr";
+    }
+
     public static function props(?preview:TranslationPackageRecord):TranslationProps {
         var selected = locale();
         var catalogues:Map<String, Map<String, Dynamic>> = [];
@@ -186,15 +230,9 @@ class I18n {
         if (preview != null) {
             catalogues.set(preview.id, packageMessages(preview, selected));
         }
-        var direction = "ltr";
-        for (choice in locales) {
-            if (choice.code == selected) {
-                direction = choice.direction;
-            }
-        }
         return {
             locale: selected,
-            direction: direction,
+            direction: direction(selected),
             fallbackLocale: FALLBACK,
             locales: locales,
             catalogues: catalogues

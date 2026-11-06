@@ -68,6 +68,12 @@ typedef ManifestData = {
 
 class PackageManifest {
     public static inline var FILENAME = "cms-package.json";
+    static inline var MAX_STORED = 64;
+    static final storedManifests:Map<String, ManifestData> = [];
+    static final storedOrder:Array<String> = [];
+    #if (target.threaded)
+    static final storedLock = new sys.thread.Mutex();
+    #end
     public static inline var RENDERER_UNSUPPORTED = "Browser theme renderers are no longer supported. Package the theme's pages as Wellout templates in a views folder.";
 
     public static function validPluginId(id:Null<String>):Bool {
@@ -396,6 +402,39 @@ class PackageManifest {
             throw new Exception('This package does not include a server module for the ${serverTarget()} target.');
         }
         return artifact;
+    }
+
+    /**
+        An installed package's manifest, parsed once per text for the paths
+        every request takes, such as the active theme and plugin hooks. The
+        result is shared: callers must not change it.
+    **/
+    public static function stored(text:String):ManifestData {
+        #if (target.threaded)
+        storedLock.acquire();
+        #end
+        var found = storedManifests.get(text);
+        #if (target.threaded)
+        storedLock.release();
+        #end
+        if (found != null) {
+            return found;
+        }
+        var parsed = parse(text);
+        #if (target.threaded)
+        storedLock.acquire();
+        #end
+        if (!storedManifests.exists(text)) {
+            storedOrder.push(text);
+            if (storedOrder.length > MAX_STORED) {
+                storedManifests.remove(storedOrder.shift());
+            }
+        }
+        storedManifests.set(text, parsed);
+        #if (target.threaded)
+        storedLock.release();
+        #end
+        return parsed;
     }
 
     public static function requireCompatible(manifest:ManifestData):Void {

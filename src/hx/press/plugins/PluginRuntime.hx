@@ -67,7 +67,7 @@ class PluginRuntime {
     }
 
     static function context(record:PackageRecord, data:Dynamic):Dynamic {
-        var manifest = PackageManifest.parse(record.manifest);
+        var manifest = PackageManifest.stored(record.manifest);
         var configured = PackageSettings.values(manifest, record.settings, true);
         return {
             apiVersion: CmsVersion.pluginApiVersion,
@@ -361,7 +361,7 @@ class PluginRuntime {
     public static function assets():Array<PluginAsset> {
         var result:Array<PluginAsset> = [];
         for (record in PackageData.forEvent("site.assets", "plugin")) {
-            var manifest = PackageManifest.parse(record.manifest);
+            var manifest = PackageManifest.stored(record.manifest);
             result.push({
                 id: record.id,
                 module: PackageStorage.assetUrl(record, manifest.module),

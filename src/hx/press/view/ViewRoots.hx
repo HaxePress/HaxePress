@@ -105,12 +105,13 @@ class ViewRoots {
         return path == "/admin" || StringTools.startsWith(path, "/admin/");
     }
 
+    /** Templates read the locale and its direction; the catalogues stay out of page rendering. **/
     static function i18n():Dynamic {
-        var data = I18n.props();
+        var selected = I18n.locale();
         return {
-            locale: data.locale,
-            direction: data.direction,
-            locales: data.locales
+            locale: selected,
+            direction: I18n.direction(selected),
+            locales: I18n.locales
         };
     }
 

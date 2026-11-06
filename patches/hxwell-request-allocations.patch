@@ -1,0 +1,137 @@
+diff --git a/src/hx/well/facades/Cache.hx b/src/hx/well/facades/Cache.hx
+--- a/src/hx/well/facades/Cache.hx
++++ b/src/hx/well/facades/Cache.hx
+@@ -38,6 +38,9 @@ class Cache {
+         return instance;
+     }
+ 
++    /** Tells a missing entry from a cached null or empty value, so a lookup reads the store once. **/
++    static final MISSING:Dynamic = new CacheMiss();
++
+     private var cacheStore:ICacheStore;
+     public function new(cacheStore:ICacheStore)
+     {
+@@ -67,8 +70,9 @@ class Cache {
+ 
+     public function remember<T>(key:String, seconds:Int, callback:Void -> T):T
+     {
+-        if(has(key))
+-            return get(key);
++        var cached:Dynamic = cacheStore.get(key, MISSING);
++        if(!Std.isOfType(cached, CacheMiss))
++            return cached;
+         var value:T = callback();
+         put(key, value, seconds);
+         return value;
+@@ -76,8 +80,9 @@ class Cache {
+ 
+     public function rememberForever<T>(key:String, callback:Void->T):T
+     {
+-        if(has(key))
+-            return get(key);
++        var cached:Dynamic = cacheStore.get(key, MISSING);
++        if(!Std.isOfType(cached, CacheMiss))
++            return cached;
+         var value:T = callback();
+         forever(key, value);
+         return value;
+@@ -129,3 +134,8 @@ class Cache {
+         cacheStore.putMany(values, seconds);
+     }
+ }
++
++/** The value a store returns for a missing entry during `remember`. */
++private class CacheMiss {
++    public function new() {}
++}
+diff --git a/src/hx/well/route/Route.hx b/src/hx/well/route/Route.hx
+--- a/src/hx/well/route/Route.hx
++++ b/src/hx/well/route/Route.hx
+@@ -128,8 +128,12 @@ class Route {
+             if (route.__routeType != RouteType.PATH && route.__routeType != RouteType.WEBSOCKET)
+                 continue;
+ 
++            // The method check is cheap; the path pattern only runs for routes of this method.
++            if (!route.getMethods().contains(httpRequest.method))
++                continue;
++
+             var params = route.matches(path);
+-            if (params != null && route.getMethods().contains(httpRequest.method)) {
++            if (params != null) {
+                 var hostWithoutPort = httpRequest.host.split(":")[0];
+                 var routeDomainPattern = route.routeDomainPattern == null ? null : route.routeDomainPattern.match(hostWithoutPort);
+                 if (route.routeDomainPattern != null && routeDomainPattern == null)
+diff --git a/src/hx/well/route/RoutePattern.hx b/src/hx/well/route/RoutePattern.hx
+--- a/src/hx/well/route/RoutePattern.hx
++++ b/src/hx/well/route/RoutePattern.hx
+@@ -9,12 +9,61 @@ class RoutePattern {
+     private var opt:String;
+     private var constraints:Map<String, String>;
+ 
++    /**
++        Literal text every match starts with, compared without the regex:
++        the pattern up to its first parameter or regex character, without a
++        trailing slash.
++    **/
++    private var prefix:String;
++
+     public function new(pattern:String, opt:String = "i") {
+         this.pattern = pattern;
+         this.constraints = new Map();
++        this.prefix = literalPrefix(pattern);
+         buildRegex(pattern, opt);
+     }
+ 
++    static function literalPrefix(pattern:String):String {
++        var end = 0;
++        while (end < pattern.length) {
++            var code = StringTools.fastCodeAt(pattern, end);
++            // { . ( ) [ ] * + ? ^ $ | \
++            if (code == 123 || code == 46 || code == 40 || code == 41 || code == 91 || code == 93
++                || code == 42 || code == 43 || code == 63 || code == 94 || code == 36
++                || code == 124 || code == 92) {
++                break;
++            }
++            end++;
++        }
++        var literal = pattern.substring(0, end);
++        // Requested paths lose their trailing slash, and an optional parameter may take the slash.
++        return literal.endsWith("/") ? literal.substring(0, literal.length - 1) : literal;
++    }
++
++    /** Whether `path` starts with the literal prefix; ASCII letters compare without case under `i`. **/
++    function startsWithPrefix(path:String):Bool {
++        var length = prefix.length;
++        if (path.length < length) {
++            return false;
++        }
++        var ignoreCase = opt != null && opt.indexOf("i") >= 0;
++        for (index in 0...length) {
++            var expected = StringTools.fastCodeAt(prefix, index);
++            var actual = StringTools.fastCodeAt(path, index);
++            if (expected == actual) {
++                continue;
++            }
++            if (!ignoreCase || lowerAscii(expected) != lowerAscii(actual)) {
++                return false;
++            }
++        }
++        return true;
++    }
++
++    static inline function lowerAscii(code:Int):Int {
++        return code >= 65 && code <= 90 ? code + 32 : code;
++    }
++
+     private function buildRegex(pattern:String, opt:String = "i"):Void {
+         var regexPattern = pattern;
+ 
+@@ -67,6 +116,8 @@ class RoutePattern {
+             path = path.substring(0, queryIndex);
+         }
+ 
++        if (!startsWithPrefix(path)) return null;
++
+         var regex = new EReg(r, opt);
+         if (!regex.match(path)) return null;
+ 

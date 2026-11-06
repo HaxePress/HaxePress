@@ -102,7 +102,7 @@ class PluginViews {
         if (record == null || record.directory != directory) {
             return null;
         }
-        var manifest = PackageManifest.parse(record.manifest);
+        var manifest = PackageManifest.stored(record.manifest);
         if (manifest.views == "") {
             return null;
         }

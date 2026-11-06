@@ -246,3 +246,18 @@ Measured on 2026-11-06 after phase 6, in a fresh JVM on a scratch copy of the si
 
 Rendering itself allocates nothing in the steady state (Wellout's allocation test); the remaining 0.83 MB is spent in the request pipeline, data access and caches.
 
+### Request pipeline
+
+Measured on 2026-11-06 with the same method, on a scratch copy of the site (builder theme, eight published posts), before and after four changes to the request pipeline: the `i18n` root no longer merges every translation catalogue, a cache lookup reads its file once instead of twice (`hxwell-request-allocations.patch`), route patterns skip the regex when their literal prefix does not match, and stored package manifests, merged package catalogues and cache revision tokens are kept in memory.
+
+| Page            | Before   | After  |
+| --------------- | -------- | ------ |
+| Homepage        | 903 KB   | 373 KB |
+| About           | 540 KB   | 157 KB |
+| Content list    | 1,387 KB | 397 KB |
+| Post            | 1,398 KB | 384 KB |
+| Category filter | 1,249 KB | 296 KB |
+| RSS feed        | 569 KB   | 141 KB |
+| Not found       | 1,005 KB | 185 KB |
+
+What remains is mostly reading content records from the file cache (each lookup reads and deserializes its file) and the JSON context of plugin hooks such as `ui.navigation`.

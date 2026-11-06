@@ -12,7 +12,9 @@ import sys.thread.Mutex;
 #else
 import hx.well.thread.FakeMutex as Mutex;
 #end
+import hx.well.cache.FileSystemCacheStore;
 import hx.well.facades.Cache;
+import sys.FileSystem;
 import hx.well.facades.Environment;
 import hx.well.facades.Storage;
 import hx.well.http.RequestStatic;
@@ -47,6 +49,18 @@ class ContentCache {
     static final hotEntries:Map<String, HotEntry> = [];
     static var hotWeight = 0;
     static var prefixState:Null<PrefixState> = null;
+
+    /**
+        Revision tokens known to this process, by key, re-read from the cache
+        at most once per `REVISION_SECONDS` and only while their file exists:
+        deleting the cache files starts new revisions at once. This process
+        changes them through `invalidate`, which updates them at once.
+    **/
+    static inline var REVISION_SECONDS = 1.0;
+
+    static final knownRevisions:Map<String, {token:String, checkedAt:Float, file:String}> = [];
+    static final revisionLock = new Mutex();
+    static var revisionFiles:Null<FileSystemCacheStore> = null;
 
     /**
         Small records that most requests read. Search, list and editor results
@@ -153,8 +167,19 @@ class ContentCache {
             }
         }
         var key = '${base}:${domain}:revision';
-        var token:String = locked(key,
-            () -> Cache.store().rememberForever(key, () -> SecureToken.generate(16)));
+        var now = Sys.time();
+        revisionLock.acquire();
+        var known = knownRevisions.get(key);
+        revisionLock.release();
+        var token:String;
+        if (known != null && now - known.checkedAt < REVISION_SECONDS
+            && FileSystem.exists(known.file)) {
+            token = known.token;
+        } else {
+            token = locked(key,
+                () -> Cache.store().rememberForever(key, () -> SecureToken.generate(16)));
+            knowRevision(key, token, now);
+        }
         if (revisions != null) {
             revisions.tokens.set(domain, token);
         }
@@ -265,10 +290,27 @@ class ContentCache {
             Cache.store().forever(key, token);
             return true;
         });
+        knowRevision(key, token, Sys.time());
         var revisions = requestRevisions(base);
         if (revisions != null) {
             revisions.tokens.set(domain, token);
         }
+    }
+
+    static function knowRevision(key:String, token:String, checkedAt:Float):Void {
+        revisionLock.acquire();
+        var known = knownRevisions.get(key);
+        var file = known != null ? known.file : revisionFile(key);
+        knownRevisions.set(key, {token: token, checkedAt: checkedAt, file: file});
+        revisionLock.release();
+    }
+
+    /** Where the default file cache keeps an entry. */
+    static function revisionFile(key:String):String {
+        if (revisionFiles == null) {
+            revisionFiles = new FileSystemCacheStore();
+        }
+        return '${revisionFiles.path}/${revisionFiles.cacheKey(key)}';
     }
 
     public static function changed(domain:String):Void {

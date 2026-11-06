@@ -90,7 +90,7 @@ class ThemeViews {
         if (record == null) {
             return null;
         }
-        var manifest = PackageManifest.parse(record.manifest);
+        var manifest = PackageManifest.stored(record.manifest);
         if (manifest.views == "") {
             return null;
         }

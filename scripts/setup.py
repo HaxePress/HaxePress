@@ -221,6 +221,7 @@ def main():
         ("hxwell", "hxwell-config-package.patch"),
         ("hxwell", "hxwell-plugin-routes.patch"),
         ("hxwell", "hxwell-response-slices.patch"),
+        ("hxwell", "hxwell-request-allocations.patch"),
         ("hxwell-crossbyte", "hxwell-crossbyte-sessions.patch"),
         ("hxwell-crossbyte", "hxwell-crossbyte-response-slices.patch"),
         ("haxe-concurrent", "haxe-concurrent-cppia.patch"),
