@@ -13,9 +13,7 @@ class RssPlugin implements PluginEntrypoint {
     public function new() {}
 
     public function onCreate(host:PluginHost, context:String):Void {
-        route = Route.get("/rss.xml", new RssHandler())
-            .name("plugin.rss.feed")
-            .attribute("inertia.share", false);
+        route = Route.get("/rss.xml", new RssHandler()).name("plugin.rss.feed");
     }
 
     public function onDestroy():Void {

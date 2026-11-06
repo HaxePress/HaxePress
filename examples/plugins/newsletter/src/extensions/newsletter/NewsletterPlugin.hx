@@ -32,12 +32,10 @@ class NewsletterPlugin implements PluginEntrypoint {
                 }
             })
         ]);
-        routes.push(Route.post("/subscribe", new SubscribeHandler())
-            .attribute("inertia.share", false));
+        routes.push(Route.post("/subscribe", new SubscribeHandler()));
         host.admin(() -> {
             routes.push(Route.get("/subscribers", new ListSubscribersHandler(host)));
-            routes.push(Route.get("/subscribers/export", new ExportSubscribersHandler(host))
-                .attribute("inertia.share", false));
+            routes.push(Route.get("/subscribers/export", new ExportSubscribersHandler(host)));
             routes.push(Route.post("/subscribers/{id}/delete", new DeleteSubscriberHandler(host))
                 .whereNumber("id"));
         });

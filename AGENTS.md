@@ -3,7 +3,7 @@
 ## Imports
 
 - For Haxe types from another package, add an explicit import and use their short names in calls, constructors, type annotations, generics, and class references.
-- Use `import hx.well.facades.Inertia;` followed by `Inertia.resolveUrlUsing(...)`. Do not write `hx.well.facades.Inertia.resolveUrlUsing(...)` in executable code.
+- Use `import hx.press.view.View;` followed by `View.render(...)`. Do not write `hx.press.view.View.render(...)` in executable code.
 - This applies even when a type is used only once.
 - Resolve type-name collisions with an import alias rather than an inline fully qualified name.
 - Keep intentional static-helper imports, including `import hx.well.http.RequestStatic.auth;` and explicit `auth("admin")` calls.
@@ -20,11 +20,11 @@ Compile the JVM target after changing imports to verify type and native-binding 
 
 ## Readability and HxWell APIs
 
-- Use descriptive intermediate variables for filtering, mapping, validation, and page props. Prepare data before calling `Inertia.render`.
+- Use descriptive intermediate variables for filtering, mapping, validation, and page props. Prepare data before calling `View.render`.
 - Use native string interpolation when composing text from values. In Haxe, write single-quoted strings with `${...}`. Use template literals in JavaScript and TypeScript and f-strings in Python. Prepare complex values before interpolating them.
 - Keep one statement per line and use multiline blocks. Do not hand-minify Haxe, JSX, CSS, or Python source.
-- Prefer the installed framework's APIs: `request.validate`, `request.only`, model queries, `toObject`, and `Inertia.render(component, props)`. Check their implementation before creating a wrapper or assuming Laravel API parity.
-- In this adapter, `withData` is for root-template data, not page props. Prepare all page props before calling `Inertia.render`.
+- Prefer the installed framework's APIs: `request.validate`, `request.only`, model queries, `toObject`, and `View.render(name, props)`. Check their implementation before creating a wrapper or assuming Laravel API parity.
+- Pages are Wellout templates (`*.well.html`). `View.share` is for root values shared across the request, not page props. Prepare all page props before calling `View.render`. Plugins render pages with `Pages.render`.
 - Cache typed data records from the models' native `toObject()` output. Model instances depend on constructor-initialized ORM metadata that this cache backend does not restore. Add presentation fields only when preparing page props.
 - The notes sample uses an older `Note.instance` API; this project's installed version uses `Model.query`. Keep explicit `auth("admin")` calls.
 - Use the standard formatter for each language and run `npm run format:check` before finishing source changes.
