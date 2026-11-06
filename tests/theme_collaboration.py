@@ -193,8 +193,9 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
         == 200,
         "AI permissions could not be restored",
     )
+    restored = [tool["name"] for tool in peer.rpc("tools/list")["result"]["tools"]]
     check(
-        len(peer.rpc("tools/list")["result"]["tools"]) == 10,
+        len(restored) == 11 and "verify_theme_image" in restored,
         "The updated permission cache did not refresh",
     )
     notifications = [

@@ -38,6 +38,12 @@ class StorageConfig extends FilesystemsConfig {
                 prefix: "themes",
                 throw_errors: true
             },
+            "image_uploads" => {
+                driver: "scoped",
+                disk: "local",
+                prefix: "image-uploads",
+                throw_errors: true
+            },
             "extensions" => {
                 driver: "scoped",
                 disk: "local",

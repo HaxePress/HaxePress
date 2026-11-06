@@ -37,11 +37,11 @@ def verify(owner, public, fixtures):
         "cms_packages", ["settings"], [("id", "=", "plugin-newsletter")], limit=1
     )
     settings_before = fixtures.rows("settings", ["value"], [("key", "=", "site_name")], limit=1)
-    image_response = owner.request(
+    image_response = owner.upload_image(
         "/admin/media/upload",
-        "POST",
-        raw=(ROOT / "public/images/coast.jpg").read_bytes(),
-        content_type="image/jpeg",
+        (ROOT / "public/images/coast.jpg").read_bytes(),
+        "image/jpeg",
+        (1000, 750),
     )
     check(image_response[0] == 201, "Validation fixture image upload")
     image_id = json.loads(image_response[2])["id"]

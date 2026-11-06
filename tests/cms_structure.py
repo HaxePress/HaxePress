@@ -224,12 +224,12 @@ def run():
                 any(link["href"] == base for group in navigation for link in group["links"]),
                 "Definition was absent from native admin navigation",
             )
-            image_file = next((ROOT / "public/images").glob("*.jpg"))
-            status, _, body = owner.request(
+            image_file = ROOT / "public/images/coast.jpg"
+            status, _, body = owner.upload_image(
                 "/admin/media/upload",
-                "POST",
-                raw=image_file.read_bytes(),
-                content_type="image/jpeg",
+                image_file.read_bytes(),
+                "image/jpeg",
+                (1000, 750),
             )
             check(status == 201, "Custom field image upload")
             image = json.loads(body)

@@ -112,8 +112,9 @@ try {
   const api = window.haxePress.themeDesigner;
   assert.ok(Object.isFrozen(api));
   assert.ok(!('token' in api) && !('command' in api) && !('script' in api));
-  assert.equal((await api.listTools()).length, 10);
-  await waitFor(() => registered.size === 10, 'Browser tools were not registered');
+  assert.equal((await api.listTools()).length, 11);
+  await waitFor(() => registered.size === 11, 'Browser tools were not registered');
+  assert.ok(registered.has('haxepress_verify_theme_image'));
   const initial = data(await api.callTool('get_design'));
   version = initial.theme.version;
   assert.equal(initial.theme.id, connection.themeId);
@@ -142,7 +143,10 @@ try {
   assert.equal(data(await api.callTool('get_design')).theme.document.tokens.accent, '#134e4a');
   await permissions(true, false, false);
   await waitFor(
-    () => registered.size === 5 && !registered.has('haxepress_edit_design'),
+    () =>
+      registered.size === 5 &&
+      !registered.has('haxepress_edit_design') &&
+      !registered.has('haxepress_verify_theme_image'),
     'Revoked browser tools remained registered',
   );
   assert.equal(api.permissions.edit, false);
@@ -159,7 +163,7 @@ try {
   await (await connection.ready()).discover();
   await assert.rejects(api.callTool('get_design'));
   await permissions(true, true, true);
-  await waitFor(() => registered.size === 10, 'Restored browser tools were not registered');
+  await waitFor(() => registered.size === 11, 'Restored browser tools were not registered');
   const snapshot = data(await api.callTool('get_design'));
   assert.equal(snapshot.theme.version, version);
   const response = await fetch(new URL('/admin/logout', process.env.TEST_URL), {

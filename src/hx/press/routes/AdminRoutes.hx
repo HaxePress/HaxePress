@@ -112,7 +112,9 @@ class AdminRoutes extends RouteGroup {
             Route.post("/content-types/{key}/save", new SaveContentTypeHandler());
             Route.post("/content-types/{key}/delete", ContentTypeController.remove);
             Route.post("/content/publish-due", ContentWorkflow.runDue);
-            Route.post("/media/upload", new UploadImageHandler());
+            Route.post("/media/upload", new UploadImageHandler()).attribute("inertia.share", false);
+            Route.post("/media/upload/verify", new UploadImageHandler(true))
+                .attribute("inertia.share", false);
             Route.get("/media", request -> MediaController.index(request))
                 .attribute("cms.navigation", {
                     group: "Content",
@@ -153,7 +155,10 @@ class AdminRoutes extends RouteGroup {
             Route.post("/themes/create", new SaveThemeDesignHandler(true));
             Route.get("/themes/{id}/design", ThemeStudioController.editor);
             Route.get("/themes/{id}/assets", ThemeAssetController.index);
-            Route.post("/themes/{id}/assets", new UploadThemeImageHandler());
+            Route.post("/themes/{id}/assets", new UploadThemeImageHandler())
+                .attribute("inertia.share", false);
+            Route.post("/themes/{id}/assets/verify", new UploadThemeImageHandler(false, true))
+                .attribute("inertia.share", false);
             Route.post("/themes/{id}/assets/{asset}/delete", ThemeAssetController.remove)
                 .whereNumber("asset");
             Route.post("/themes/{id}/design", new SaveThemeDesignHandler());

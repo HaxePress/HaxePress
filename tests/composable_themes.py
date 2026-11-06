@@ -139,11 +139,11 @@ def verify(owner, public, fixtures):
                 for index in range(25)
             ],
         )
-        uploaded = owner.request(
+        uploaded = owner.upload_image(
             "/admin/media/upload",
-            "POST",
-            raw=(ROOT / "public/images/coast.jpg").read_bytes(),
-            content_type="image/jpeg",
+            (ROOT / "public/images/coast.jpg").read_bytes(),
+            "image/jpeg",
+            (1000, 750),
         )
         check(uploaded[0] == 201, "Composable image upload failed")
         image = json.loads(uploaded[2])

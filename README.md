@@ -129,7 +129,7 @@ The JVM suite uses temporary databases, actual Crossbyte/SSR processes and a tes
 
 Media deletion enforces live content, plugin and database relationships. See [the dependency contract](docs/MEDIA-DEPENDENCIES.md) for persistent references, watched model columns and lifecycle behavior.
 
-Site identity supports managed PNG/WebP/JPEG/GIF logos, theme-font text fallback and generic publisher/site descriptions. See [site identity](docs/SITE-IDENTITY.md) for settings, upload validation and legacy-value migration.
+Site identity accepts PNG, JPEG and GIF logo uploads and supports theme-font text fallback and generic publisher/site descriptions. See [site identity](docs/SITE-IDENTITY.md) for settings, upload validation and legacy-value migration.
 
 Theme cards show live miniature previews. Simple is an application-owned default with bundled styles and catalogues, and cannot be uninstalled or replaced by an uploaded package. See [themes](docs/THEMES.md).
 

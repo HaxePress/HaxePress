@@ -69,9 +69,7 @@ def run():
             owner.request("/admin/pages/0/discard-working", "POST", {"draft_key": draft_key})
 
         content = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
-        status, _, body = owner.request(
-            "/admin/media/upload", "POST", raw=content, content_type="image/gif"
-        )
+        status, _, body = owner.upload_image("/admin/media/upload", content, "image/gif", (1, 1))
         check(status == 201, "GIF upload failed: " + body[:100])
         image = json.loads(body)
         try:

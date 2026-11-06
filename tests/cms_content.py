@@ -223,11 +223,11 @@ def verify(fixtures):
     )
 
     fixture = (ROOT / "public/images/coast.jpg").read_bytes()
-    status, _, body = admin.request(
+    status, _, body = admin.upload_image(
         "/admin/media/upload",
-        "POST",
-        raw=fixture,
-        content_type="image/jpeg",
+        fixture,
+        "image/jpeg",
+        (1000, 750),
         extra_headers={"X-File-Name": "CMS%20coast.jpg"},
     )
     check(status == 201, "upload image into catalog")

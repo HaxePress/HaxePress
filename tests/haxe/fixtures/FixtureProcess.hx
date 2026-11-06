@@ -30,6 +30,8 @@ import hx.press.model.PackageUpload;
 import hx.press.model.ContentRevision;
 import hx.press.model.EditorDraft;
 import hx.press.model.MediaAsset;
+import hx.press.media.ImageUploads;
+import hx.press.model.ImageUpload;
 import hx.press.model.MediaDependency;
 import hx.press.model.MediaDependencySource;
 import hx.press.model.Admin;
@@ -187,6 +189,10 @@ class FixtureProcess {
             Schema.drop("categories");
             return true;
         }
+        if (command.action == "expire_image_uploads") {
+            ImageUploads.expire();
+            return true;
+        }
         return switch (command.entity) {
             case "items": execute(ContentItem.query, command);
             case "content_types": execute(ContentType.query, command);
@@ -213,6 +219,7 @@ class FixtureProcess {
             case "media_dependencies": execute(MediaDependency.query, command);
             case "media_dependency_sources": execute(MediaDependencySource.query, command);
             case "media_assets": execute(MediaAsset.query, command);
+            case "image_uploads": execute(ImageUpload.query, command);
             case "admins": execute(Admin.query, command);
             case "login_attempts": execute(LoginAttempt.query, command);
             case "menu_links": execute(MenuLink.query, command);

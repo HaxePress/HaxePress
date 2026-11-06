@@ -64,9 +64,6 @@ class MediaStorage {
             return {extension: "jpg", contentType: "image/jpeg"};
         if (bytes.length >= 6 && ["GIF87a", "GIF89a"].contains(bytes.getString(0, 6)))
             return {extension: "gif", contentType: "image/gif"};
-        if (bytes.length >= 12 && bytes.getString(0, 4) == "RIFF"
-            && bytes.getString(8, 4) == "WEBP")
-            return {extension: "webp", contentType: "image/webp"};
         return null;
     }
 
@@ -88,11 +85,7 @@ class MediaStorage {
                     && width <= 10000
                     && height <= 10000
                     && width * 1.0 * height <= MAX_PIXELS) {
-                    var decoded = reader.read(0);
-                    if (decoded != null) {
-                        result = {width: width, height: height};
-                        decoded.flush();
-                    }
+                    result = {width: width, height: height};
                 }
             }
         } catch (error:Dynamic) {

@@ -8,6 +8,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
 import Icon from '../../components/Icon';
 import MediaReferences from '../../components/MediaReferences';
+import { uploadManagedImage } from '../../media';
 import { errorText, type MediaImage, type PageLinks, type SharedProps } from '../../types';
 
 interface LibraryImage extends MediaImage {
@@ -50,18 +51,7 @@ export default function Media({
     setUploading(true);
     setError('');
     try {
-      const response = await fetch('/admin/media/upload', {
-        method: 'POST',
-        body: file,
-        headers: {
-          'X-CSRF-TOKEN': csrfToken || '',
-          'X-File-Name': encodeURIComponent(file.name),
-          'Content-Type': file.type || 'application/octet-stream',
-          Accept: 'application/json',
-        },
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'The image could not be uploaded.');
+      await uploadManagedImage(file, csrfToken, mediaRules);
       router.reload();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Upload failed.');
@@ -177,7 +167,7 @@ export default function Media({
             <section className="admin-card empty-state">
               <Icon name="image" />
               <h2>{t('No images')}</h2>
-              <p>{t('Upload JPEG, PNG, WebP or GIF images up to 5 MB and 20 megapixels.')}</p>
+              <p>{t('Upload JPEG, PNG or GIF images up to 5 MB and 20 megapixels.')}</p>
             </section>
           )}
           <Pagination links={pagination} count={images.length} noun={t('images')} />

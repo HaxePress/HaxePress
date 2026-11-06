@@ -47,8 +47,8 @@ def run():
     with FixtureStore.from_environment() as store:
         try:
             image_bytes = large_png()
-            status, _, body = owner.request(
-                "/admin/media/upload", "POST", raw=image_bytes, content_type="image/png"
+            status, _, body = owner.upload_image(
+                "/admin/media/upload", image_bytes, "image/png", (1024, 768)
             )
             check(status == 201, "The MCP large-image fixture could not be uploaded")
             image = json.loads(body)

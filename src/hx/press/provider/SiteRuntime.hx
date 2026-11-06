@@ -2,6 +2,7 @@ package hx.press.provider;
 
 import hx.press.ContentWorkflow;
 import hx.press.WorkingCopies;
+import hx.press.media.ImageUploads;
 import hx.press.packages.PackageManager;
 import hx.press.plugins.PluginRuntime;
 import hx.press.themes.ThemeMcpHost;
@@ -27,12 +28,13 @@ class SiteRuntime {
         Schedule.get().fixedDelay(_ -> {
             Cache.store().expireCache();
             try {
+                ImageUploads.expire();
                 PackageManager.cleanupUploads();
                 WorkingCopies.expire();
                 Connection.free();
             } catch (error:Dynamic) {
                 Connection.free();
-                trace("Package upload cleanup failed: " + Std.string(error));
+                trace("Temporary upload cleanup failed: " + Std.string(error));
             }
             return true;
         }, 60000, 60000);

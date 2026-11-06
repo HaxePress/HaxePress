@@ -2,10 +2,11 @@ package hx.press.media;
 
 import hx.well.facades.Storage;
 
-/** Managed-image references are platform independent; decoding stays in the upload driver. */
+/** Managed-image references and the browser's upload rules. */
 class MediaReferences {
     public static inline var MAX_BYTES = 5 * 1024 * 1024;
-    public static final mimeTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    static final uploadMimeTypes = ["image/jpeg", "image/png", "image/gif"];
+    public static final mimeTypes = uploadMimeTypes.concat(["image/webp"]);
 
     public static function prefix():String {
         var url = Storage.disk("media").url("");
@@ -37,8 +38,8 @@ class MediaReferences {
         return {
             uploadUrl: "/admin/media/upload",
             maxBytes: MAX_BYTES,
-            mimeTypes: mimeTypes,
-            extensions: ["jpg", "jpeg", "png", "webp", "gif"],
+            mimeTypes: uploadMimeTypes,
+            extensions: ["jpg", "jpeg", "png", "gif"],
             imagePattern: "^" + pattern.toString() + "[A-Za-z0-9_-]{32}\\.(jpg|png|webp|gif)$"
         };
     }

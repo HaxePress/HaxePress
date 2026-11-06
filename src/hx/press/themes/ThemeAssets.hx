@@ -15,9 +15,6 @@ import hx.press.model.ThemeDesign;
 import hx.well.facades.Storage;
 import hx.well.internal.SecureToken;
 import hx.well.thread.MutexPool;
-#if jvm
-import hx.press.MediaStorage;
-#end
 
 typedef ThemeAssetRecord = {
     var id:Int;
@@ -35,6 +32,7 @@ typedef ThemeImageInfo = {
     var contentType:String;
     var width:Int;
     var height:Int;
+    var sha256:String;
 }
 
 class ThemeAssets {
@@ -104,33 +102,8 @@ class ThemeAssets {
         }
     }
 
-    public static function imageInfo(bytes:Bytes):ThemeImageInfo {
-        if (bytes == null || bytes.length == 0 || bytes.length > MediaReferences.MAX_BYTES) {
-            throw new Exception("Choose an image smaller than 5 MB.");
-        }
-        #if jvm
-        var format = MediaStorage.format(bytes);
-        if (format == null) {
-            throw new Exception("Choose a JPEG, PNG, WebP or GIF image.");
-        }
-        var dimensions = MediaStorage.dimensions(bytes);
-        if (dimensions == null) {
-            throw new Exception("Use a valid image under 20 megapixels.");
-        }
-        return {
-            extension: format.extension,
-            contentType: format.contentType,
-            width: dimensions.width,
-            height: dimensions.height
-        };
-        #else
-        throw new Exception("Theme image uploads require the JVM image driver.");
-        #end
-    }
-
-    public static function upload(id:String, bytes:Bytes, title:String = "",
-            alt:String = ""):Dynamic {
-        var info = imageInfo(bytes);
+    public static function saveImage(id:String, bytes:Bytes, info:ThemeImageInfo,
+            title:String = "", alt:String = ""):Dynamic {
         return locked(id, () -> {
             if (!validThemeId(id) || !ThemeDesign.query.where("id", id).exists()) {
                 throw new Exception("This theme is no longer available.");
@@ -151,7 +124,7 @@ class ThemeAssets {
                     "width" => info.width,
                     "height" => info.height,
                     "size" => bytes.length,
-                    "sha256" => Sha256.make(bytes).toHex(),
+                    "sha256" => info.sha256,
                     "created_at" => SiteSettingsStore.timestamp()
                 ]);
                 registered = true;

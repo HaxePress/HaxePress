@@ -124,11 +124,11 @@ def verify(owner, public, fixtures):
             "Rejected design changed its version",
         )
 
-        uploaded = owner.request(
+        uploaded = owner.upload_image(
             "/admin/media/upload",
-            "POST",
-            raw=(ROOT / "public/images/coast.jpg").read_bytes(),
-            content_type="image/jpeg",
+            (ROOT / "public/images/coast.jpg").read_bytes(),
+            "image/jpeg",
+            (1000, 750),
         )
         check(uploaded[0] == 201, "Theme image upload failed")
         image = json.loads(uploaded[2])

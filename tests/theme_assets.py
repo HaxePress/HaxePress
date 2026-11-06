@@ -1,6 +1,7 @@
 """Theme-owned images stay outside site media and survive a complete package round trip."""
 
 import copy
+import hashlib
 import io
 import json
 import os
@@ -54,13 +55,34 @@ def run():
                 == 422,
                 "Invalid theme image accepted",
             )
-            status, _, body = owner.request(
+            webp_bytes = (ROOT / "tests/fixtures/media/logo-lossless.webp").read_bytes()
+            check(
+                owner.request(upload, "POST", raw=webp_bytes, content_type="image/webp")[0] == 422,
+                "New WebP theme image accepted",
+            )
+            status, headers, staged = owner.request(
                 upload,
                 "POST",
                 raw=image_bytes,
                 content_type="image/png",
+                binary=True,
                 extra_headers={"X-File-Name": "Transparent%20theme%20logo.png"},
             )
+            check(status == 202 and staged == image_bytes, "Theme image staging changed the bytes")
+            check(
+                json.loads(owner.request(upload)[2])["images"] == [],
+                "An unconfirmed image entered the theme library",
+            )
+            pending_id = headers["x-upload-id"]
+            digest = hashlib.sha256(staged).hexdigest()
+            check(
+                owner.verify_image(
+                    "/admin/themes/" + other + "/assets", pending_id, digest, (120, 40)
+                )[0]
+                == 404,
+                "An upload was confirmed for another theme",
+            )
+            status, _, body = owner.verify_image(upload, pending_id, digest, (120, 40))
             check(status == 201, "Theme image upload failed: " + body[:150])
             image = json.loads(body)
             check(
@@ -137,11 +159,11 @@ def run():
                 "Theme storage aggregate budget was ignored",
             )
             check(
-                owner.request(
+                owner.upload_image(
                     "/admin/themes/" + other + "/assets",
-                    "POST",
-                    raw=image_bytes,
-                    content_type="image/png",
+                    image_bytes,
+                    "image/png",
+                    (120, 40),
                 )[0]
                 == 201,
                 "The upload budget was applied across themes",
@@ -151,7 +173,7 @@ def run():
             large = large_png()
             for _ in range(5):
                 check(
-                    owner.request(upload, "POST", raw=large, content_type="image/png")[0] == 201,
+                    owner.upload_image(upload, large, "image/png", (1024, 768))[0] == 201,
                     "Unused theme image upload failed",
                 )
             status, _, archive = owner.request(base + "/export", binary=True)

@@ -79,8 +79,8 @@ def verify(fixtures):
     packages = []
     image_ids = []
     source_bytes = (ROOT / "tests/fixtures/media/logo-transparent.png").read_bytes()
-    status, _, body = owner.request(
-        "/admin/media/upload", "POST", raw=source_bytes, content_type="image/png"
+    status, _, body = owner.upload_image(
+        "/admin/media/upload", source_bytes, "image/png", (120, 40)
     )
     check(status == 201, "Export image upload failed")
     image = json.loads(body)
@@ -355,8 +355,8 @@ def verify(fixtures):
             == 422,
             "An incompatible visual format was accepted",
         )
-        status, _, body = owner.request(
-            "/admin/media/upload", "POST", raw=png(True), content_type="image/png"
+        status, _, body = owner.upload_image(
+            "/admin/media/upload", png(True), "image/png", (1024, 768)
         )
         check(status == 201, "Streaming export fixture upload failed")
         large = json.loads(body)

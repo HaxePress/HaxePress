@@ -830,7 +830,7 @@ export default function Editor({
                 >
                   <Icon name="upload" /> {t('Upload cover image')}
                 </button>
-                <p className="upload-size-note">{t('JPEG, PNG, WebP or GIF. Up to 5 MB.')}</p>
+                <p className="upload-size-note">{t('JPEG, PNG or GIF. Up to 5 MB.')}</p>
                 {uploadMessage('cover')}
                 {form.data.image && (
                   <button

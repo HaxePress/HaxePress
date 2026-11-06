@@ -93,6 +93,7 @@ for (const kind of ['http', 'websocket']) {
           'search_theme_assets',
           'read_theme_asset_image',
           'upload_theme_image',
+          'verify_theme_image',
         ],
       );
       assert.ok(!tools.some((tool) => /publish|activate|shell|execute|grant/i.test(tool.name)));
@@ -213,10 +214,19 @@ for (const kind of ['http', 'websocket']) {
         Buffer.from(image.content[0].data, 'base64').length,
         Number(process.env.TEST_MCP_IMAGE_BYTES),
       );
+      const stagedImage = await call('upload_theme_image', {
+        data: image.content[0].data,
+        name: 'AI theme image.png',
+      });
+      const pending = data(stagedImage);
+      const preview = stagedImage.content.find((entry) => entry.type === 'image');
+      assert.equal(preview?.data, image.content[0].data);
+      const png = Buffer.from(preview.data, 'base64');
       const ownedImage = data(
-        await call('upload_theme_image', {
-          data: image.content[0].data,
-          name: 'AI theme image.png',
+        await call('verify_theme_image', {
+          ...pending,
+          width: png.readUInt32BE(16),
+          height: png.readUInt32BE(20),
         }),
       );
       assert.ok(ownedImage.url.startsWith('/theme-assets/' + environment.HXPRESS_THEME_ID + '/'));

@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/server';
+import { createHash } from 'node:crypto';
 import * as z from 'zod/v4';
 import { applyOperations, type Operation } from './operations';
 import {
@@ -155,7 +156,7 @@ export function createThemeServer(options: ThemeServerOptions) {
       feedLimit: 24,
     },
     workflow:
-      'Read get_design and its version first. Use edit_design for small atomic changes, or replace_design for an entirely new theme. Every write needs expectedVersion and creates a saved draft. The user reviews and publishes in the editor.',
+      'Read get_design and its version first. Use edit_design for small atomic changes, or replace_design for an entirely new theme. Design edits need expectedVersion and save a draft. The user reviews and publishes in the editor.',
     layout:
       'Sections own blocks. Containers, semantic elements and repeaters may own children. Core templates must remain present. Reusable components live in document.components and render with a component block. Add custom layouts in document.templates plus templateMeta with a label and core-template fallback.',
     content:
@@ -163,7 +164,7 @@ export function createThemeServer(options: ThemeServerOptions) {
     styles:
       'styles.desktop.normal is the base CSS map. styles.tablet and styles.mobile override it; hover and focus are independent states. CSS values are strings. Global tokens hold background, text, accent, font, width and radius. Shared appearances live in classes; css holds scoped theme CSS. Set an empty style value to inherit.',
     images:
-      'Use upload_theme_image and search_theme_assets for theme-owned images, or search_media for existing site media. Images and CSS backgrounds use the managed media library. Do not insert remote image URLs or executable HTML. Site branding and menu blocks use the CMS site settings and navigation.',
+      'Stage theme images with upload_theme_image, check the returned image, then call verify_theme_image with its ID, hash and dimensions. Use search_theme_assets or search_media to find existing images. Images and CSS backgrounds use the managed media library. Do not insert remote image URLs or executable HTML. Site branding and menu blocks use the CMS site settings and navigation.',
     identifiers:
       'Existing node IDs are stable. Insert and duplicate operations return fresh IDs. When replacing a document, use unique ASCII IDs up to 40 characters. Operations on nonexistent nodes or invalid nested moves fail without saving.',
   };
@@ -429,15 +430,15 @@ export function createThemeServer(options: ThemeServerOptions) {
         'upload_theme_image',
         {
           description:
-            'Upload a JPEG, PNG, WebP or GIF image as canonical Base64, up to 5 MB. The image belongs to this theme, is stored separately from site media, and is included in theme exports. Use its returned URL in image blocks or CSS backgrounds.',
+            'Stage a JPEG, PNG or GIF image as canonical Base64, up to 5 MB. The response includes the uploaded image, its ID and SHA-256 hash. Check the image and call verify_theme_image to save it to this theme.',
           inputSchema: z.object({
             data: z.string().max(6990508),
             name: z.string().max(180).optional(),
           }),
           annotations: edit,
         },
-        async ({ data, name }) =>
-          safely(async () => {
+        async ({ data, name }) => {
+          try {
             if (!/^[A-Za-z0-9+/]*={0,2}$/.test(data))
               throw new Error('Supply canonical Base64 image data.');
             const bytes = Buffer.from(data, 'base64');
@@ -453,7 +454,7 @@ export function createThemeServer(options: ThemeServerOptions) {
               body: bytes,
               headers: {
                 Authorization: 'Bearer ' + token,
-                Accept: 'application/json',
+                Accept: 'image/*, application/json',
                 'Content-Type': 'application/octet-stream',
                 'X-File-Name': encodeURIComponent(name || 'Theme image'),
               },
@@ -462,11 +463,62 @@ export function createThemeServer(options: ThemeServerOptions) {
                 ...(options.signal ? [options.signal] : []),
               ]),
             });
-            const result = await response.json();
-            if (!response.ok)
-              throw new Error(result.error || 'The theme image could not be uploaded.');
-            return result;
+            if (response.status !== 202) {
+              const error = response.headers.get('content-type')?.includes('application/json')
+                ? (await response.json()).error
+                : null;
+              throw new Error(error || 'The theme image could not be uploaded.');
+            }
+            const id = response.headers.get('x-upload-id');
+            const mimeType = response.headers.get('content-type')?.split(';')[0] || '';
+            const uploaded = Buffer.from(await response.arrayBuffer());
+            const sha256 = createHash('sha256').update(uploaded).digest('hex');
+            const originalHash = createHash('sha256').update(bytes).digest('hex');
+            if (
+              !id ||
+              sha256 !== originalHash ||
+              !['image/jpeg', 'image/png', 'image/gif'].includes(mimeType)
+            ) {
+              throw new Error('The uploaded image does not match the selected file.');
+            }
+            const pending = result({ id, sha256 });
+            return {
+              ...pending,
+              content: [
+                ...pending.content,
+                { type: 'image' as const, mimeType, data: uploaded.toString('base64') },
+              ],
+            };
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text:
+                    error instanceof Error
+                      ? error.message
+                      : 'The theme image could not be uploaded.',
+                },
+              ],
+              isError: true,
+            };
+          }
+        },
+      );
+      server.registerTool(
+        'verify_theme_image',
+        {
+          description:
+            'Confirm a staged theme image after checking that it displays and matches the original file. Supply the upload ID, SHA-256 hash and measured pixel dimensions. The result includes its saved theme image URL.',
+          inputSchema: z.object({
+            id: z.string().regex(/^[A-Za-z0-9_-]{32}$/),
+            sha256: z.string().regex(/^[a-f0-9]{64}$/),
+            width: z.number().int().min(1).max(10000),
+            height: z.number().int().min(1).max(10000),
           }),
+          annotations: edit,
+        },
+        async (confirmation) => safely(() => api('/assets/verify', confirmation)),
       );
     }
     return server;

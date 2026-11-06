@@ -126,6 +126,20 @@ class CmsSchema {
                 table.timestamps();
             });
         }
+        if (!Schema.hasTable("image_uploads")) {
+            Schema.create("image_uploads", table -> {
+                table.string("key", 32).primary();
+                table.integer("user_id");
+                table.string("owner_hash", 64);
+                table.string("theme_id", 80);
+                table.string("label", 180);
+                table.string("sha256", 64);
+                table.integer("size");
+                table.double("expires_epoch");
+                table.index(["user_id", "expires_epoch"]);
+                table.index(["expires_epoch"]);
+            });
+        }
         MediaDependencySchema.up();
         if (!Schema.hasTable("cms_packages")) {
             Schema.create("cms_packages", table -> {

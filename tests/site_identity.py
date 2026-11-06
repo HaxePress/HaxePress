@@ -1,9 +1,11 @@
-"""Verify managed logos, genuine WebP decoding, theme fallback and generic site settings."""
+"""Verify PNG uploads, legacy WebP logos, theme fallback and generic site settings."""
 
 from html.parser import HTMLParser
+import hashlib
 import json
 import os
 from pathlib import Path
+import secrets
 
 from cms_content import props
 from e2e import Client, check
@@ -82,18 +84,44 @@ def run():
             for name in ("logo-transparent.png", "logo-lossless.webp", "logo-lossy.webp"):
                 content = (ROOT / "tests/fixtures/media" / name).read_bytes()
                 mime = "image/png" if name.endswith(".png") else "image/webp"
-                status, _, body = admin.request(
-                    "/admin/media/upload", "POST", raw=content, content_type=mime
-                )
-                check(status == 201, name + " upload: " + str(status) + " " + body[:200])
-                image = json.loads(body)
+                if mime == "image/png":
+                    status, _, body = admin.upload_image(
+                        "/admin/media/upload", content, mime, (120, 40)
+                    )
+                    check(status == 201, name + " upload: " + str(status) + " " + body[:200])
+                    image = json.loads(body)
+                    check(
+                        image["contentType"] == mime
+                        and image["width"] == 120
+                        and image["height"] == 40,
+                        "Wrong confirmed logo dimensions or type",
+                    )
+                else:
+                    check(
+                        admin.request(
+                            "/admin/media/upload", "POST", raw=content, content_type=mime
+                        )[0]
+                        == 415,
+                        "New WebP logo upload was accepted",
+                    )
+                    filename = secrets.token_hex(16) + ".webp"
+                    (fixtures.work / "storage/media" / filename).write_bytes(content)
+                    identifier = fixtures.create(
+                        "media_assets",
+                        [
+                            {
+                                "filename": filename,
+                                "title": name,
+                                "alt": "Legacy logo",
+                                "mime_type": mime,
+                                "width": 120,
+                                "height": 40,
+                                "size": len(content),
+                            }
+                        ],
+                    )[0]
+                    image = {"id": identifier, "url": "/media/" + filename}
                 created.append(image)
-                check(
-                    image["contentType"] == mime
-                    and image["width"] == 120
-                    and image["height"] == 40,
-                    "Wrong decoded logo dimensions or type",
-                )
                 save(image["url"])
                 check(props(public, "/")["site"]["site_logo"] == image["url"], "Stale logo cache")
                 themes(image["url"])
@@ -127,15 +155,33 @@ def run():
                     props(public, "/")["site"]["site_logo"] == current,
                     "Invalid logo changed settings",
                 )
+            original_count = fixtures.count("media_assets")
+            truncated_png = (ROOT / "tests/fixtures/media/logo-transparent.png").read_bytes()[:33]
+            upload = "/admin/media/upload"
+            status, headers, staged = admin.request(
+                upload, "POST", raw=truncated_png, content_type="image/png", binary=True
+            )
+            check(status == 202 and staged == truncated_png, "The server decoded staged pixels")
+            pending_id = headers["x-upload-id"]
+            pending = [("key", "=", pending_id)]
+            temporary = fixtures.work / "storage/image-uploads" / pending_id
+            check(temporary.is_dir(), "Unconfirmed upload was not staged privately")
             check(
-                admin.request(
-                    "/admin/media/upload",
-                    "POST",
-                    raw=b"RIFF\x04\x00\x00\x00WEBP",
-                    content_type="image/webp",
+                fixtures.count("media_assets") == original_count,
+                "Unconfirmed image entered the media library",
+            )
+            fixtures.update("image_uploads", {"expires_epoch": 0}, pending)
+            check(
+                admin.verify_image(
+                    upload, pending_id, hashlib.sha256(staged).hexdigest(), (120, 40)
                 )[0]
-                == 422,
-                "A WebP signature without a decodable image was accepted",
+                == 404,
+                "An expired image upload was confirmed",
+            )
+            fixtures.call("expire_image_uploads")
+            check(
+                fixtures.count("image_uploads", pending) == 0 and not temporary.exists(),
+                "Expired image staging was not removed",
             )
             save("")
             themes("")
@@ -151,7 +197,7 @@ def run():
             )
         admin.request("/admin/logout", "POST", {})
     print(
-        "PASS Site identity: generic optional publisher/about fields, transparent PNG, lossy/lossless WebP, all theme logos/fallbacks, live cache invalidation and protected media",
+        "PASS Site identity: transparent PNG, legacy WebP logos, upload expiry, theme fallbacks, cache invalidation and protected media",
         flush=True,
     )
 

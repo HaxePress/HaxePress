@@ -132,7 +132,7 @@ export default function Settings({ notice }: { notice: string }) {
                 )}
               </div>
               <p className="field-help">
-                {t('PNG, WebP, JPEG or GIF. Up to 5 MB. Transparent backgrounds are supported.')}
+                {t('PNG, JPEG or GIF. Up to 5 MB. Transparent backgrounds are supported.')}
               </p>
               <p className="field-help">
                 {t('Without a logo, your theme displays the site name in its own font.')}

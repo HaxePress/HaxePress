@@ -6,6 +6,7 @@ Uses ADMIN_EMAIL / ADMIN_PASSWORD from .env unless overridden in the environment
 """
 
 import csv
+import hashlib
 import html
 import http.client
 import http.cookies
@@ -95,6 +96,34 @@ class Client:
             return response.status, normalized, text
         finally:
             connection.close()
+
+    def verify_image(self, path, upload_id, digest, dimensions, csrf=True):
+        width, height = dimensions
+        return self.request(
+            path + "/verify",
+            "POST",
+            raw=json.dumps(
+                {"id": upload_id, "sha256": digest, "width": width, "height": height}
+            ).encode(),
+            content_type="application/json",
+            csrf=csrf,
+        )
+
+    def upload_image(self, path, raw, content_type, dimensions, extra_headers=None):
+        status, headers, payload = self.request(
+            path,
+            "POST",
+            raw=raw,
+            content_type=content_type,
+            binary=True,
+            extra_headers=extra_headers,
+        )
+        if status != 202:
+            return status, headers, payload.decode("utf-8")
+        check(payload == raw, "Staged image bytes differ from the selected file")
+        return self.verify_image(
+            path, headers["x-upload-id"], hashlib.sha256(payload).hexdigest(), dimensions
+        )
 
 
 def check(condition, message):
@@ -418,16 +447,6 @@ def run():
             "disguised SVG accepted",
         )
         check(
-            admin.request(
-                "/admin/media/upload",
-                "POST",
-                raw=bytes.fromhex("89504e470d0a1a0a") + b"not-an-image",
-                content_type="image/png",
-            )[0]
-            == 422,
-            "corrupted image accepted",
-        )
-        check(
             admin.request("/admin/media/upload", "POST", raw=b"")[0] == 422, "empty upload accepted"
         )
         check(
@@ -435,10 +454,51 @@ def run():
             == 413,
             "oversized upload accepted",
         )
-        status, _, text = admin.request(
-            "/admin/media/upload", "POST", raw=fixture, content_type="image/jpeg"
+        upload = "/admin/media/upload"
+        status, headers, payload = admin.request(
+            upload, "POST", raw=fixture, content_type="image/jpeg", binary=True
         )
-        check(status == 201, "valid image upload: " + text[:250])
+        check(status == 202 and payload == fixture, "Staged image bytes changed")
+        check(
+            headers.get("content-type") == "image/jpeg"
+            and headers.get("cache-control") == "private, no-store",
+            "Staged image type or caching",
+        )
+        upload_id = headers["x-upload-id"]
+        dimensions = (1000, 750)
+        digest = hashlib.sha256(fixture).hexdigest()
+        check(
+            admin.verify_image(upload, upload_id, digest, dimensions, csrf=False)[0] == 419,
+            "Image confirmation bypassed CSRF",
+        )
+        other_session = Client()
+        other_session.request("/admin/login")
+        status, headers, _ = other_session.request(
+            "/admin/login",
+            "POST",
+            {
+                "email": os.environ.get("TEST_ADMIN_EMAIL", ENV["ADMIN_EMAIL"]),
+                "password": os.environ.get("TEST_ADMIN_PASSWORD", ENV["ADMIN_PASSWORD"]),
+            },
+        )
+        check(status == 303 and headers.get("location") == "/admin", "Second admin login")
+        other_session.request("/admin")
+        check(
+            other_session.verify_image(upload, upload_id, digest, dimensions)[0] == 404,
+            "A separate admin session confirmed the upload",
+        )
+        other_session.request("/admin/logout", "POST", {})
+        wrong_digest = hashlib.sha256(b"different image").hexdigest()
+        check(
+            admin.verify_image(upload, upload_id, wrong_digest, dimensions)[0] == 422,
+            "Image confirmation accepted a mismatched hash",
+        )
+        status, _, text = admin.verify_image(upload, upload_id, digest, dimensions)
+        check(status == 201, "Valid image confirmation: " + text[:250])
+        check(
+            admin.verify_image(upload, upload_id, digest, dimensions)[0] == 404,
+            "A confirmed upload ID was reused",
+        )
         media = json.loads(text)
         check(
             re.fullmatch(r"/media/[A-Za-z0-9_-]{32}\.jpg", media["url"]) is not None,
@@ -468,7 +528,7 @@ def run():
         ]:
             check(public.request(path)[0] in (403, 404), "unsafe storage path exposed: " + path)
         mark(
-            "Guarded image upload, size/type validation and session-free PublicHandler media serving"
+            "Private image staging, session-bound hash confirmation and PublicHandler media serving"
         )
         data = {
             "id": "",

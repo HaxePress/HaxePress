@@ -311,6 +311,6 @@ SDK artifacts are named from `cms.json` (`cms-plugin-api-4.*`). Use the source S
 
 ## Media dependencies
 
-Shared site props now use `publisher_name` and `about_site` for optional publisher/site information. `site_logo` is a managed media URL or an empty string; themes render their text wordmark when it is empty. See [site identity](SITE-IDENTITY.md). WebP participates in the same managed-media validation and dependency rules as PNG/JPEG/GIF.
+Shared site props use `publisher_name` and `about_site` for optional publisher and site information. `site_logo` is a managed media URL or an empty string. Themes render their text wordmark when it is empty. Saved WebP assets retain managed-media reference tracking. New image uploads accept JPEG, PNG and GIF. [Site identity](SITE-IDENTITY.md)
 
 Plugins that own media data must use the shared [media dependency API](MEDIA-DEPENDENCIES.md). Explicit IDs and soft model columns remain protected after deactivation or uninstall; native incoming foreign keys are detected automatically. `PluginDatabase.put` tracks managed media values. Release a reference only after removing its owning data.

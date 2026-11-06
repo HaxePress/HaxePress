@@ -32,7 +32,7 @@ def run():
         == 303,
         "Media protection login",
     )
-    original_bytes = next((ROOT / "public/images").glob("*.jpg")).read_bytes()
+    original_bytes = (ROOT / "public/images/coast.jpg").read_bytes()
     public = Client()
 
     def references(image, client=owner):
@@ -64,8 +64,8 @@ def run():
         return next(item for item in page["images"] if item["id"] == image["id"])
 
     def upload():
-        status, _, body = owner.request(
-            "/admin/media/upload", "POST", raw=original_bytes, content_type="image/jpeg"
+        status, _, body = owner.upload_image(
+            "/admin/media/upload", original_bytes, "image/jpeg", (1000, 750)
         )
         check(status == 201, "Dependency fixture upload")
         return json.loads(body)

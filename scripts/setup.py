@@ -269,6 +269,16 @@ def main():
         cwd=ROOT,
         check=True,
     )
+    # Earlier setups installed these WebP reader JARs directly into java-lib.
+    for artifact in (
+        "common-image",
+        "common-io",
+        "common-lang",
+        "imageio-core",
+        "imageio-metadata",
+        "imageio-webp",
+    ):
+        (ROOT / "java-lib" / f"{artifact}-3.15.3.jar").unlink(missing_ok=True)
     if prepare_environment(ROOT):
         print(
             "Created private .env with HxWell's application key. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."

@@ -28,6 +28,8 @@ class ThemeAiRoutes {
             Route.get("/assets", ThemeAssetController.listing).attribute("inertia.share", false);
             Route.post("/assets", new UploadThemeImageHandler(true))
                 .attribute("inertia.share", false);
+            Route.post("/assets/verify", new UploadThemeImageHandler(true, true))
+                .attribute("inertia.share", false);
             Route.get("/assets/{asset}", ThemeAssetController.readForAi)
                 .whereNumber("asset")
                 .attribute("inertia.share", false);

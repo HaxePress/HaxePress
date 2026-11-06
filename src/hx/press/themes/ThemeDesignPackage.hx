@@ -295,8 +295,11 @@ class ThemeDesignPackage {
     } {
         #if jvm
         var format = MediaStorage.format(bytes);
+        if (format == null) {
+            throw new Exception("Use JPEG, PNG or GIF for bundled theme images.");
+        }
         var dimensions = MediaStorage.dimensions(bytes);
-        if (format == null || dimensions == null) {
+        if (dimensions == null) {
             throw new Exception("A bundled theme image is invalid or exceeds the image dimension limits.");
         }
         return {

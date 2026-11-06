@@ -1,21 +1,26 @@
 package hx.press.handler.admin.packages;
 
 import hx.press.CmsAccess;
-import hx.press.media.MediaReferences;
+import hx.press.media.ImageUploads;
+import hx.press.model.Admin;
+import hx.press.model.ThemeDesign;
 import hx.press.themes.ThemeAiAccess;
 import hx.press.themes.ThemeAiAccess.ThemeAiActor;
 import hx.press.themes.ThemeAssets;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
+import hx.well.http.RequestStatic.auth;
 import hx.well.http.ResponseBuilder;
 
 class UploadThemeImageHandler extends AbstractHandler {
     final ai:Bool;
+    final verification:Bool;
 
-    public function new(ai:Bool = false) {
+    public function new(ai:Bool = false, verification:Bool = false) {
         super();
         this.ai = ai;
+        this.verification = verification;
     }
 
     public function execute(request:Request):AbstractResponse {
@@ -24,22 +29,17 @@ class UploadThemeImageHandler extends AbstractHandler {
         if (!permitted) {
             return ResponseBuilder.asJson({error: "Your account cannot upload theme images."}, 403);
         }
-        var bytes = request.bodyBytes;
-        if (bytes == null || bytes.length == 0) {
-            return ResponseBuilder.asJson({error: "Choose an image to upload."}, 422);
+        var themeId = request.route("id");
+        if (!ThemeAssets.validThemeId(themeId) || !ThemeDesign.query.where("id", themeId)
+            .exists()) {
+            return ResponseBuilder.asJson({error: "This theme is no longer available."}, 404);
         }
-        if (bytes.length > MediaReferences.MAX_BYTES) {
-            return ResponseBuilder.asJson({error: "Choose an image smaller than 5 MB."}, 413);
-        }
-        var label = request.header("X-File-Name", "");
+        var userId = ai ? actor.id : (cast auth("admin").user() : Admin).id;
+        var credential = ai ? "ai:" + request.header("Authorization", "") : "admin:"
+            + request.session.sessionKey;
         try {
-            label = StringTools.urlDecode(label).substr(0, 180);
-        } catch (_:Dynamic) {
-            label = "";
-        }
-        try {
-            var asset = ThemeAssets.upload(request.route("id"), bytes, label);
-            return ResponseBuilder.asJson(asset, 201);
+            return verification ? ImageUploads.verify(request, userId, credential,
+                themeId) : ImageUploads.stage(request, userId, credential, themeId, 422);
         } catch (error:Dynamic) {
             return ResponseBuilder.asJson({error: Std.string(error)}, 422);
         }

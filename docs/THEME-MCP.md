@@ -24,7 +24,7 @@ External keys expire after 24 hours. Only their SHA-256 hashes are stored. Creat
 | Permission | Tools |
 | --- | --- |
 | Read design | `get_design_guide`, `get_design`, `get_collection_schema`, `search_theme_assets`, `read_theme_asset_image` and the guide resource. |
-| Edit design draft | `edit_design`, `replace_design`, `upload_theme_image`; requires Read design. |
+| Edit design draft | `edit_design`, `replace_design`, `upload_theme_image`, `verify_theme_image`; requires Read design. |
 | Browse media | `search_media`, `read_media_image`; requires Read design and the account's media capability. |
 
 An absent policy preserves the account's existing theme-management and media permissions. Saving a policy uses native handler validation, CSRF, an ORM upsert and a query-specific typed cache. It does not rotate or create a key. Permission changes are pushed to browser peers; their WebMCP registrations are updated. The server filters discovery/tool lists and enforces permissions again on calls and data writes. Client-supplied permission headers are ignored.
@@ -47,7 +47,7 @@ await designer.callTool('edit_design', {
 });
 ```
 
-The read-only `permissions` property describes the current server policy. `getContext()` reports the current theme, saved version, dirty state, selected scope and selection. `callTool(name, arguments, {signal})` accepts an optional AbortSignal. Results use the normal MCP content/structured-content shape. Mutating browser calls reject until local work is saved, so a tool cannot silently replace it. Retained API references stop working when the editor unmounts; registered tools and connections are cleaned up.
+The read-only `permissions` property describes the current server policy. `getContext()` reports the current theme, saved version, dirty state, selected scope and selection. `callTool(name, arguments, {signal})` accepts an optional AbortSignal. Results use the normal MCP content/structured-content shape. The editor requires local changes to be saved before running an AI design edit. Retained API references, registered tools and connections are cleaned up when the editor unmounts.
 
 When WebMCP is available, these same definitions are registered as `haxepress_get_design`, `haxepress_edit_design`, etc. The implementation uses `document.modelContext` and supports the older navigator-based API when supplied by a browser. No WebMCP polyfill is installed. Extensions can use the page API even without native WebMCP support; exact integration depends on the browser and extension.
 

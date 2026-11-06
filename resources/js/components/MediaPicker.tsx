@@ -164,7 +164,7 @@ export default function MediaPicker({
             {t(uploading ? 'Uploading…' : 'Upload image')}
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/gif"
               disabled={uploading}
               onChange={(event) => {
                 const file = event.target.files?.[0];
