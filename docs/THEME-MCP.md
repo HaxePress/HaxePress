@@ -38,6 +38,15 @@ Use `list_themes` to get a theme ID. `inspect_theme_tree` returns template, comp
 
 `upload_theme_image` stages a theme-owned image. Review its preview and pass its ID, SHA-256 and measured dimensions to `verify_theme_image`. Use the resulting managed URL with `set_theme_block_image`. Theme-owned assets live in the theme storage and travel with its export.
 
+### Theme design skill
+
+Every connection that can read a theme serves the `haxepress-theme-design` [Agent Skill](https://agentskills.io/specification): the workflow for creating or restyling a theme, the document model, the edit operations and a review checklist for the preview tool. Its files live in `mcp/skills/haxepress-theme-design/` and are bundled into the MCP worker, so a client always gets the version that matches the site. Clients receive it in four ways:
+
+- Hosts that support the [MCP skills extension](https://modelcontextprotocol.io/seps/2640-skills-extension) see `io.modelcontextprotocol/skills` in the server capabilities and discover the skill with `skills/list` and `skills/get`, which return its frontmatter and the SHA-256 digest and size of each file.
+- Every file is a `text/markdown` resource under `skill://haxepress-theme-design/`, starting with `SKILL.md`. The server instructions point the model at it.
+- `get_theme_design_skill` returns `SKILL.md` or a named reference file, for clients that only use tools.
+- The `design_theme` prompt takes a brief and starts a conversation with the skill.
+
 The same per-theme read, draft edit and shared media permissions apply to remote and browser clients. A permission change takes effect on the next operation and updates the scoped browser tools. The editor receives live draft revisions and offers **Load saved design** when an external edit conflicts with unsaved work.
 
 ## Browser JavaScript

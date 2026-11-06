@@ -16,6 +16,7 @@ import {
 import { layoutPresets } from '../resources/js/themes/builder/presets';
 import { sectionChoices } from '../resources/js/themes/builder/friendly-presets';
 import { capture } from './preview-browser';
+import { registerThemeSkill, skillPointer } from './skills';
 import {
   attachedFile,
   encodedImage,
@@ -36,7 +37,10 @@ export interface ThemeServerOptions {
 }
 
 export function createThemeServer(options: ThemeServerOptions) {
-  const server = new McpServer({ name: 'haxepress-theme-editor', version: __CMS_VERSION__ });
+  const server = new McpServer(
+    { name: 'haxepress-theme-editor', version: __CMS_VERSION__ },
+    options.permissions.read ? { instructions: skillPointer } : undefined,
+  );
   registerThemeTools(server, options);
   return server;
 }
@@ -259,6 +263,7 @@ export function registerThemeTools(server: McpServer, options: ThemeServerOption
         ],
       }),
     );
+    registerThemeSkill(server);
     register(
       'get_design',
       {

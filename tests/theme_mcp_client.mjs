@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import * as z from 'zod/v4';
 
 const environment = {
   HXPRESS_THEME_ID: process.env.TEST_THEME_ID,
@@ -17,6 +19,79 @@ const globalNames = {
   read_media_image: 'read_media_for_theme',
   preview_theme: 'preview_theme_design',
 };
+const skillUri = 'skill://haxepress-theme-design/SKILL.md';
+const skillEntry = z.looseObject({
+  uri: z.string(),
+  frontmatter: z.looseObject({ name: z.string(), description: z.string() }),
+  resources: z.array(z.object({ uri: z.string(), digest: z.string(), size: z.number() })),
+});
+
+/**
+ * The theme design skill reaches every client: through the skills extension
+ * (SEP-2640), as resources, through a read-only tool and as a prompt.
+ */
+async function verifySkill(client, names) {
+  assert.ok(client.getServerCapabilities()?.extensions?.['io.modelcontextprotocol/skills']);
+  assert.ok(
+    client.getInstructions()?.includes(skillUri),
+    'The instructions do not point at the skill',
+  );
+  const { skills } = await client.request(
+    { method: 'skills/list', params: {} },
+    z.looseObject({ skills: z.array(skillEntry) }),
+  );
+  const skill = skills.find((entry) => entry.uri === skillUri);
+  assert.equal(skill.frontmatter.name, 'haxepress-theme-design');
+  assert.ok(skill.frontmatter.description.length > 100);
+  assert.ok(skill.resources.some((file) => file.uri === skillUri));
+  const texts = [];
+  for (const file of skill.resources) {
+    const { contents } = await client.readResource({ uri: file.uri });
+    const bytes = Buffer.from(contents[0].text, 'utf8');
+    assert.equal(contents[0].mimeType, 'text/markdown', file.uri);
+    assert.equal(bytes.length, file.size, file.uri);
+    assert.equal(
+      `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+      file.digest,
+      file.uri,
+    );
+    texts.push(contents[0].text);
+  }
+  const { skill: fetched } = await client.request(
+    { method: 'skills/get', params: { uri: skillUri } },
+    z.looseObject({ skill: skillEntry }),
+  );
+  assert.deepEqual(fetched, skill);
+  await assert.rejects(
+    client.request(
+      { method: 'skills/get', params: { uri: 'skill://other/SKILL.md' } },
+      z.looseObject({}),
+    ),
+    (error) => error.code === -32602,
+  );
+  const main = texts[skill.resources.findIndex((file) => file.uri === skillUri)];
+  assert.ok(main.startsWith('---\nname: haxepress-theme-design\n'));
+  const tool = await client.callTool({ name: 'get_theme_design_skill', arguments: {} });
+  assert.equal(tool.content[0].text, main);
+  const reference = await client.callTool({
+    name: 'get_theme_design_skill',
+    arguments: { file: 'references/visual-review.md' },
+  });
+  assert.ok(reference.content[0].text.startsWith('# Reviewing a design'));
+  const brief = 'A calm site for a ceramics studio.';
+  const prompt = await client.getPrompt({ name: 'design_theme', arguments: { brief } });
+  const message = prompt.messages[0].content.text;
+  assert.ok(message.includes(brief) && message.includes('# Designing HaxePress themes'));
+  // Every tool the skill names exists, under its admin name or its theme connection name.
+  const tools =
+    /`((?:get|list|create|edit|replace|preview|search|read|upload|verify|set|inspect)_[a-z_]+)`/g;
+  for (const [, name] of texts.join('\n').matchAll(tools))
+    assert.ok(
+      names.has(name) || names.has(globalNames[name]),
+      `The skill names a missing tool: ${name}`,
+    );
+}
+
 let latestVersion;
 for (const mode of ['legacy', { pin: '2026-07-28' }]) {
   const client = new Client(
@@ -62,6 +137,15 @@ for (const mode of ['legacy', { pin: '2026-07-28' }]) {
     assert.equal(resources.resources[0].uri, 'haxepress://theme/design-guide');
     const read = await client.readResource({ uri: 'haxepress://theme/design-guide' });
     assert.equal(JSON.parse(read.contents[0].text).schema, 2);
+    await verifySkill(client, names);
+    const missing = await client.callTool({
+      name: 'get_theme_design',
+      arguments: { themeId: 'theme-does-not-exist' },
+    });
+    assert.ok(
+      missing.isError && missing.content[0].text.includes('list_themes'),
+      missing.content[0].text,
+    );
     let snapshot = data(await call('get_design'));
     const collection = data(
       await call('get_collection_schema', { key: snapshot.collections[0].key }),

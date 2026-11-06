@@ -113,6 +113,7 @@ def permissions_and_events(owner, public, peer, other, connection, version):
     )
     expected = [
         "get_design_guide",
+        "get_theme_design_skill",
         "get_design",
         "preview_theme",
         "get_collection_schema",
@@ -170,7 +171,7 @@ def permissions_and_events(owner, public, peer, other, connection, version):
     )
     restored = peer.rpc("tools/list")["result"]["tools"]
     check(
-        len(restored) == 12 and any(tool["name"] == "verify_theme_image" for tool in restored),
+        len(restored) == 13 and any(tool["name"] == "verify_theme_image" for tool in restored),
         "The scoped browser catalog did not refresh",
     )
     notifications = [

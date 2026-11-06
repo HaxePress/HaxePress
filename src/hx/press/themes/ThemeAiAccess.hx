@@ -2,6 +2,7 @@ package hx.press.themes;
 
 import haxe.crypto.Sha256;
 import hx.press.ai.AdminMcpAccess;
+import hx.press.ai.AdminMcpAccess.AdminMcpError;
 import hx.press.themes.ThemeAiPermissions.AiPermissions;
 import hx.well.facades.Cache;
 import hx.well.facades.Config;
@@ -34,7 +35,16 @@ class ThemeAiAccess {
             return authenticateToken(themeId, authorization);
         }
         var actor = AdminMcpAccess.delegated(request);
-        return actor == null ? null : forAdmin(themeId, actor.admin, actor.sessionKey);
+        if (actor == null) {
+            return null;
+        }
+        // A signed-in administrator who names a missing theme needs to know which ID to use.
+        if (!ThemeDesign.query.where("id", themeId).exists()) {
+            throw new AdminMcpError("theme_not_found",
+                "This theme does not exist or is not a builder theme. Use list_themes to find a builder theme ID.",
+                404);
+        }
+        return forAdmin(themeId, actor.admin, actor.sessionKey);
     }
 
     public static function allowedOrigin(origin:String):Bool {

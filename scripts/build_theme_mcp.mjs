@@ -16,6 +16,8 @@ await build({
   format: 'esm',
   target: 'node22',
   bundle: true,
+  // The theme design skill's Markdown files are served verbatim.
+  loader: { '.md': 'text' },
   define: { __CMS_VERSION__: JSON.stringify(release.version) },
 });
 console.log('Built the site-hosted HaxePress MCP server.');

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 import { registerContentTools } from './content-tools';
+import { skillPointer } from './skills';
 import {
   addTool,
   adminBridge,
@@ -57,6 +58,7 @@ export async function createAdminServer(options: AdminServerOptions) {
         'Use the named CMS tools. Read the saved version before editing content or a theme.',
         'For articles, upload_media_image stages original bytes or an attachment. Inspect the returned image and confirm its hash and dimensions with verify_media_image, then use set_content_cover or insert_content_image.',
         'For themes, start with list_themes and inspect_theme_tree. Use upload_theme_image, verify_theme_image and set_theme_block_image for theme-owned images.',
+        ...(can('extensions') ? [skillPointer] : []),
       ].join(' '),
     },
   );
