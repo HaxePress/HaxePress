@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { router } from '../page';
 import { useEffect, useState } from 'react';
 import type { PublicCollection } from '../content';
 import { useTranslation } from '../i18n';

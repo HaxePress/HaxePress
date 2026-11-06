@@ -22,7 +22,14 @@ class PluginModule {
     }
 
     public function dispatch(event:String, context:Dynamic):Dynamic {
-        var lifecycle = ["install", "activate", "deactivate", "uninstall", "settings.saved"];
+        var lifecycle = [
+            "install",
+            "activate",
+            "deactivate",
+            "uninstall",
+            "settings.saved",
+            "schedule.run"
+        ];
         if (!PackageManifest.events.contains(event) && !lifecycle.contains(event)) {
             throw new Exception("The requested plugin hook is not supported.");
         }

@@ -6,11 +6,7 @@ import type useThemeAiSync from './useThemeAiSync';
 import type { AiPermissions } from './ThemeDesignerConnection';
 
 interface Connection {
-  active: boolean;
-  expires: number;
-  token: string | null;
   hosted: boolean;
-  websocketPath: string;
   permissions: AiPermissions;
   mediaAllowed: boolean;
 }
@@ -26,7 +22,7 @@ export default function ThemeAiPanel({
   onClose: () => void;
   collaboration: ReturnType<typeof useThemeAiSync>;
 }) {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const [connection, setConnection] = useState<Connection | null>(null);
   const [permissions, setPermissions] = useState<AiPermissions>({
     read: false,
@@ -38,13 +34,12 @@ export default function ThemeAiPanel({
   const [notice, setNotice] = useState('');
   const dialog = useRef<HTMLDialogElement>(null);
 
-  async function update(method: 'GET' | 'POST' | 'DELETE') {
+  async function update() {
     setBusy(true);
     setError('');
     setNotice('');
     try {
       const response = await fetch(`/admin/themes/${id}/ai`, {
-        method,
         headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken || '' },
       });
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json'))
@@ -52,8 +47,6 @@ export default function ThemeAiPanel({
       const result: Connection = await response.json();
       setConnection(result);
       setPermissions(result.permissions);
-      if (method === 'POST') setNotice('Connection key created. It is shown once.');
-      if (method === 'DELETE') setNotice('This connection was revoked.');
     } catch {
       setError('The AI connection could not be updated.');
     } finally {
@@ -91,37 +84,12 @@ export default function ThemeAiPanel({
   }
 
   useEffect(() => {
-    void update('GET');
+    void update();
   }, [id]);
   useEffect(() => {
     if (dialog.current && !dialog.current.open) dialog.current.showModal();
   }, []);
 
-  function endpoint() {
-    if (!connection) return '';
-    const url = new URL(connection.websocketPath, location.origin);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    return url.toString();
-  }
-  async function copyConnection() {
-    if (!connection?.token) return;
-    try {
-      await navigator.clipboard.writeText(
-        JSON.stringify(
-          {
-            url: endpoint(),
-            headers: { Authorization: `Bearer ${connection.token}` },
-            themeId: id,
-          },
-          null,
-          2,
-        ),
-      );
-      setNotice('Connection details copied.');
-    } catch {
-      setError('The connection details could not be copied.');
-    }
-  }
   async function copyBrowserApi() {
     try {
       await navigator.clipboard.writeText('await window.haxePress.themeDesigner.listTools()');
@@ -156,11 +124,6 @@ export default function ThemeAiPanel({
           <Icon name="x" />
         </button>
       </div>
-      <p>
-        {t(
-          'Browser access uses your signed-in account. External AI access requires a connection key.',
-        )}
-      </p>
       <Alert error message={t(error)} />
       <Alert message={t(notice)} />
       <div className="theme-ai-presence" aria-live="polite">
@@ -173,7 +136,6 @@ export default function ThemeAiPanel({
                 : 'Browser disconnected',
           )}
         </span>
-        <span>{t('{count} AI connections', { count: collaboration.presence.llms })}</span>
         {collaboration.status === 'disconnected' && (
           <button
             className="button button-outline"
@@ -256,56 +218,19 @@ export default function ThemeAiPanel({
             </button>
           </fieldset>
           <div className="theme-ai-credentials">
-            <h3>{t('External AI connection')}</h3>
-            <label>
-              {t('WebSocket URL')}
-              <input value={endpoint()} readOnly />
-            </label>
-            <p className="field-help">
-              {connection.active
-                ? t('Expires {time}', { time: new Date(connection.expires).toLocaleString(locale) })
-                : t('No active AI connection.')}
-            </p>
             {!connection.hosted && (
-              <Alert error message={t('The site collaboration service is unavailable.')} />
+              <Alert error message="The site collaboration service is unavailable." />
             )}
-            {connection.token && (
-              <>
-                <label>
-                  {t('Connection key')}
-                  <input type="password" value={connection.token} readOnly autoComplete="off" />
-                </label>
-                <p className="field-help">
-                  {t(
-                    'This key is shown once. Creating a replacement invalidates the previous key.',
-                  )}
-                </p>
-                <button type="button" className="button" onClick={() => void copyConnection()}>
-                  <Icon name="copy" />
-                  {t('Copy connection details')}
-                </button>
-              </>
-            )}
-            <div className="package-actions">
-              <button
-                className="button button-outline"
-                type="button"
-                disabled={busy}
-                onClick={() => void update('POST')}
-              >
-                {t(connection.active ? 'Replace connection' : 'Create connection')}
-              </button>
-              {connection.active && (
-                <button
-                  className="button button-outline"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void update('DELETE')}
-                >
-                  {t('Revoke connection')}
-                </button>
-              )}
-            </div>
+            <button
+              className="button button-outline"
+              type="button"
+              onClick={() => {
+                onClose();
+                window.dispatchEvent(new Event('haxepress:connect-ai'));
+              }}
+            >
+              {t('Connect AI')}
+            </button>
           </div>
         </>
       )}

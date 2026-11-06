@@ -1,0 +1,51 @@
+<props
+  entries="List<AdminActivityEntryView>"
+  entity="String"
+  total="Int"
+  pagination="PageLinksView"
+  entityChoices="List<AdminActivityFilterView>"
+/>
+<AdminLayout :title="t('Activity')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Activity') }}</h1>
+    </div>
+    <label class="activity-filter"
+      >{{ t('Show') }}<select name="entity" form="activity-filter" data-well-autosubmit>
+        <option value="">{{ t('All activity') }}</option>
+        <option
+          :for="choice in entityChoices"
+          value="{{ choice.value }}"
+          :selected="choice.value == entity"
+        >
+          {{ t(choice.label) }}
+        </option>
+      </select></label
+    >
+  </div>
+  <form id="activity-filter" action="/admin/activity" method="get"></form>
+  <section class="admin-card activity-card">
+    <div class="admin-card-heading">
+      <h2>{{ t('Recent changes') }} <span class="count-badge">{{ total }}</span></h2>
+    </div>
+    <ol :if="entries" class="activity-list">
+      <li :for="entry in entries">
+        <span class="activity-marker">{{ icon('clock') }}</span>
+        <div>
+          <p>
+            <strong>{{ entry.actor }}</strong> {{ t(entry.actionKey) }}
+            <span class="activity-kind">{{ t(entry.entity) }}</span>
+          </p>
+          <span>{{ entry.label ? entry.label : t('Untitled') }}</span>
+        </div>
+        <time datetime="{{ entry.datetime }}">{{ entry.created_at }}</time>
+      </li>
+    </ol>
+    <div :else class="empty-state">
+      {{ icon('clock') }}
+      <h2>{{ t('No activity') }}</h2>
+      <p>{{ t('Changes will appear here as your team works.') }}</p>
+    </div>
+    <Pagination :links="pagination" :count="size(entries)" :noun="t('changes')" />
+  </section>
+</AdminLayout>

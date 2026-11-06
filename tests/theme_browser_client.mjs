@@ -10,7 +10,8 @@ await mkdir(new URL('../Export/tests/', import.meta.url), { recursive: true });
 await build({
   stdin: {
     contents: `export { ThemeDesignerConnection } from './resources/js/themes/builder/ThemeDesignerConnection';
-      export { installBrowserTools } from './resources/js/themes/builder/browser-tools';`,
+      export { installBrowserTools } from './resources/js/themes/builder/browser-tools';
+      export { startAdminMcp } from './resources/js/ai/AdminMcpBrowser';`,
     resolveDir: root,
     sourcefile: 'theme-browser-test.ts',
     loader: 'ts',
@@ -42,7 +43,7 @@ Object.defineProperty(globalThis, 'document', {
 });
 Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
 Object.defineProperty(globalThis, 'location', {
-  value: new URL(process.env.TEST_URL),
+  value: new URL(`/admin/themes/${process.env.TEST_THEME_ID}/design`, process.env.TEST_URL),
   configurable: true,
 });
 class BrowserWebSocket extends WebSocket {
@@ -54,12 +55,13 @@ class BrowserWebSocket extends WebSocket {
   }
 }
 Object.defineProperty(globalThis, 'WebSocket', { value: BrowserWebSocket, configurable: true });
-const { ThemeDesignerConnection, installBrowserTools } = await import(
+const { ThemeDesignerConnection, installBrowserTools, startAdminMcp } = await import(
   pathToFileURL(fileURLToPath(output))
 );
 const connection = new ThemeDesignerConnection(process.env.TEST_THEME_ID);
 let dirty = false;
 let version = 1;
+let stopAdmin;
 const changes = [];
 const unsubscribe = connection.subscribe((event) => {
   if (event.type === 'design_changed') changes.push(event.change);
@@ -166,6 +168,21 @@ try {
   await waitFor(() => registered.size === 11, 'Restored browser tools were not registered');
   const snapshot = data(await api.callTool('get_design'));
   assert.equal(snapshot.theme.version, version);
+  stopAdmin = startAdminMcp(
+    () => {},
+    () => {},
+  );
+  await waitFor(
+    () => registered.has('haxepress_admin_get_admin_routes'),
+    'The admin page did not register its global MCP tools',
+  );
+  const admin = window.haxePress.adminMcp;
+  assert.equal(admin.getContext().path, location.pathname);
+  assert.ok(Object.isFrozen(admin) && !('token' in admin));
+  const page = data(await admin.callTool('read_admin', { path: '/admin/settings' }));
+  assert.equal(page.data.component, 'Admin/Settings');
+  const discovery = data(await registered.get('haxepress_admin_get_admin_routes').execute({}));
+  assert.ok(discovery.data.routes.some((route) => route.path === '/admin/settings'));
   const response = await fetch(new URL('/admin/logout', process.env.TEST_URL), {
     method: 'POST',
     redirect: 'manual',
@@ -176,6 +193,7 @@ try {
   });
   assert.equal(response.status, 303);
   await assert.rejects(api.callTool('get_design'));
+  await assert.rejects(admin.callTool('read_admin', { path: '/admin/settings' }));
   await waitFor(
     () => connection.status === 'disconnected' && registered.size === 0,
     'Logout retained browser tool access',
@@ -184,9 +202,11 @@ try {
     `${JSON.stringify({ version, browserApi: true, webMcp: true, permissions: true, logout: true })}\n`,
   );
 } finally {
+  stopAdmin?.();
   unsubscribe();
   dispose();
   await connection.close();
   assert.equal(window.haxePress.themeDesigner, undefined);
+  assert.equal(window.haxePress.adminMcp, undefined);
   assert.equal(registered.size, 0);
 }

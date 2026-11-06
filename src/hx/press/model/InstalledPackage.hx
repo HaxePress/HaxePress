@@ -11,6 +11,7 @@ class InstalledPackage extends BaseModel<InstalledPackage> {
 
     @:primary @:visible @:field public var id:String = "";
     @:visible @:field public var kind:String = "plugin";
+    @:visible @:field public var plugin_id:Null<String> = null;
     @:visible @:field public var slug:String = "";
     @:visible @:field public var name:String = "";
     @:visible @:field public var name_key:String = "";

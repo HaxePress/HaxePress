@@ -10,7 +10,9 @@ import hx.well.type.AttributeType;
 class SecurityMiddleware extends AbstractMiddleware {
     public function handle(request:Request, next:Request->Null<Response>):Null<Response> {
         var route:RouteElement = request.getAttribute(AttributeType.RouteElement);
-        var previewFrame = route != null && route.getAttribute("theme.preview.frame", false);
+        var contentPreview = route != null && route.getAttribute("content.preview", false);
+        var previewFrame = contentPreview
+            || (route != null && route.getAttribute("theme.preview.frame", false));
         var framePolicy = previewFrame ? "SAMEORIGIN" : "DENY";
         ResponseStatic.get()
             .header("X-Content-Type-Options", "nosniff")
@@ -18,6 +20,9 @@ class SecurityMiddleware extends AbstractMiddleware {
             .header("Referrer-Policy", "strict-origin-when-cross-origin");
         if (previewFrame) {
             ResponseStatic.get().header("Content-Security-Policy", "frame-ancestors 'self'");
+        }
+        if (contentPreview) {
+            ResponseStatic.get().header("X-Robots-Tag", "noindex, nofollow");
         }
         if (request.path == "/admin" || StringTools.startsWith(request.path, "/admin/"))
             ResponseStatic.get().header("Cache-Control", "no-store");

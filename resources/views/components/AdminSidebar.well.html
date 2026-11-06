@@ -1,0 +1,39 @@
+<div class="sidebar-content">
+  <a class="admin-brand" href="/admin"
+    ><span class="admin-brand-mark" aria-hidden="true">{{ icon('feather') }}</span
+    ><span><strong>{{ site.site_name }}</strong><small>{{ t('Administration') }}</small></span></a
+  >
+  <div class="sidebar-navigation">
+    <nav aria-label="{{ t('Admin navigation') }}">
+      <div :for="group in adminSidebar" class="admin-nav-group">
+        <span class="admin-nav-label">{{ group.label }}</span
+        ><a
+          :for="link in group.links"
+          :class="[link.current ? 'active', link.child ? 'admin-nav-child']"
+          :aria-current="link.current ? 'page'"
+          href="{{ link.href }}"
+          >{{ icon(link.icon) }}<span>{{ link.label }}</span></a
+        >
+      </div>
+    </nav>
+  </div>
+  <div class="sidebar-bottom">
+    <a href="/" class="visit-site"
+      >{{ icon('external') }}<span>{{ t('View website') }}</span>{{ icon('arrow-up-right') }}</a
+    >
+    <div class="sidebar-profile">
+      <a class="admin-avatar" href="/admin/account" aria-label="{{ t('Your account') }}"
+        >{{ initials(auth.admin.name ?? 'Editor') }}</a
+      >
+      <div>
+        <strong>{{ auth.admin.name ?? 'Editor' }}</strong
+        ><span class="role-label">{{ t(auth.admin.roleLabel ?? 'Account') }}</span>
+      </div>
+      <form action="/admin/logout" method="post">
+        <button class="icon-button" aria-label="{{ t('Sign out') }}" data-well-busy="">
+          {{ icon('logout') }}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

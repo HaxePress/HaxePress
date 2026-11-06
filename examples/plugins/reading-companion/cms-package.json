@@ -2,6 +2,7 @@
   "apiVersion": 4,
   "cmsVersion": "2.16.0",
   "kind": "plugin",
+  "pluginId": "547bfef7-6b6c-4783-b70a-22f4e87529e4",
   "slug": "reading-companion",
   "name": "Reading Companion",
   "version": "2.16.0",

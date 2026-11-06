@@ -1,0 +1,20 @@
+<Document>
+  <Asset css="css/site.css" />
+  <Asset css="css/cms.css" />
+  <Asset css="css/themes/builder.css" />
+  <Asset css="css/theme-builder.css" />
+  <Asset css="css/easy-builder.css" />
+  <Island
+    name="design-canvas"
+    :props="{
+      translations: translations,
+      locale: i18n.locale,
+      direction: i18n.direction,
+      name: canvasName(),
+      url: request.url,
+      pageProps: pageProps(),
+      shared: canvasShared()
+    }"
+    load="eager"
+  ></Island>
+</Document>

@@ -1,0 +1,53 @@
+<props
+  items="List<ContentItemView>"
+  query="String"
+  category="String"
+  resultCount="Int"
+  pagination="PageLinksView"
+  collection="PublicCollectionView"
+  archiveUrl="String"
+  categories="List<String> = []"
+  fieldFilters="Map<String, String>?"
+  tag="TagView?"
+/>
+<FieldnotesLayout>
+  <PageHead
+    :title="tag.name ?? t(collection.name)"
+    :description="tag.description ? tag.description : collection.description"
+  />
+  <section class="page-intro wrap">
+    <p class="eyebrow">{{ t(collection.singular) }}</p>
+    <h1>{{ tag.name ?? t(collection.name) }}</h1>
+    <p :if="tag.description or collection.description">
+      {{ tag.description ? tag.description : collection.description }}
+    </p>
+    <a :if="tag" href="{{ collection.publicBase }}" class="text-link"
+      >{{ t('Back to {collection}', collection: t(collection.name)) }}</a
+    >
+  </section>
+  <section class="wrap">
+    <ContentFilters
+      :collection="collection"
+      :path="archiveUrl"
+      :query="query"
+      :category="category"
+      :categories="categories"
+      :tag="tag.slug ?? ''"
+      :fieldFilters="fieldFilters"
+    />
+    <div class="results-meta">
+      <p>{{ t('Result count', count: resultCount) }}</p>
+      <a :if="tag" href="{{ url(archiveUrl, tag: tag.slug, type: collection.key) }}"
+        >{{ t('Clear search') }}</a
+      ><a :else href="{{ archiveUrl }}">{{ t('Clear search') }}</a>
+    </div>
+    <div :if="items" class="content-grid">
+      <FieldnotesCard :for="item in items" :item="item" />
+    </div>
+    <div :else class="empty-state">
+      <h2>{{ t('No content here just yet.') }}</h2>
+      <p>{{ t('Try another word or change your filters.') }}</p>
+    </div>
+    <Pagination :links="pagination" :count="size(items)" />
+  </section>
+</FieldnotesLayout>

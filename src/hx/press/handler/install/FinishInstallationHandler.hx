@@ -1,8 +1,11 @@
 package hx.press.handler.install;
 
 import haxe.Exception;
+import hx.press.AdminController;
 import hx.press.CategoryData;
 import hx.press.config.DatabaseConfig;
+import hx.press.install.InstallationController;
+import hx.press.install.InstallationController.SetupAdministrator;
 import hx.press.install.InstallationDatabase;
 import hx.press.install.InstallationDatabase.SetupDatabase;
 import hx.press.install.InstallationEnv;
@@ -11,10 +14,10 @@ import hx.press.model.Admin;
 import hx.press.provider.DatabaseProvider;
 import hx.press.provider.SiteRuntime;
 import hx.press.validation.ValidationResponder;
+import hx.press.view.View;
 import hx.well.database.Connection;
 import hx.well.facades.Config;
 import hx.well.facades.Environment;
-import hx.well.facades.Inertia;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -24,6 +27,11 @@ import hx.well.http.ResponseBuilder;
 
 class FinishInstallationHandler extends AbstractHandler implements ValidationResponder {
     public override function validate():Bool {
+        if (reviewed(request()) != null) {
+            // The review step already checked these fields; only its option arrives here.
+            var sample:Dynamic = request().input("sample_content", "0");
+            return Std.isOfType(sample, String) && (sample == "0" || sample == "1");
+        }
         return request().validate([
             "site_name" => [Required, String, Min(2), Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")],
             "admin_name" => [Required, String, Min(2), Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")],
@@ -41,29 +49,68 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
     }
 
     public function validationFailed(request:Request):AbstractResponse {
-        return
-            ResponseBuilder.asJson({error: "Check the site and administrator fields. Use a password between 12 and 72 bytes."},
-            422);
+        return failed(request,
+            "Check the site and administrator fields. Use a password between 12 and 72 bytes.",
+            422, "administrator");
+    }
+
+    /**
+        The administrator kept by the review step, when the installer form
+        confirms it. Requests that send the administrator fields use those.
+    **/
+    static function reviewed(request:Request):Null<SetupAdministrator> {
+        if (request.input("admin_password") != null || request.session == null) {
+            return null;
+        }
+        return request.session.get(InstallationController.ADMINISTRATOR_KEY);
+    }
+
+    static function setupInputs(request:Request):Map<String, Dynamic> {
+        var administrator = reviewed(request);
+        if (administrator == null) {
+            return request.only("site_name", "admin_name", "admin_email", "admin_password",
+                "confirm_password", "sample_content");
+        }
+        var sample:Dynamic = request.input("sample_content", "0");
+        return [
+            "site_name" => administrator.site_name,
+            "admin_name" => administrator.admin_name,
+            "admin_email" => administrator.admin_email,
+            "admin_password" => administrator.admin_password,
+            "confirm_password" => administrator.admin_password,
+            "sample_content" => sample
+        ];
+    }
+
+    /** JSON for scripts; the installer form returns to `step` with the error. **/
+    static function failed(request:Request, message:String, status:Int,
+            step:String):AbstractResponse {
+        var url = InstallationState.pending ? '/admin/install?step=${step}' : "/admin/login";
+        var scope = InstallationState.pending ? "setup" : "credentials";
+        var redirect = AdminController.validationRedirect(request, scope, message, url);
+        if (redirect != null) {
+            return redirect.header("Cache-Control", "private, no-store");
+        }
+        return ResponseBuilder.asJson({error: message}, status)
+            .header("Cache-Control", "private, no-store");
     }
 
     public function execute(request:Request):AbstractResponse {
-        var inputs = request.only("site_name", "admin_name", "admin_email", "admin_password",
-            "confirm_password", "sample_content");
+        var inputs = setupInputs(request);
         var siteName = StringTools.trim(inputs.get("site_name"));
         var adminName = StringTools.trim(inputs.get("admin_name"));
         if (siteName.length < 2 || adminName.length < 2) {
             return validationFailed(request);
         }
         if (inputs.get("admin_password") != inputs.get("confirm_password")) {
-            return ResponseBuilder.asJson({error: "The passwords do not match."}, 422);
+            return failed(request, "The passwords do not match.", 422, "administrator");
         }
         var database:Null<SetupDatabase> = request.session.get(InstallationDatabase.SESSION_KEY);
         if (database == null
             || Date.now()
                 .getTime() - database.checkedAt >= InstallationDatabase.VERIFICATION_LIFETIME) {
-            return
-                ResponseBuilder.asJson({error: "Verify the database connection again before continuing."},
-                    409);
+            return failed(request, "Verify the database connection again before continuing.", 409,
+                "database");
         }
         InstallationState.locks.acquire("installation");
         var prepared:Null<String> = null;
@@ -105,14 +152,18 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
             prepared = null;
             InstallationState.complete();
             request.session.forget(InstallationDatabase.SESSION_KEY);
+            request.session.forget(InstallationController.ADMINISTRATOR_KEY);
             phase = "runtime startup";
             SiteRuntime.start();
             phase = "administrator sign-in";
             var admin = Admin.query.where("email", values.get("ADMIN_EMAIL")).limit(1).first();
             auth("admin").login(admin);
             request.session.put("auth_version", admin.password);
-            Inertia.clearHistory();
             InstallationState.locks.release("installation");
+            if (View.redirectsValidation(request)) {
+                return ResponseBuilder.asRedirect("/admin", 303)
+                    .header("Cache-Control", "private, no-store");
+            }
             return ResponseBuilder.asJson({installed: true, redirect: "/admin"})
                 .header("Cache-Control", "private, no-store");
         } catch (failure:Dynamic) {
@@ -130,15 +181,13 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
             }
             InstallationState.locks.release("installation");
             if (!InstallationState.pending) {
-                return
-                    ResponseBuilder.asJson({error: "Installation was saved. Restart HaxePress and sign in to the administrator account."},
-                    503)
-                    .header("Cache-Control", "private, no-store");
+                return failed(request,
+                    "Installation was saved. Restart HaxePress and sign in to the administrator account.",
+                    503, "review");
             }
-            return
-                ResponseBuilder.asJson({error: "Setup could not be completed. Check configuration-file permissions and use an empty, writable database before retrying."},
-                422)
-                .header("Cache-Control", "private, no-store");
+            return failed(request,
+                "Setup could not be completed. Check configuration-file permissions and use an empty, writable database before retrying.",
+                422, "review");
         }
     }
 }

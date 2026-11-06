@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link } from '../../page';
 import { useState } from 'react';
 import Icon from '../../components/Icon';
 import { useTranslation } from '../../i18n';

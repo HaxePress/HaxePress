@@ -1,0 +1,161 @@
+<props
+  preview="ThemePreviewView"
+  customizerOpen="Bool = false"
+  notice="String = ''"
+  error="String = ''"
+/>
+<Document>
+  <Asset css="css/site.css" />
+  <Asset css="css/cms.css" />
+  <Asset css="css/admin.css" />
+  <PageHead :title="t('Theme preview')" admin />
+  <Island name="theme-preview" :props="{ saved: preview.saved }" load="eager">
+    <div class="theme-preview-shell">
+      <aside class="theme-preview-banner" aria-label="{{ t('Theme preview') }}">
+        <span>{{ t('Previewing') }} <strong>{{ preview.name }}</strong></span>
+        <div class="theme-preview-devices" role="group" aria-label="{{ t('Preview size') }}">
+          <button
+            type="button"
+            class="theme-preview-device"
+            data-viewport="desktop"
+            data-width="100%"
+            aria-pressed="true"
+          >
+            {{ icon('desktop') }}<span>{{ t('Desktop') }}</span>
+          </button>
+          <button
+            type="button"
+            class="theme-preview-device"
+            data-viewport="tablet"
+            data-width="768px"
+            aria-pressed="false"
+          >
+            {{ icon('tablet') }}<span>{{ t('Tablet') }}</span>
+          </button>
+          <button
+            type="button"
+            class="theme-preview-device"
+            data-viewport="mobile"
+            data-width="390px"
+            aria-pressed="false"
+          >
+            {{ icon('mobile') }}<span>{{ t('Mobile') }}</span>
+          </button>
+        </div>
+        <div class="theme-preview-actions">
+          <Island
+            :if="auth"
+            name="admin-ai"
+            :props="{
+              translations: translations,
+              locale: i18n.locale,
+              direction: i18n.direction,
+              adminId: auth.admin.id,
+              csrfToken: csrfToken
+            }"
+            load="idle"
+            ><button
+              class="button button-outline admin-ai-trigger"
+              type="button"
+              aria-label="{{ t('Connect AI') }}"
+              aria-haspopup="dialog"
+            >
+              {{ icon('sparkles') }}<span>{{ t('Connect AI') }}</span>
+            </button></Island
+          >
+          <button
+            :if="preview.customizable"
+            type="button"
+            class="theme-preview-device"
+            :aria-expanded="customizerOpen ? 'true' : 'false'"
+            aria-controls="theme-customizer-panel"
+            data-customizer-toggle
+          >
+            {{ icon('palette') }}<span>{{ t('Customize') }}</span>
+          </button>
+          <a href="/admin/themes">{{ t('Back to themes') }}</a>
+          <button
+            class="button"
+            form="theme-activate"
+            :disabled="preview.dirty"
+            :title="preview.dirty ? t('Save or discard changes before activating.') : null"
+            data-well-busy="{{ t('Activate theme') }}"
+            data-theme-activate
+          >
+            {{ t('Activate theme') }}
+          </button>
+        </div>
+      </aside>
+      <div class="theme-preview-workspace{{ customizerOpen ? ' has-customizer' : '' }}">
+        <aside
+          :if="preview.customizable"
+          id="theme-customizer-panel"
+          class="theme-customizer-panel"
+          aria-label="{{ t('Theme customization') }}"
+          :hidden="not customizerOpen"
+        >
+          <form
+            class="theme-customizer-form"
+            method="post"
+            action="/admin/themes/{{ preview.id }}/settings"
+            data-theme-customizer
+          >
+            <input type="hidden" name="_context" value="preview" />
+            <header class="theme-customizer-heading">
+              <div>
+                <h2>{{ t('Customize theme') }}</h2>
+                <p>{{ preview.name }}</p>
+              </div>
+              <button
+                type="button"
+                class="icon-button"
+                aria-label="{{ t('Close customization') }}"
+                data-customizer-close
+              >
+                {{ icon('x') }}
+              </button>
+            </header>
+            <div class="theme-customizer-messages">
+              <Alert :message="notice" />
+              <Alert error :message="error" />
+            </div>
+            <fieldset class="theme-customizer-fields">
+              <PackageSettingField :for="field in preview.fields" :field="field" />
+            </fieldset>
+            <footer class="theme-customizer-footer">
+              <p role="status" data-customizer-status>{{ t('Loading preview…') }}</p>
+              <button
+                type="submit"
+                class="button"
+                :disabled="not preview.dirty"
+                data-well-busy="{{ t('Saving…') }}"
+                data-customizer-save
+              >
+                {{ t('Save changes') }}
+              </button>
+              <button
+                type="button"
+                class="button button-outline"
+                :disabled="not preview.dirty"
+                data-customizer-discard
+              >
+                {{ t('Discard changes') }}
+              </button>
+            </footer>
+          </form>
+        </aside>
+        <main class="theme-preview-viewport" data-device="desktop">
+          <div class="theme-preview-canvas" style="min-width: 100%">
+            <iframe
+              class="theme-preview-frame"
+              :src="preview.url"
+              title="{{ t('{name} preview', name: preview.name) }}"
+              style="width: 100%"
+            ></iframe>
+          </div>
+        </main>
+      </div>
+    </div>
+  </Island>
+  <form id="theme-activate" method="post" action="/admin/themes/{{ preview.id }}/enable"></form>
+</Document>

@@ -22,8 +22,6 @@
     "resources/js/**/*.ts",
     "resources/js/**/*.tsx",
     "vite.config.ts",
-    "examples/themes/**/*.ts",
-    "examples/themes/**/*.tsx",
     "mcp/**/*.ts"
   ]
 }

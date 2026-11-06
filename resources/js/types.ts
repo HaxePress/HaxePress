@@ -105,7 +105,14 @@ export interface SharedProps {
   mediaRules?: MediaRules;
   adminNavigation?: {
     label: string;
-    links: { href: string; label: string; icon: string; exact: boolean; activePaths?: string[] }[];
+    links: {
+      href: string;
+      label: string;
+      icon: string;
+      exact: boolean;
+      activePaths?: string[];
+      parent?: string;
+    }[];
   }[];
   theme?: ThemeInfo | null;
   themeFeeds?: Record<string, ContentItem[]>;
@@ -148,6 +155,25 @@ export interface ExtensionBlock {
   slot: string;
   content: string;
 }
+export interface PackageInspection {
+  key: string;
+  installedVersion: string | null;
+  serverTarget: 'jvm' | 'cpp' | 'php' | '';
+  repository?: string;
+  manifest: {
+    name: string;
+    version: string;
+    author: string;
+    description: string;
+    serverJar: string;
+    serverCppia: string;
+    serverPhp: string;
+    module: string;
+    stylesheet: string;
+    layout: string;
+  };
+}
+
 export interface ExtensionSummary {
   designed?: boolean;
   id: string;

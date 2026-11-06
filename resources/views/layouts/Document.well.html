@@ -1,0 +1,15 @@
+<props bodyClass="String = ''" />
+<!doctype html>
+<html lang="{{ i18n.locale }}" dir="{{ i18n.direction }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" />
+    <Asset css="css/wellout.css" />
+    <Assets />
+    <HeadOutlet />
+  </head>
+  <body :class="bodyClass">
+    <slot />
+  </body>
+</html>

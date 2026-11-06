@@ -24,7 +24,7 @@ import hx.press.handler.admin.packages.SaveThemeAiPermissionsHandler;
 import hx.press.handler.ExtensionAssetHandler;
 import hx.press.middleware.AdminMiddleware;
 import hx.press.middleware.AdminSessionMiddleware;
-import hx.press.middleware.AdminInertiaProps;
+import hx.press.middleware.AdminMcpSessionMiddleware;
 import hx.well.middleware.AbstractMiddleware;
 import hx.well.middleware.SessionMiddleware;
 import hx.well.middleware.CsrfMiddleware;
@@ -46,36 +46,33 @@ import hx.press.handler.admin.team.SaveMemberHandler;
 import hx.press.handler.admin.content.SaveContentTypeHandler;
 import hx.press.handler.admin.role.SaveRoleHandler;
 import hx.press.handler.admin.navigation.SaveNavigationRegionHandler;
+#if jvm
+import hx.press.packages.GitHubPackageController;
+#end
 
 using hx.well.tools.RouteElementTools;
 
 class AdminRoutes extends RouteGroup {
     public static function extension(callback:Void->Void):Void {
         var middlewares:Array<Class<AbstractMiddleware>> = [
-            SessionMiddleware,
+            AdminMcpSessionMiddleware,
             AdminSessionMiddleware,
             CsrfMiddleware,
             SessionAuthMiddleware,
-            AdminInertiaProps,
             AdminMiddleware
         ];
         Route.path("/admin").middleware(middlewares).group(callback);
     }
 
     public function template():Void {
-        var sessionMiddleware:Array<Class<AbstractMiddleware>> = [
-            SessionMiddleware,
-            AdminSessionMiddleware,
-            CsrfMiddleware,
-            SessionAuthMiddleware,
-            AdminInertiaProps
-        ];
+        var sessionMiddleware:Array<Class<AbstractMiddleware>> = [SessionMiddleware, AdminSessionMiddleware, CsrfMiddleware, SessionAuthMiddleware];
         Route.middleware(sessionMiddleware).group(() -> {
             Route.get("/login", AdminController.loginPage);
             Route.post("/login", new LoginHandler());
         });
 
         var protectedMiddleware = sessionMiddleware.copy();
+        protectedMiddleware[0] = AdminMcpSessionMiddleware;
         protectedMiddleware.push(AdminMiddleware);
         Route.middleware(protectedMiddleware).group(() -> {
             LegacyContentRoutes.registerAdmin();
@@ -89,6 +86,7 @@ class AdminRoutes extends RouteGroup {
                 exact: true
             });
             Route.post("/logout", new LogoutHandler());
+            AdminMcpRoutes.admin();
             CollectionRoutes.register("/content", request -> "entry");
             CollectionRoutes.register("/pages", request -> "page");
             CollectionRoutes.register("/collections/{kind}", request -> request.route("kind"));
@@ -112,9 +110,8 @@ class AdminRoutes extends RouteGroup {
             Route.post("/content-types/{key}/save", new SaveContentTypeHandler());
             Route.post("/content-types/{key}/delete", ContentTypeController.remove);
             Route.post("/content/publish-due", ContentWorkflow.runDue);
-            Route.post("/media/upload", new UploadImageHandler()).attribute("inertia.share", false);
-            Route.post("/media/upload/verify", new UploadImageHandler(true))
-                .attribute("inertia.share", false);
+            Route.post("/media/upload", new UploadImageHandler());
+            Route.post("/media/upload/verify", new UploadImageHandler(true));
             Route.get("/media", request -> MediaController.index(request))
                 .attribute("cms.navigation", {
                     group: "Content",
@@ -155,10 +152,8 @@ class AdminRoutes extends RouteGroup {
             Route.post("/themes/create", new SaveThemeDesignHandler(true));
             Route.get("/themes/{id}/design", ThemeStudioController.editor);
             Route.get("/themes/{id}/assets", ThemeAssetController.index);
-            Route.post("/themes/{id}/assets", new UploadThemeImageHandler())
-                .attribute("inertia.share", false);
-            Route.post("/themes/{id}/assets/verify", new UploadThemeImageHandler(false, true))
-                .attribute("inertia.share", false);
+            Route.post("/themes/{id}/assets", new UploadThemeImageHandler());
+            Route.post("/themes/{id}/assets/verify", new UploadThemeImageHandler(false, true));
             Route.post("/themes/{id}/assets/{asset}/delete", ThemeAssetController.remove)
                 .whereNumber("asset");
             Route.post("/themes/{id}/design", new SaveThemeDesignHandler());
@@ -169,14 +164,15 @@ class AdminRoutes extends RouteGroup {
             Route.post("/themes/{id}/ai/permissions", new SaveThemeAiPermissionsHandler());
             Route.websocket("/themes/{id}/ai/ws")
                 .middleware([ThemeBrowserMcpMiddleware])
-                .handler(new ThemeMcpWebSocket(true))
-                .attribute("inertia.share", false);
-            Route.post("/themes/{id}/ai", ThemeAiController.connection);
-            Route.delete("/themes/{id}/ai", ThemeAiController.connection);
+                .handler(new ThemeMcpWebSocket());
             Route.get("/themes/{id}/design/status", ThemeAiController.status);
             Route.get("/themes/{id}/design/snapshot", ThemeAiController.snapshot);
             Route.get("/themes/{id}/design/frame", ThemeStudioController.frame)
                 .attribute("theme.preview.frame", true);
+            #if jvm
+            Route.get("/plugins/github/releases", GitHubPackageController.releases);
+            Route.post("/plugins/github/inspect", GitHubPackageController.inspect);
+            #end
             for (kind in ["plugin", "theme"]) {
                 var packageKind = kind;
                 var prefix = kind == "plugin" ? "/plugins" : "/themes";
@@ -222,7 +218,7 @@ class AdminRoutes extends RouteGroup {
                 icon: "settings",
                 capability: "settings",
                 position: 20,
-                exact: false
+                exact: true
             });
             Route.get("/navigation", request -> ManagementController.navigation(request))
                 .attribute("cms.navigation", {

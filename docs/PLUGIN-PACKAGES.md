@@ -2,6 +2,12 @@
 
 Owners upload ZIP packages from **Plugins** or **Themes**, review their manifest, install or replace a version, configure settings and activate it. Native code starts on activation/startup, after compatibility checks. Inspecting an archive does not execute its server code.
 
+On JVM sites, **Plugins → Install from GitHub** accepts a public GitHub repository or its Releases URL. Choose a release ZIP, inspect its manifest, then use the normal install or replace action. The picker lists uploaded release assets up to 64 MB. Publish a HaxePress package ZIP containing the native modules for the exact CMS version. GitHub's automatically generated source archives are outside the picker. [GitHub release assets](https://docs.github.com/en/rest/releases/assets)
+
+The example repository publishes a ready-to-install package for HaxePress 2.16.0. Its source and build instructions are also in `examples/plugin-repository`. [Example plugin releases](https://github.com/hxwell/haxepress-plugin-example/releases)
+
+Set `TEST_GITHUB_RELEASE=true` when running `python3 tests/run.py --only cms_packages` to include a live installation from the example release.
+
 CMS **2.16.0 / API 4** uses the `hx.press.*` application namespace, `ContentItem` / `content_items` for content storage, and the public renderer pages listed below. Rebuild older native plugins and renderer themes for this exact release. The bundled upgrade retains package settings, activation and the selected theme.
 
 Simple is embedded in the application and is not distributed as a replaceable ZIP. Theme cards use real isolated preview frames; custom `simple` layouts may inherit the application's bundled CSS. See [themes](THEMES.md).
@@ -13,6 +19,7 @@ Simple is embedded in the application and is not distributed as a replaceable ZI
   "apiVersion": 4,
   "cmsVersion": "2.16.0",
   "kind": "plugin",
+  "pluginId": "73bd51b4-a55b-4f34-8b3c-2016b19fb0f4",
   "slug": "my-extension",
   "name": "My extension",
   "version": "2.16.0",
@@ -37,9 +44,35 @@ Simple is embedded in the application and is not distributed as a replaceable ZI
 
 Place `cms-package.json` at the archive root or inside one enclosing folder. Frontend files live in `public/`; optional `assets.module` and `assets.stylesheet` refer to `.js`/`.mjs` and `.css` files there. The normal builder emits all three server targets. JAR and CPPIA remain required; PHP hosts also require `server.php` and its declared classes. `cmsVersion` is an exact release, rather than a version range. API 1/2/3 metadata can be read during upgrades; it does not authorize executing incompatible server modules or renderer themes.
 
-Uploads are capped at 10 MB compressed, 32 MB expanded, 16 MB per file and 256 archive entries. Inspection validates paths, duplicates/case aliases, declared assets, translation files and native artifact structure. Extraction streams bounded entries through Storage. Server modules and browser/SSR code are trusted owner-supplied code with the application's permissions.
+Generate one lowercase UUID for the plugin project and declare it in `pluginId`. Keep it across releases. Installation rejects a UUID owned by another package and updates must retain the installed UUID. An existing package that predates this field adopts the UUID from its first updated ZIP. Themes use their usual theme IDs.
+
+The default RSS, Newsletter and JVM Backups plugins are installed from the packages shipped with HaxePress. Startup upgrades them from the current shipped artifacts while preserving compatible settings and activation. Their lifecycle controls are **Activate** and **Deactivate**.
+
+Packages are capped at 64 MB compressed, 128 MB expanded, 16 MB per file and 256 archive entries. The HTTP upload configuration can impose a lower limit on local uploads. Inspection validates paths, duplicates/case aliases, declared assets, translation files and native artifact structure. Extraction streams bounded entries through Storage. Server modules and browser/SSR code are trusted owner-supplied code with the application's permissions.
 
 Setting kinds are `text`, `textarea`, `boolean`, `number`, `color`, `select` and `secret`. Fields have unique lowercase keys, labels and string defaults, with optional help/required/minimum/maximum/options. Secrets have no default credentials, are encrypted, masked in owner props and omitted from public settings. An empty secret retains its old value; clearing is explicit. Replacement preserves settings whose names and kinds still match.
+
+## MCP tools
+
+Expose a plugin action as an MCP tool by adding `cms.mcp` metadata to a concrete route registered inside `host.admin`.
+
+```haxe
+host.admin(() -> {
+    Route.get("/inventory/search", new SearchInventoryHandler())
+        .attribute("cms.mcp", {
+            name: "search",
+            description: "Search the site's inventory by product name.",
+            capability: "inventory",
+            inputSchema: {
+                type: "object",
+                properties: {query: {type: "string", maxLength: 80}},
+                required: ["query"]
+            }
+        });
+});
+```
+
+The exported name starts with `plugin_` and includes the plugin slug. The tool uses GET by default. Set `method` to `POST` or `DELETE` for a matching route that changes data. The host passes GET arguments as query parameters and write arguments as JSON. HaxePress checks the declared capability and runs the native handler and its validators. The declaration defaults to the `extensions` capability. Use fixed route paths and bounded JSON object schemas. Plugin tools follow the plugin's activation and route lifecycle.
 
 ## Native lifecycle and routes
 
@@ -61,6 +94,14 @@ class ExamplePlugin implements PluginEntrypoint {
 ```
 
 Contexts/results are JSON objects. An empty result is treated as an empty object, and returned JSON is limited to 64K characters. The context contains `apiVersion`, `cmsVersion`, `locale`, `packageInfo`, `database`, decrypted server `settings`, site settings and event `data`.
+
+### Scheduled tasks
+
+In `onCreate`, register an optional persistent job with `host.schedule(pluginId, key, intervalSeconds, payload)`. Read `packageInfo.pluginId` from the creation context. The host checks it against the plugin's installed UUID. Use a stable lowercase key and optional JSON object payload. Registering the same definition again keeps its next due time.
+
+The runtime calls `dispatch("schedule.run", context)` on the active plugin. The event's `data` includes `id`, `key` and the parsed `payload`. Return an empty object on success or an object with an `error` message to record a failed run. Keep effects idempotent across an interrupted run. Use `host.unschedule(pluginId, key)` to remove a rule. Deactivation pauses the plugin's jobs and uninstall removes them. Core jobs have a null plugin ID. Each plugin can provide management controls on its own admin page through `host.admin` and native `cms.navigation` route metadata.
+
+### Server modules
 
 | Target | Module | Loading |
 | --- | --- | --- |
@@ -91,9 +132,11 @@ public function onDestroy():Void {
 
 The host batches route registration and tracks ownership. Stopping a module removes remaining managed routes even when destruction throws. Creation/destruction failures disable the affected plugin, retain its error and show a process-wide restart warning. Installing an inactive package does not execute it. Disable, replacement, uninstall and graceful JVM shutdown destroy running instances; settings changes dispatch `settings.saved` to an active instance.
 
+A plugin's administration page renders the standard `Admin/PluginPage` view: `Pages.render("Admin/PluginPage", {pluginPage: page})`, with `import hx.press.view.Pages;` (the SDK exports it for every target; the JVM host renders the page). `page` holds a `title`, `description`, `total`, `columns` (`key`, `label`), `rows`, `actions` (`label`, `href`, optional `download`), an optional `rowAction` (`label`, `path` with `{id}`, `confirm`), `pagination` from `Pagination.links` and a `noun`. Texts are keys in the plugin's `namespace`. The page is rendered on the server inside the administration layout; the newsletter example's subscriber list shows the whole shape.
+
 Put request field rules in the handler's `override validate():Bool`, using `request().validate(...)`. Register the handler instance directly with `Route.post`; calling `execute` from a route callback bypasses the framework's validation lifecycle. The managed plugin route forwards validation while holding the module's lifecycle lock and checks that the installed generation is still active before calling plugin code.
 
-HxWell aborts with HTTP 422 when `validate()` returns false. A handler can implement the shared `hx.press.validation.ValidationResponder` interface to retain an endpoint-specific JSON response or Inertia form redirect:
+HxWell aborts with HTTP 422 when `validate()` returns false. A handler can implement the shared `hx.press.validation.ValidationResponder` interface to retain an endpoint-specific JSON response or form redirect:
 
 ```haxe
 import hx.press.validation.ValidationResponder;
@@ -256,21 +299,19 @@ Disabling/uninstalling retains plugin tables, values and history for later reins
 
 ## Themes
 
-Themes declare a stylesheet and a stable lowercase layout identifier. Simple is the minimal default. Renderer themes declare `assets.renderer` and export `createTheme(runtime)`. The following standard pages are available as fallback views:
+Themes declare a stylesheet, a stable lowercase layout identifier and `assets.views`, a folder of Wellout templates (`*.well.html`). Simple is the minimal default. A theme provides any of the standard pages, and the application's own view renders the pages it leaves out:
 
 ```ts
 ['Home', 'ContentIndex', 'ContentDetail', 'Page', 'About', 'NotFound']
 ```
 
-The runtime injects the host React/Inertia instance, translated UI primitives, navigation helpers and `asset(path)`. Bundle package-owned components, not another React runtime. Public props use `ContentItem`, `items`, `item` and generic content/page routes. `Link` and `useSiteHref()` keep preview navigation in the selected owner-only frame, including locale/query parameters. The outer preview toolbar and desktop/tablet/mobile controls remain isolated from theme CSS.
-
-The browser imports the generation-specific module URL. Node SSR imports that installed module from `CMS_STORAGE_PATH`. The launcher and test runners set it to the same storage root as the JVM. Theme code runs in both browser and SSR contexts with the normal active-theme/owner checks.
+Templates are checked when the package is installed, against the same view contract the application uses: the props of each page, the shared values (`site`, `theme`, `navigation`, `i18n`, …), the helpers (`t`, `url`, `themeAsset`, `markdown`, …) and the application's components (`SiteLayout`, `ContentCard`, `Pagination`, `FieldValues`, `ContentFilters`, …). A package whose templates do not check is rejected with the first diagnostic. Theme templates are untrusted: they cannot use islands or raw HTML, and rendering is bounded in output size and component depth. `themeAsset(path)` links the package's `public/` files. Inside the owner-only preview frame, links to public pages keep the preview base, language and customization session. Packages that only declare a JavaScript `assets.renderer` are rejected.
 
 ## Shared translations
 
 Core and packages use English fallback with Turkish included. Declare up to ten JSON catalogues under `translations`. Files are flat key/message objects; plural values contain `one` / `other`. Catalogue limits are 128 KB, 1500 messages, 500 characters per key and 4000 per translation. Named placeholders are substituted once. Messages are plain text.
 
-Namespaces are `plugin-{slug}` and `theme-{slug}`; packages cannot replace another namespace. React uses `useTranslation(namespace)`, native code imports `hx.press.i18n.I18n`, and frontend `activate` receives a package-bound `t`. `I18n.t(key, parameters, namespace, locale)` supports explicit background locale. Public rendering checks the active theme before core messages; administration uses the core namespace. Preference changes use a separate cookie without a public session, and owners configure the default language.
+Namespaces are `plugin-{slug}` and `theme-{slug}`; packages cannot replace another namespace. Theme templates translate with `t(key)`, which checks the theme's catalogue before the core one; native code imports `hx.press.i18n.I18n`, and frontend `activate` receives a package-bound `t`. `I18n.t(key, parameters, namespace, locale)` supports explicit background locale. Public rendering checks the active theme before core messages; administration uses the core namespace. Preference changes use a separate cookie without a public session, and owners configure the default language.
 
 Catalogue caches include package identity, installed generation and locale. Replacement/activation/removal invalidate them. Only active catalogues are public; inactive theme previews can use that theme's translations. Stored authored content is not automatically translated.
 
@@ -290,7 +331,7 @@ SDKs, native plugins and theme ZIPs are generated under `Export/packages/` and p
 
 ## Partial and named templates
 
-A renderer can return only the templates it implements. `pages` is a name-to-component map, not a closed page enum. Administration components cannot be overridden by themes. Missing public templates use the controller-provided standard view; the CMS uses the shared Vite entry rather than requiring a source file per runtime template name.
+A theme provides only the templates it implements; the views folder is a set of named templates, not a closed page enum. Administration views cannot be overridden by themes. Missing public templates use the application's standard view.
 
 A theme manifest may declare:
 
@@ -305,7 +346,7 @@ A theme manifest may declare:
 }
 ```
 
-Templates accept the same `item`, `collection`, `related`, `items`, filter and cursor props used by the relevant standard view. `runtime.FieldValues` renders public structured values, and `runtime.ContentFilters` provides collection-aware search/filter controls. Content links use `item.url` / `item.archiveUrl`; management links use the server's `adminBase`. Previews use the same stored collection paths inside their isolated frame.
+Templates accept the same `item`, `collection`, `related`, `items`, filter and cursor props used by the relevant standard view. `<FieldValues>` renders public structured values, and `<ContentFilters>` provides collection-aware search/filter controls. Content links use `item.url` / `item.archiveUrl`; management links use the server's `adminBase`. Previews use the same stored collection paths inside their isolated frame.
 
 SDK artifacts are named from `cms.json` (`cms-plugin-api-4.*`). Use the source SDK and native export metadata with the matching HaxePress checkout and framework compatibility patches. Rebuild older JAR/CPPIA/PHP packages for this exact release; do not mix export metadata from another host.
 

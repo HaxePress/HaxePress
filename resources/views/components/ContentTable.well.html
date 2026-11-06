@@ -1,0 +1,98 @@
+<props
+  items="List<ContentAdminRowView>"
+  compact="Bool = false"
+  singular="String = ''"
+  showCategory="Bool = false"
+  fields="List<ContentAdminListFieldView> = []"
+/>
+<div class="table-scroll">
+  <table :class="compact ? 'content-table content-table-compact' : 'content-table'">
+    <thead>
+      <tr>
+        <th>{{ singular ? t(singular) : t('Content item') }}</th>
+        <th>{{ t('Status') }}</th>
+        <th :if="showCategory">{{ t('Category') }}</th>
+        <th :for="field in fields">{{ field.label }}</th>
+        <th>{{ t('Last updated') }}</th>
+        <th><span class="sr-only">{{ t('Actions') }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr :for="item in items">
+        <td>
+          <div class="table-content">
+            <img :if="item.image" src="{{ item.image }}" alt="" loading="lazy" /><span
+              :else
+              class="table-image-placeholder"
+              aria-hidden="true"
+              >{{ icon('image') }}</span
+            ><span
+              ><strong
+                ><template :if="item.status == 'trash'">{{ item.title }}</template
+                ><a :else href="{{ item.adminBase }}/{{ item.id }}/edit"
+                  >{{ item.title }}</a
+                ></strong
+              ><small
+                >{{ item.url ? item.url : t('Private content') }}<span
+                  :if="item.featured"
+                  class="featured-text"
+                  >{{ icon('sparkles') }} {{ t('Featured') }}</span
+                ></small
+              ></span
+            >
+          </div>
+        </td>
+        <td>
+          <span class="status {{ item.status }}"
+            >{{ item.status == 'published' ? t('Published') : item.status == 'scheduled' ?
+            t('Scheduled') : item.status == 'trash' ? t('In trash') : t('Draft') }}</span
+          >
+        </td>
+        <td :if="showCategory">{{ item.category }}</td>
+        <td :for="column in item.columns ?? []">
+          {{ column.translate ? t(column.text) : column.text }}
+        </td>
+        <td class="table-date">{{ item.updatedLabel }}</td>
+        <td>
+          <div class="table-actions">
+            <a
+              :if="item.status != 'trash'"
+              class="icon-button"
+              href="{{ item.adminBase }}/{{ item.id }}/edit"
+              aria-label="{{ t('Edit {title}', title: item.title) }}"
+              >{{ icon('edit') }}</a
+            >
+            <a
+              :if="item.status == 'published' and item.url"
+              class="icon-button"
+              href="{{ item.url }}"
+              aria-label="{{ t('Read {title}', title: item.title) }}"
+              >{{ icon('external') }}</a
+            >
+            <form
+              :if="can('publish') or item.status == 'draft' or item.status == 'trash'"
+              action="{{ item.adminBase }}/{{ item.id }}/{{ item.status == 'trash' ? 'permanent-delete' : 'trash' }}"
+              method="post"
+            >
+              <button
+                class="icon-button danger"
+                type="submit"
+                aria-label="{{ t('Delete {title}', title: item.title) }}"
+                data-well-confirm="{{ item.status == 'trash' ? t('Delete this content permanently? This action cannot be undone.') : t('Move this content to the trash? You can restore it later.') }}"
+              >
+                {{ icon('trash') }}
+              </button>
+            </form>
+            <form
+              :if="item.status == 'trash'"
+              action="{{ item.adminBase }}/{{ item.id }}/restore"
+              method="post"
+            >
+              <button class="button button-outline" type="submit">{{ t('Restore') }}</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

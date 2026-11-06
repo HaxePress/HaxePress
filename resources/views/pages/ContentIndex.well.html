@@ -1,0 +1,52 @@
+<props
+  items="List<ContentItemView>"
+  query="String"
+  category="String"
+  resultCount="Int"
+  pagination="PageLinksView"
+  collection="PublicCollectionView"
+  archiveUrl="String"
+  categories="List<String> = []"
+  fieldFilters="Map<String, String>?"
+  tag="TagView?"
+/>
+<SiteLayout>
+  <PageHead
+    :title="tag.name ?? t(collection.name)"
+    :description="tag.description ? tag.description : collection.description"
+  />
+  <header class="simple-page-heading">
+    <h1>{{ tag.name ?? t(collection.name) }}</h1>
+    <p :if="tag.description or collection.description">
+      {{ tag.description ? tag.description : collection.description }}
+    </p>
+    <a :if="tag" href="{{ collection.publicBase }}"
+      >{{ t('Back to {collection}', collection: t(collection.name)) }}</a
+    >
+  </header>
+  <ContentFilters
+    :collection="collection"
+    :path="archiveUrl"
+    :query="query"
+    :category="category"
+    :categories="categories"
+    :fieldFilters="fieldFilters"
+    :tag="tag.slug ?? ''"
+  />
+  <div class="simple-results">
+    <p>{{ t('Result count', count: resultCount) }}</p>
+    <template :if="query or category or any(fieldFilters)"
+      ><a :if="tag" href="{{ url(archiveUrl, tag: tag.slug, type: collection.key) }}"
+        >{{ t('Clear search') }}</a
+      ><a :else href="{{ archiveUrl }}">{{ t('Clear search') }}</a></template
+    >
+  </div>
+  <div :if="items" class="content-list">
+    <ContentCard :for="item in items" :item="item" />
+  </div>
+  <div :else class="simple-empty">
+    <h2>{{ t('No content here just yet.') }}</h2>
+    <p>{{ t('Try another word or change your filters.') }}</p>
+  </div>
+  <Pagination :links="pagination" :count="size(items)" />
+</SiteLayout>

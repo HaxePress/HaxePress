@@ -11,7 +11,7 @@ from pathlib import Path
 from e2e import Client, check
 from fixture_store import FixtureStore
 
-HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
+HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
 
 
 def package_archive(entries):
@@ -44,6 +44,7 @@ def verify_packages(fixtures):
     }
     example = Path(__file__).resolve().parents[1] / "Export/packages/reading-companion-2.16.0.zip"
     with zipfile.ZipFile(example) as sample:
+        manifest["pluginId"] = json.loads(sample.read("cms-package.json"))["pluginId"]
         jar = sample.read("server.jar")
         cppia = sample.read("server.cppia")
     manifest["server"] = {

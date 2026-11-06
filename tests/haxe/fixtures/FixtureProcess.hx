@@ -4,6 +4,7 @@ import haxe.Exception;
 import haxe.Json;
 import haxe.Log;
 import haxe.ds.StringMap;
+import haxe.io.Bytes;
 import haxe.io.Eof;
 import hx.well.database.Connection;
 import hx.well.database.query.QueryBuilder;
@@ -20,6 +21,8 @@ import hx.press.model.Subscriber;
 import hx.press.model.Tag;
 import hx.press.model.ContentTag;
 import hx.press.model.InstalledPackage;
+import hx.press.model.ScheduledJob;
+import hx.press.model.ScheduledBackup;
 import hx.press.model.ThemeDesign;
 import hx.press.model.ThemeAsset;
 import hx.press.model.ThemeAiConnection;
@@ -61,6 +64,7 @@ import hx.press.model.ContentTypePath;
 import hx.press.model.ContentValue;
 import hx.press.database.ContentStructureSchema;
 import hx.press.database.AccessSchema;
+import hx.press.config.DatabaseConfig;
 import hx.press.navigation.NavigationRegions;
 import hx.press.model.NavigationRegion;
 import hx.press.model.Role;
@@ -79,8 +83,20 @@ class FixtureProcess {
             throw new Exception("The fixture process requires an isolated integration-test database");
         }
         ConfigData.init();
-        var path = Environment.env("DB_PATH");
-        Connection.create("default", {path: path}, () -> new GuardedConnection(Sqlite.open(path)));
+        var database = DatabaseConfig.definitions().get("default");
+        if (database.driver == "mysql") {
+            Connection.create("default", {
+                host: database.host,
+                port: database.port,
+                database: database.database,
+                user: database.username,
+                pass: database.password
+            });
+        } else {
+            var path = database.path;
+            Connection.create("default", {path: path},
+                () -> new GuardedConnection(Sqlite.open(path)));
+        }
         respond({ok: true, value: "ready"});
 
         while (true) {
@@ -115,6 +131,9 @@ class FixtureProcess {
     }
 
     static function handle(command:Dynamic):Dynamic {
+        if (command.action == "backup_probe") {
+            return backupProbe(command);
+        }
         if (command.action == "native_api_checks") {
             NativeApiChecks.run();
             return true;
@@ -208,6 +227,8 @@ class FixtureProcess {
             case "tags": execute(Tag.query, command);
             case "content_tags": execute(ContentTag.query, command);
             case "cms_packages": execute(InstalledPackage.query, command);
+            case "scheduled_jobs": execute(ScheduledJob.query, command);
+            case "scheduled_backup_files": execute(ScheduledBackup.query, command);
             case "theme_designs": execute(ThemeDesign.query, command);
             case "theme_assets": execute(ThemeAsset.query, command);
             case "theme_ai_connections": execute(ThemeAiConnection.query, command);
@@ -228,6 +249,61 @@ class FixtureProcess {
             case "plugin_migrations": execute(PluginMigrationRecord.query, command);
             default: throw new Exception("Unknown fixture model");
         };
+    }
+
+    static function backupProbe(command:Dynamic):Dynamic {
+        var tableName = "plugin_backup_probe";
+        var model = new BaseModel<Dynamic>();
+        model.setTable(tableName);
+        switch (command.operation) {
+            case "create":
+                Schema.create(tableName, table -> {
+                    table.string("bucket", 24);
+                    table.integer("sequence");
+                    table.bigInteger("content_id").unsigned();
+                    table.bigInteger("precise");
+                    table.binary("payload");
+                    table.primary(["bucket", "sequence"]);
+                    table.index(["content_id"]);
+                    table.foreign("content_id")
+                        .references("id")
+                        .on("content_items")
+                        .cascadeOnDelete();
+                });
+                for (index in 0...20) {
+                    new QueryBuilder(model).insert([
+                        "bucket" => index < 18 ? "a" : "b",
+                        "sequence" => index,
+                        "content_id" => command.contentId,
+                        "precise" => "9007199254740993",
+                        "payload" => Bytes.ofHex("00ffa97a")
+                    ]);
+                }
+                return true;
+            case "drop":
+                Schema.dropIfExists(tableName);
+                return true;
+            case "verify":
+                var rows = new QueryBuilder(model)
+                    .selectWithText(["precise", "payload", "content_id"],
+                        ["precise", "content_id"])
+                    .limit(21)
+                    .getResultSet();
+                var count = 0;
+                while (rows.hasNext()) {
+                    var row = rows.next();
+                    var payload:Bytes = row.payload;
+                    if (row.precise != "9007199254740993"
+                        || payload.toHex() != "00ffa97a"
+                        || row.content_id != Std.string(command.contentId)) {
+                        return false;
+                    }
+                    count++;
+                }
+                return count == 20;
+            default:
+                throw new Exception("Unknown backup probe operation.");
+        }
     }
 
     static function execute<T:BaseModel<T>>(model:BaseModelQuery<T>, command:Dynamic):Dynamic {
@@ -311,6 +387,15 @@ class FixturePluginHost implements PluginHost {
 
     public function can(capability:String):Bool {
         return true;
+    }
+
+    public function schedule(pluginId:String, key:String, intervalSeconds:Int,
+            ?payload:String):Void {
+        throw new Exception("Scheduling requires the application host.");
+    }
+
+    public function unschedule(pluginId:String, key:String):Bool {
+        throw new Exception("Scheduling requires the application host.");
     }
 }
 

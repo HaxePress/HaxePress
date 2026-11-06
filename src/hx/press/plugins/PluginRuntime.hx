@@ -1,5 +1,6 @@
 package hx.press.plugins;
 
+import haxe.Exception;
 import hx.press.validation.ValidationResponder;
 import hx.well.template.StatusTemplate;
 import hx.press.ContentCache;
@@ -16,6 +17,8 @@ import hx.press.SiteSettingsStore;
 import hx.press.i18n.I18n;
 import hx.press.MediaStorage;
 import hx.press.packages.PackageData;
+import hx.press.packages.BuiltInPlugins;
+import hx.press.packages.PackageManager;
 import hx.press.packages.PackageData.PackageRecord;
 import hx.press.packages.PackageManifest;
 import hx.press.packages.PackageSettings;
@@ -51,7 +54,6 @@ private class LivePlugin {
 class PluginRuntime {
     static final locks = new MutexPool();
     static final modules:SynchronizedMap<String, LivePlugin> = SynchronizedMap.newStringMap();
-    static final host = new DefaultPluginHost();
     public static var ready(default, null):Bool = false;
 
     static function key(record:PackageRecord):String {
@@ -67,6 +69,7 @@ class PluginRuntime {
             locale: I18n.locale(),
             packageInfo: {
                 id: record.id,
+                pluginId: record.plugin_id,
                 slug: record.slug,
                 version: record.version
             },
@@ -127,7 +130,7 @@ class PluginRuntime {
                 var path = Storage.disk("extensions")
                     .path('${PackageStorage.installed(record.directory)}/${artifact}');
                 module = new PluginModule(path, manifest.entrypoint);
-                module.create(host, context(record, {}));
+                module.create(new DefaultPluginHost(record.plugin_id), context(record, {}));
             }, route -> {
                 route.attribute("hx.press.plugin", record.id);
                 var handler = route.getHandler();
@@ -203,17 +206,41 @@ class PluginRuntime {
 
     static function withRoute<T>(id:String, directory:String, callback:Void->T, missing:Void->T):T {
         var moduleKey = '${id}:${directory}';
+        // The backup module snapshots installed packages. Follow the lifecycle lock order.
+        var packageSnapshot = id == BuiltInPlugins.BACKUP;
+        if (packageSnapshot) {
+            PackageManager.writes.acquire("packages");
+        }
         locks.acquire(moduleKey);
         try {
             var active = directory != null && modules.exists(moduleKey)
                 && PackageData.activeDirectory(id) == directory;
             var result = active ? callback() : missing();
             locks.release(moduleKey);
+            if (packageSnapshot) {
+                PackageManager.writes.release("packages");
+            }
             return result;
         } catch (error:Dynamic) {
             locks.release(moduleKey);
+            if (packageSnapshot) {
+                PackageManager.writes.release("packages");
+            }
             throw error;
         }
+    }
+
+    public static function runScheduled(record:PackageRecord, id:String, task:String,
+            payload:Dynamic):Bool {
+        return withRoute(record.id, record.directory, () -> {
+            var live = modules.get(key(record));
+            var result = live.module.dispatch("schedule.run",
+                context(record, {id: id, key: task, payload: payload}));
+            if (result.error is String && result.error != "") {
+                throw new Exception(result.error);
+            }
+            return true;
+        }, () -> false);
     }
 
     public static function route(id:String, directory:String, request:Request,

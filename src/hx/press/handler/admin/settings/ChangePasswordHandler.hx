@@ -54,7 +54,7 @@ class ChangePasswordHandler extends AbstractHandler implements ValidationRespond
 
     static function invalid(request:Request, message:String):AbstractResponse {
         if (destination(request) == "/admin/account") {
-            return ManagementController.account(request, message, 422);
+            return ManagementController.account(request, message, 422, "password");
         }
         return AdminController.settingsForm(request, message, "", 422, "password");
     }

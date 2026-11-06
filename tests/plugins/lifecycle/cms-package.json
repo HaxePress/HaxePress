@@ -2,6 +2,7 @@
   "apiVersion": 4,
   "cmsVersion": "2.16.0",
   "kind": "plugin",
+  "pluginId": "5e8cc1e4-24cc-472f-992f-8be8b335c3f8",
   "slug": "lifecycle-test",
   "name": "Lifecycle Test",
   "version": "2.16.0",
@@ -22,6 +23,12 @@
     {
       "key": "fail_destroy",
       "label": "Fail destruction",
+      "kind": "boolean",
+      "defaultValue": "false"
+    },
+    {
+      "key": "schedule_probe",
+      "label": "Schedule probe",
       "kind": "boolean",
       "defaultValue": "false"
     }

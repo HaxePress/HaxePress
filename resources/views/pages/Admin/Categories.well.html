@@ -1,0 +1,115 @@
+<props
+  categoryList="List<AdminCategoryView>"
+  notice="String"
+  categoryForm="AdminCategoryFormView"
+  query="String"
+  total="Int"
+  pagination="PageLinksView"
+/>
+<AdminLayout :title="t('Categories')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Categories') }}</h1>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('category')" />
+  <div class="categories-grid">
+    <section class="admin-card category-collection" aria-labelledby="category-list-title">
+      <div class="admin-card-heading">
+        <div>
+          <h2 id="category-list-title">
+            {{ t('Your categories') }} <span class="count-badge">{{ total }}</span>
+          </h2>
+          <p>
+            {{ t('Content counts include drafts. Move content before deleting their category.') }}
+          </p>
+        </div>
+      </div>
+      <form class="category-search-form" action="/admin/categories" method="get">
+        <label class="sr-only" for="category-query">{{ t('Find a category') }}</label>
+        <input
+          id="category-query"
+          name="q"
+          type="search"
+          maxlength="80"
+          value="{{ query }}"
+          placeholder="{{ t('Find a category by name…') }}"
+        />
+        <button class="button button-outline" type="submit">{{ t('Search') }}</button>
+      </form>
+      <ul :if="categoryList" class="category-list">
+        <li
+          :for="category in categoryList"
+          :class="categoryForm.id == (category.id | string) ? 'editing'"
+        >
+          <div class="category-details">
+            <strong>{{ category.name }}</strong
+            ><span
+              >{{ category.items }} {{ category.items == 1 ? t('content item') : t('content items')
+              }}</span
+            >
+          </div>
+          <div class="category-actions">
+            <a
+              class="icon-button"
+              aria-label="Rename {{ category.name }}"
+              href="{{ url('/admin/categories', q: query, edit: category.id) }}#category-name"
+              >{{ icon('edit') }}</a
+            >
+            <form action="/admin/categories/{{ category.id }}/delete" method="post">
+              <button
+                type="submit"
+                class="icon-button danger"
+                aria-label="Delete {{ category.name }}"
+                :disabled="category.items > 0"
+                :title="category.items > 0 ? t('Move these content to another category before deleting.') : t('Delete category')"
+                data-well-confirm="{{ t('Delete “{name}”? This category has no content.', name: category.name) }}"
+              >
+                {{ icon('trash') }}
+              </button>
+            </form>
+          </div>
+        </li>
+      </ul>
+      <div :else class="empty-state">
+        {{ icon('grid') }}
+        <h2>{{ t('No categories') }}</h2>
+        <p>{{ t('Add your first category to start organizing content.') }}</p>
+      </div>
+      <Pagination :links="pagination" :count="size(categoryList)" :noun="t('categories')" />
+    </section>
+    <section class="admin-card settings-card category-form" aria-labelledby="category-form-title">
+      <h2 id="category-form-title">
+        {{ categoryForm.id ? t('Rename category') : t('Add a category') }}
+      </h2>
+      <p>
+        {{ categoryForm.id ? t('The new name will appear on all content in this category.') : t('New
+        categories appear in the content item editor and site filters.') }}
+      </p>
+      <form action="/admin/categories/save" method="post">
+        <input type="hidden" name="id" value="{{ old('id') ?? categoryForm.id }}" />
+        <label for="category-name">{{ t('Category name') }}</label>
+        <input
+          id="category-name"
+          name="name"
+          required
+          maxlength="80"
+          placeholder="{{ t('For example, Food & drink') }}"
+          value="{{ old('name') ?? categoryForm.name }}"
+          :autofocus="categoryForm.id ? true : false"
+        />
+        <p class="field-help">{{ t('Choose a distinct name, up to 80 characters.') }}</p>
+        <div class="category-form-actions">
+          <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+            {{ icon(categoryForm.id ? 'check' : 'plus') }}{{ categoryForm.id ? t('Save changes') :
+            t('Add category') }}
+          </button>
+          <a :if="categoryForm.id" class="button button-outline" href="/admin/categories"
+            >{{ t('Cancel') }}</a
+          >
+        </div>
+      </form>
+    </section>
+  </div>
+</AdminLayout>

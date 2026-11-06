@@ -2,13 +2,13 @@
 
 > **Development preview — not production-ready.** HaxePress is under active development and is intended for local testing and evaluation. APIs, package compatibility and database schemas may change; it has not completed production security, reliability or performance validation.
 
-HaxePress is a general-purpose content management system built with **HxWell**, its native ORM/Schema/Cache/Storage APIs, **hxwell-crossbyte**, and **hxwell-inertia**. The administration interface and public site use React, TypeScript and Vite, with server-side rendering. English is the default language; Turkish is included.
+HaxePress is a general-purpose content management system built with **HxWell**, its native ORM/Schema/Cache/Storage APIs, **hxwell-crossbyte** and **[Wellout](https://github.com/hxwell/wellout)**. The JVM renders the public site, themes, plugin pages and administration from type-checked Wellout templates (`*.well.html`). Browsers receive HTML; small client islands built with TypeScript and Vite add interactive parts such as the content editor and the theme builder. English is the default language; Turkish is included.
 
 The current release is **2.16.0**, with **plugin/theme API 4**. The application runs on **JVM** with **SQLite or MySQL**. Native extension packages include JVM JAR, C++ CPPIA and PHP modules in one version-specific ZIP.
 
 ## Run locally
 
-Install Git, Make, Python 3.12+, Java 21+, Maven, Node.js 22.12+ with npm, and Neko for the HxWell CLI. Install uv if you run the format checks. Setup uses Haxe 4.3.7 and installs the Haxe libraries and Git snapshots from `dependencies.lock.json` in the workspace. Maven resolves the JVM dependencies from `pom.xml` and copies the runtime JARs into `java-lib`. For development, set `HXWELL_PATH` or `HXWELL_CROSSBYTE_PATH` to a compatible local checkout.
+Install Git, Make, Python 3.12+, Java 21+, Maven, Node.js 22.12+ with npm, and Neko for the HxWell CLI. Install uv if you run the format checks. Setup uses Haxe 4.3.7 and installs the Haxe libraries and Git snapshots from `dependencies.lock.json` in the workspace. Maven resolves the JVM dependencies from `pom.xml` and copies the runtime JARs into `java-lib`. For development, set `HXWELL_PATH`, `HXWELL_CROSSBYTE_PATH` or `WELLOUT_PATH` to a compatible local checkout.
 
 ```sh
 make setup
@@ -40,9 +40,7 @@ python3 scripts/hxwell.py build jvm
 python3 scripts/run.py
 ```
 
-`VITE_INCLUDE_PAGE_ENTRY=false` lets the CMS load its shared Vite application entry while themes supply named templates at runtime.
-
-The launcher starts the JVM HTTP application and a private Node.js SSR renderer on loopback port 13714. They stop together. The JVM also manages the private MCP SDK host for URL-based theme designer connections; see [MCP setup](docs/THEME-MCP.md). Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `STORAGE_PATH`, `CACHE_PATH`, `SESSION_PATH` and the Inertia SSR settings in `.env`. The default database is `storage/cms.sqlite`.
+The launcher starts the JVM HTTP application, which renders every page itself; no Node.js process takes part in rendering. The JVM also manages the private Node.js MCP SDK host for admin and theme tools. Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `STORAGE_PATH`, `CACHE_PATH` and `SESSION_PATH` in `.env`. The default database is `storage/cms.sqlite`. [MCP setup](docs/THEME-MCP.md)
 
 ## Definition-driven CMS
 
@@ -65,16 +63,17 @@ Themes provide partial or additional named public templates with standard fallba
 - Manage owners, editors and writers, with server-side permissions and session revocation.
 - Install, preview, configure and activate themes; preview desktop, tablet and mobile viewports in an isolated frame.
 - Install version-specific native plugins with creation/destruction callbacks, route ownership, settings and lifecycle diagnostics.
+- Schedule private site backups with per-rule sections, encryption and retention. [Backup and restore](docs/INSTALLATION.md#site-backups)
 - Extend the data model with plugin-owned models/tables, named migrations, relationships, scoped JSON state and configured database connections.
 - Share translations between the administration interface, themes and plugins.
 
-RSS, Newsletter and Reading Companion are optional bundled plugins. Simple is the minimal default theme; Fieldnotes, Notebook and Gallery are independently packaged themes. Each package keeps its own identity and translations.
+RSS, Newsletter and JVM Backups ship as default plugins that can be deactivated. Reading Companion is an optional sample. Simple is the minimal default theme. Fieldnotes, Notebook and Gallery are independently packaged themes. Each package keeps its own identity and translations.
 
 Published content uses `/content/{slug}`, the content index uses `/content`, pages use `/pages/{slug}` and tag archives use `/tags/{slug}`. Administration uses `/admin/content`, `/admin/pages`, `/admin/media`, `/admin/categories`, `/admin/tags`, `/admin/navigation`, `/admin/themes`, `/admin/plugins`, `/admin/team`, `/admin/activity` and `/admin/settings`.
 
 ## Native data architecture
 
-`hx.press.model.ContentItem` stores content and pages in `content_items`; `content_type` references a stored content type; Content (`entry`) and Pages (`page`) are seeded defaults. `ContentTag` uses `content_tags.content_id`. Application services live in the `hx.press.*` namespace. Public Inertia pages are `Home`, `ContentIndex`, `ContentDetail`, `Page`, `About` and `NotFound`.
+`hx.press.model.ContentItem` stores content and pages in `content_items`; `content_type` references a stored content type; Content (`entry`) and Pages (`page`) are seeded defaults. `ContentTag` uses `content_tags.content_id`. Application services live in the `hx.press.*` namespace. Public pages are the Wellout views `Home`, `ContentIndex`, `ContentDetail`, `Page`, `About` and `NotFound`.
 
 Queries select only the response's fields, filter/count/order in SQL and use bounded cursor pages. Content bodies are loaded for a specific detail/editor operation, search predicate or bounded migration. Reading time is write-time metadata. Query-specific caches include identifiers, filters, cursor and page size; native writes invalidate the affected domains. Cached values are typed plain records, not ORM instances.
 
@@ -101,7 +100,8 @@ The source is organized as follows:
 | `src/hx/press/model/` | Typed core ORM models |
 | `src/hx/press/config/` | Application configuration and provider registration |
 | `src/hx/press/handler/` | Public and guarded administration handlers |
-| `resources/js/` | React administration/public pages and theme runtime |
+| `resources/views/` | Wellout pages, layouts and components |
+| `resources/js/` | Client islands, the theme builder and the content editor |
 | `resources/css/` | Scoped site and administration styles |
 | `examples/` | Native plugin and theme sources |
 | `tests/` | Isolated JVM/CPPIA/PHP checks and ORM fixtures |
@@ -110,7 +110,7 @@ The source is organized as follows:
 
 Back up `.env`, the database and managed `storage/` data before upgrading. The legacy naming migration renames the old content/tag tables and reference column through Schema APIs, preserves IDs/content/relationships, normalizes the old content type, working-copy keys and revision snapshots, and updates factory defaults only when they still match the original values. Existing custom site text is retained. The structure migration replaces the global slug constraint with `(content_type, slug)`, renames menu references to `content_id`, and adds registry/value/grant tables. Old public URLs redirect to canonical routes.
 
-Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Third-party native plugins and renderer themes must be rebuilt for the exact CMS 2.16.0 / API 4 release. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. Keep custom `DB_PATH` values; the local project's original default filename is migrated to `storage/cms.sqlite` during deployment.
+Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Third-party native plugins must be rebuilt for the exact CMS 2.16.0 / API 4 release. Themes provide Wellout views; packages that only contain a JavaScript renderer are rejected. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. Keep custom `DB_PATH` values; the local project's original default filename is migrated to `storage/cms.sqlite` during deployment.
 
 ## Verification
 
@@ -123,7 +123,7 @@ PATH="$PWD/.tools/haxe:$PATH" npm run format:check
 
 The [CI workflow](.github/workflows/ci.yml) runs setup, formatting, the application and extension build, and the JVM integration suite on Ubuntu for pushes and pull requests to `main`. It uses Haxe 4.3.7 and Java 21.
 
-The JVM suite uses temporary databases, actual Crossbyte/SSR processes and a test-only ORM fixture process. It exercises permissions, uploads, caches/projections, cursor pagination, revision/scheduling flows, package replacement, migrations and languages. Native C++ and PHP hosts load real extension modules and run the same persistence contract checks. An existing-installation rehearsal verifies preserved data, relationships, working copies, revision snapshots, package state, redirects and repeat startup.
+The JVM suite uses temporary databases, actual Crossbyte processes and a test-only ORM fixture process. It exercises permissions, uploads, caches/projections, cursor pagination, revision/scheduling flows, package replacement, migrations and languages. Native C++ and PHP hosts load real extension modules and run the same persistence contract checks. An existing-installation rehearsal verifies preserved data, relationships, working copies, revision snapshots, package state, redirects and repeat startup.
 
 [The acceptance record](docs/CMS.md) describes the current verification evidence. Historical API 2 records are retained under `docs/history/`.
 
@@ -138,3 +138,5 @@ Theme cards show live miniature previews. Simple is an application-owned default
 WebSocket cleanup is covered by shared Crossbyte and Undertow transport regressions. See [session lifecycle](docs/WEBSOCKET-LIFECYCLE.md).
 
 Theme editor uploads belong to the theme, use a separate Storage disk, and travel with visual-theme exports. See [theme images](docs/THEME-ASSETS.md).
+
+Pages are written in Wellout, a type-checked server-side template language developed in its own repository. See [the template language integration](docs/TEMPLATE-LANGUAGE.md) and [the porting guide](docs/WELLOUT-PORTING.md).

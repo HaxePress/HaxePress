@@ -3,7 +3,7 @@ package hx.press;
 import hx.press.CategoryData;
 import hx.press.ContentItemData;
 import hx.press.plugins.PluginRuntime;
-import hx.well.facades.Inertia;
+import hx.press.view.View;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.press.model.ActivityLog;
@@ -45,6 +45,6 @@ class DashboardController {
             widgets: widgets,
             collectionCards: collections
         };
-        return Inertia.render("Admin/Dashboard", props);
+        return View.render("Admin/Dashboard", props);
     }
 }

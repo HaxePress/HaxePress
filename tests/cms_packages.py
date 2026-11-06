@@ -5,6 +5,8 @@ import io
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlencode
+from uuid import uuid4
 import secrets
 import shutil
 import tempfile
@@ -19,7 +21,8 @@ from e2e import Client, check
 from fixture_store import FixtureStore
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
+HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
+GITHUB_EXAMPLE = "https://github.com/hxwell/haxepress-plugin-example"
 
 
 def props(client, path):
@@ -86,6 +89,42 @@ def run():
         verify(fixtures)
 
 
+def verify_github_release(admin, public):
+    slug = "github-release-example"
+    plugin = f"/admin/plugins/plugin-{slug}"
+    endpoint = f"/{slug}"
+    github = "/admin/plugins/github"
+    params = urlencode({"repository": f"{GITHUB_EXAMPLE}/releases", "page": 1})
+    status, _, body = admin.request(f"{github}/releases?{params}")
+    check(status == 200, f"GitHub release lookup returned {status}: {body[:300]}")
+    listing = json.loads(body)
+    check(listing["repository"] == GITHUB_EXAMPLE, "The repository URL was not normalized")
+    release = next(item for item in listing["releases"] if item["tag"] == "v0.1.1")
+    asset = next(item for item in release["assets"] if item["name"] == f"{slug}-0.1.1.zip")
+    status, _, body = admin.request(
+        f"{github}/inspect", "POST", {"repository": listing["repository"], "asset": asset["id"]}
+    )
+    check(status == 201, f"GitHub ZIP inspection returned {status}: {body[:300]}")
+    inspected = json.loads(body)
+    check(inspected["manifest"]["version"] == "0.1.1", "The wrong release ZIP was staged")
+    try:
+        check(public.request(endpoint)[0] == 404, "ZIP inspection executed the plugin")
+        status, _, body = admin.request("/admin/plugins/install", "POST", {"key": inspected["key"]})
+        check(status == 303, f"GitHub ZIP installation returned {status}: {body[:300]}")
+        check(public.request(endpoint)[0] == 404, "A new installation started automatically")
+        check(admin.request(f"{plugin}/enable", "POST", {})[0] == 303, "Plugin activation failed")
+        status, _, body = public.request(endpoint)
+        check(
+            status == 200 and json.loads(body)["status"] == "active",
+            "The release module did not run",
+        )
+    finally:
+        admin.request(f"{plugin}/uninstall", "POST", {})
+        admin.request("/admin/plugins/discard", "POST", {"key": inspected["key"]})
+    check(public.request(endpoint)[0] == 404, "Removing the plugin left its route registered")
+    print("PASS Real GitHub release listing, ZIP inspection, install and activation", flush=True)
+
+
 def verify(fixtures):
     admin = Client()
     public = Client()
@@ -103,6 +142,38 @@ def verify(fixtures):
         "package owner login",
     )
     check(public.request("/admin/plugins")[0] == 303, "plugin panel bypassed the guard")
+    check(
+        "Install from GitHub" in admin.request("/admin/plugins")[2], "The plugin picker is missing"
+    )
+    github = "/admin/plugins/github"
+    repository = GITHUB_EXAMPLE
+    params = urlencode({"repository": repository, "page": 1})
+    check(
+        public.request(f"{github}/releases?{params}")[0] == 303, "GitHub lookup bypassed the guard"
+    )
+    check(
+        admin.request(
+            f"{github}/inspect", "POST", {"repository": repository, "asset": "1"}, csrf=False
+        )[0]
+        == 419,
+        "GitHub package staging bypassed CSRF",
+    )
+    untrusted = urlencode({"repository": "https://github.com.example.test/owner/plugin", "page": 1})
+    check(
+        admin.request(f"{github}/releases?{untrusted}")[0] == 422,
+        "A lookalike GitHub host was accepted",
+    )
+    check(
+        admin.request(
+            f"{github}/inspect",
+            "POST",
+            {"repository": repository, "asset": "https://example.test/package.zip"},
+        )[0]
+        == 422,
+        "Package staging accepted a direct download URL",
+    )
+    if os.environ.get("TEST_GITHUB_RELEASE") == "true":
+        verify_github_release(admin, public)
     rejected = admin.request("/admin/plugins/upload", "POST", raw=b"invalid", csrf=False)
     check(
         rejected[0] == 419,
@@ -143,8 +214,12 @@ def verify(fixtures):
                 'class="featured-content"' in rendered and 'class="hero"' not in rendered,
                 "packaged theme did not render its own pages",
             )
-            check(theme["renderer"].endswith("theme.mjs"), "theme renderer metadata")
-            check(public.request(theme["renderer"])[0] == 200, "theme renderer asset")
+            check(theme["renderer"] == "", "packaged theme still declares a browser renderer")
+            check(
+                f'<link rel="stylesheet" href="{theme["stylesheet"]}">' in rendered
+                and "data-page=" not in rendered,
+                "packaged theme pages were not rendered on the server with their stylesheet",
+            )
         if not theme["built_in"]:
             status, headers, stylesheet = public.request(theme["stylesheet"])
             check(
@@ -157,15 +232,16 @@ def verify(fixtures):
                 "Built-in theme uses package assets",
             )
     cards = admin.request("/admin/themes")[2]
+    preview_revision = props(admin, "/admin/themes")["themePreviewRevision"]
     check(
-        props(admin, "/admin/themes")["themePreviewRevision"] != initial_preview_revision,
+        preview_revision != initial_preview_revision,
         "Theme changes did not invalidate cached preview images",
     )
     check(
         cards.count('class="theme-thumbnail"') == 4
         and cards.count('data-preview-state="loading"') == 4
         and "<iframe" not in cards
-        and "themePreviewRevision" in cards
+        and cards.count(f"snapshot={preview_revision}") == 4
         and "theme-thumbnail-gallery" not in cards,
         "Theme cards did not defer their cached preview captures",
     )
@@ -179,7 +255,7 @@ def verify(fixtures):
         "preview toolbar and iframe shell",
     )
     check(
-        preview["theme"] is None
+        preview.get("theme") is None
         and "/extension-assets/" not in parent_html
         and parent_headers["x-frame-options"] == "DENY",
         "parent preview page loaded theme styles or changed its frame policy",
@@ -366,6 +442,7 @@ def verify(fixtures):
         "apiVersion": 4,
         "cmsVersion": "2.16.0",
         "kind": "plugin",
+        "pluginId": str(uuid4()),
         "slug": "test-banner",
         "name": "Test Banner",
         "version": "2.16.0",

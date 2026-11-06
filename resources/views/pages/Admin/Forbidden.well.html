@@ -1,0 +1,8 @@
+<props message="String" />
+<AdminLayout :title="t('Access restricted')">
+  <section class="admin-card empty-state">
+    <h1>{{ t('Access restricted') }}</h1>
+    <p>{{ t(message) }}</p>
+    <a href="/admin" class="button">{{ t('Back to overview') }}</a>
+  </section>
+</AdminLayout>

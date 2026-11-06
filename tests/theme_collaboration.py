@@ -3,6 +3,7 @@
 import json
 import os
 
+from admin_mcp import call, session_status
 from e2e import check
 from validation import post_json
 from websocket_lifecycle import WebSocket
@@ -75,23 +76,17 @@ def initial_browser(owner, store, theme_id):
     return peer
 
 
-def permissions_and_events(owner, public, store, peer, other, token, version):
+def permissions_and_events(owner, public, peer, other, connection, version):
     route = f"/admin/themes/{peer.theme_id}"
-    api = f"/api/theme-designer/{peer.theme_id}"
-    bearer = {"Authorization": f"Bearer {token}"}
     peer.tool("get_design")
     changes = [
         event["params"]
         for event in peer.events
         if event.get("method") == "notifications/haxepress/design_changed"
     ]
+    check(changes and changes[-1]["version"] == version, "Remote edits were not pushed live")
     check(
-        changes and changes[-1]["version"] == version,
-        "LLM edits were not pushed live to the browser",
-    )
-    check(
-        all(event["themeId"] == peer.theme_id for event in changes),
-        "A change crossed its theme channel",
+        all(event["themeId"] == peer.theme_id for event in changes), "A change crossed its channel"
     )
     other.tool("get_design")
     check(
@@ -101,29 +96,21 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
         ),
         "Another theme received draft notifications",
     )
-    original = store.rows(
-        "theme_ai_connections", ["token_hash"], [("theme_id", "=", peer.theme_id)], limit=1
+
+    original = session_status(owner, connection)
+    policy = {"read": "1", "edit": "0", "media": "0"}
+    check(
+        owner.request(f"{route}/ai/permissions", "POST", policy, csrf=False)[0] == 419,
+        "Theme permissions bypassed CSRF",
     )
     check(
-        owner.request(
-            f"{route}/ai/permissions", "POST", {"read": "1", "edit": "0", "media": "0"}, csrf=False
-        )[0]
-        == 419,
-        "Permission changes bypassed CSRF",
+        post_json(owner, f"{route}/ai/permissions", {**policy, "edit": "invalid"})[0] == 422,
+        "Theme permission validation was bypassed",
     )
     check(
-        post_json(owner, f"{route}/ai/permissions", {"read": "1", "edit": "invalid", "media": "1"})[
-            0
-        ]
-        == 422,
-        "Permission validation was bypassed",
+        post_json(owner, f"{route}/ai/permissions", policy)[0] == 200,
+        "Could not make theme read-only",
     )
-    check(
-        post_json(owner, f"{route}/ai/permissions", {"read": "1", "edit": "0", "media": "0"})[0]
-        == 200,
-        "Read-only permissions could not be saved",
-    )
-    tools = peer.rpc("tools/list")["result"]["tools"]
     expected = [
         "get_design_guide",
         "get_design",
@@ -131,72 +118,59 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
         "search_theme_assets",
         "read_theme_asset_image",
     ]
-    check([tool["name"] for tool in tools] == expected, "Browser tool permissions were not applied")
+    tools = peer.rpc("tools/list")["result"]["tools"]
+    check([tool["name"] for tool in tools] == expected, "Browser permission filtering changed")
+    edits = {
+        "expectedVersion": version,
+        "operations": [{"action": "tokens", "values": {"accent": "#cc0000"}}],
+    }
+    remote = {"themeId": peer.theme_id}
     check(
-        public.request(f"{api}/design", "POST", {}, extra_headers=bearer)[0] == 403,
-        "A read-only AI connection could write",
+        call(public, connection, "edit_theme_design", {**remote, **edits}).get("isError"),
+        "A read-only theme accepted a remote edit",
     )
     check(
-        public.request(f"{api}/media", extra_headers=bearer)[0] == 403,
-        "A denied media permission was ignored",
+        call(public, connection, "search_media_for_theme", remote).get("isError"),
+        "A denied theme could browse shared media",
     )
-    reply = peer.rpc(
-        "tools/call",
-        {
-            "name": "edit_design",
-            "arguments": {
-                "expectedVersion": version,
-                "operations": [{"action": "tokens", "values": {"accent": "#cc0000"}}],
-            },
-        },
-    )
+    reply = peer.rpc("tools/call", {"name": "edit_design", "arguments": edits})
     check(
         "error" in reply or reply.get("result", {}).get("isError"),
-        "A forbidden browser edit succeeded",
+        "A read-only browser edited a theme",
     )
-    status, _, body = public.request(
-        f"/mcp/themes/{peer.theme_id}",
-        "POST",
-        raw=json.dumps({"jsonrpc": "2.0", "id": 31, "method": "tools/list"}).encode(),
-        content_type="application/json",
-        extra_headers={
-            **bearer,
-            "Accept": "application/json, text/event-stream",
-            "X-Haxepress-Permissions": '{"read":true,"edit":true,"media":true}',
-        },
+    check(peer.tool("get_design")["theme"]["version"] == version, "Denied edits changed the theme")
+    current = session_status(owner, connection)
+    stable_fields = ("id", "profile", "url", "expires", "firstSeenAt")
+    check(
+        current is not None
+        and all(current[field] == original[field] for field in stable_fields)
+        and current["lastSeenAt"] >= original["lastSeenAt"],
+        "Changing theme permissions changed the global MCP session identity",
+    )
+
+    check(
+        post_json(owner, f"{route}/ai/permissions", {**policy, "read": "0"})[0] == 200,
+        "Theme AI tools could not be disabled",
     )
     check(
-        status == 200
-        and [tool["name"] for tool in json.loads(body)["result"]["tools"]] == expected,
-        "External permissions were forged through a header",
-    )
-    current = peer.tool("get_design")
-    check(current["theme"]["version"] == version, "Permission failures changed the saved draft")
-    check(
-        store.rows(
-            "theme_ai_connections", ["token_hash"], [("theme_id", "=", peer.theme_id)], limit=1
-        )
-        == original,
-        "Saving permissions rotated a connection key",
+        call(public, connection, "get_theme_design", remote).get("isError"),
+        "A disabled theme still returned its draft",
     )
     check(
-        post_json(owner, f"{route}/ai/permissions", {"read": "0", "edit": "1", "media": "1"})[0]
-        == 200,
-        "AI tools could not be disabled",
-    )
-    check(
-        public.request(f"{api}/design", extra_headers=bearer)[0] == 403,
-        "Disabled AI tools retained design access",
+        not call(public, connection, "get_theme_design", {"themeId": other.theme_id}).get(
+            "isError"
+        ),
+        "A theme policy affected another theme",
     )
     check(
         post_json(owner, f"{route}/ai/permissions", {"read": "1", "edit": "1", "media": "1"})[0]
         == 200,
-        "AI permissions could not be restored",
+        "Theme AI permissions could not be restored",
     )
-    restored = [tool["name"] for tool in peer.rpc("tools/list")["result"]["tools"]]
+    restored = peer.rpc("tools/list")["result"]["tools"]
     check(
-        len(restored) == 11 and "verify_theme_image" in restored,
-        "The updated permission cache did not refresh",
+        len(restored) == 11 and any(tool["name"] == "verify_theme_image" for tool in restored),
+        "The scoped browser catalog did not refresh",
     )
     notifications = [
         event
@@ -208,6 +182,6 @@ def permissions_and_events(owner, public, store, peer, other, token, version):
         "Browser permission changes were not pushed",
     )
     print(
-        "PASS Shared theme WebSockets: admin-session authentication, trusted origins, no browser API key, live scoped changes, server-side read/edit/media permissions and key preservation",
+        "PASS Theme collaboration: isolated live changes, browser access and scoped permissions",
         flush=True,
     )

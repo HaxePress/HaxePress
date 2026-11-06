@@ -1,0 +1,18 @@
+<props links="List<NavigationLinkView>" />
+<template :for="link in links"
+  ><a
+    :if="link.new_tab == 1"
+    href="{{ link.url }}"
+    :class="isCurrent(link.url) ? 'active'"
+    :aria-current="isCurrent(link.url) ? 'page'"
+    target="_blank"
+    rel="noopener noreferrer"
+    >{{ t(link.label) }}</a
+  ><a
+    :else
+    href="{{ link.url }}"
+    :class="isCurrent(link.url) ? 'active'"
+    :aria-current="isCurrent(link.url) ? 'page'"
+    >{{ t(link.label) }}</a
+  ></template
+>

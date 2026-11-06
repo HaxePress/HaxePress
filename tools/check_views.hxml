@@ -1,0 +1,5 @@
+-cp src
+-lib wellout
+-D hxwell_config_package=hx.press.config
+-main hx.press.view.CheckViews
+--interp

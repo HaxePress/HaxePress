@@ -1,0 +1,66 @@
+<props
+  roles="List<RoleDefinitionView>"
+  query="String"
+  pagination="PageLinksView"
+  noticeMessage="String"
+/>
+<AdminLayout :title="t('Roles')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Roles') }}</h1>
+    </div>
+    <a class="button" href="/admin/roles/new">{{ icon('plus') }} {{ t('New role') }}</a>
+  </div>
+  <Alert :message="noticeMessage" />
+  <section class="admin-card">
+    <div class="admin-card-heading">
+      <h2>{{ t('Access roles') }}</h2>
+      <form class="admin-search" method="get" action="/admin/roles">
+        {{ icon('search') }}
+        <label class="sr-only" for="role-search">{{ t('Search roles') }}</label>
+        <input
+          id="role-search"
+          name="q"
+          value="{{ query }}"
+          maxlength="100"
+          placeholder="{{ t('Search roles') }}"
+        />
+      </form>
+    </div>
+    <div class="table-scroll">
+      <table class="content-table">
+        <thead>
+          <tr>
+            <th>{{ t('Role') }}</th>
+            <th>{{ t('Description') }}</th>
+            <th>{{ t('Status') }}</th>
+            <th><span class="sr-only">{{ t('Actions') }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for="role in roles">
+            <td>
+              <strong><a href="/admin/roles/{{ role.key }}/edit">{{ t(role.name) }}</a></strong
+              ><small class="field-help"> {{ role.key }}</small>
+            </td>
+            <td>{{ role.description }}</td>
+            <td>
+              <span class="status {{ role.enabled ? 'published' : 'draft' }}"
+                >{{ t(role.enabled ? 'Enabled' : 'Disabled') }}</span
+              >
+            </td>
+            <td>
+              <a
+                class="icon-button"
+                href="/admin/roles/{{ role.key }}/edit"
+                aria-label="{{ t('Edit {name}', name: role.name) }}"
+                >{{ icon('edit') }}</a
+              >
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <Pagination :links="pagination" :count="size(roles)" noun="roles" />
+</AdminLayout>

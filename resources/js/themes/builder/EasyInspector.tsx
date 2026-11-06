@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage } from '../../page';
 import type { SharedProps } from '../../types';
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';

@@ -1,0 +1,260 @@
+<props
+  supported="Bool"
+  uploadLimit="Int"
+  schedules="List<BackupScheduleView>"
+  backupForm="BackupFormView"
+  scheduleForm="BackupScheduleFormView?"
+  savedFiles="BackupSavedFilesView?"
+  editing="Bool"
+/>
+<AdminLayout :title="t('Backup / Restore')">
+  <div class="admin-page-heading">
+    <h1>{{ t('Backup / Restore') }}</h1>
+  </div>
+  <div class="settings-grid">
+    <section class="admin-card settings-card">
+      <h2>{{ t('Site backups') }}</h2>
+      <template :if="supported">
+        <p class="field-help">
+          {{ t('Site settings, accounts and shared media are included in every backup.') }}
+        </p>
+        <Alert error :message="error('backup')" />
+        <form action="/admin/backups" method="post">
+          <input type="hidden" name="backup_form" value="1" />
+          <fieldset>
+            <label class="checkbox-label"
+              ><input type="checkbox" name="content" value="1" :checked="backupForm.content" />{{
+              t('Content') }}</label
+            >
+            <label class="checkbox-label"
+              ><input type="checkbox" name="themes" value="1" :checked="backupForm.themes" />{{
+              t('Themes') }}</label
+            >
+            <label class="checkbox-label"
+              ><input type="checkbox" name="plugins" value="1" :checked="backupForm.plugins" />{{
+              t('Plugins') }}</label
+            >
+            <label class="checkbox-label"
+              ><input
+                type="checkbox"
+                name="encrypted"
+                value="1"
+                :checked="backupForm.encrypted"
+                data-well-toggle="backup-encrypted-warning"
+              />{{ t('Encrypt with APP_KEY (.hxpress)') }}</label
+            >
+          </fieldset>
+          <div
+            id="backup-encrypted-warning"
+            class="alert error"
+            role="alert"
+            :hidden="not backupForm.encrypted"
+          >
+            {{ icon('alert') }}{{ t('This file is unusable on projects with a different APP_KEY. If
+            the original APP_KEY is lost, the backup is permanently unrecoverable.') }}
+          </div>
+          <button
+            class="button button-outline"
+            type="submit"
+            :disabled="not (backupForm.content or backupForm.themes or backupForm.plugins)"
+            data-well-busy="{{ t('Verifying backup…') }}"
+          >
+            {{ t('Prepare backup') }}
+          </button>
+        </form>
+        <template :if="backupForm.download">
+          <p class="field-help" role="status">{{ t('Backup verified. Keep the file private.') }}</p>
+          <p class="field-help"><code>MD5 {{ backupForm.md5 }}</code></p>
+          <a class="button" href="{{ backupForm.download }}">{{ t('Download verified backup') }}</a>
+        </template>
+      </template>
+      <p :else class="field-help">{{ t('Site backups require SQLite or MySQL.') }}</p>
+    </section>
+    <Island
+      name="backup-restore-check"
+      :props="{
+        translations: translations,
+        locale: i18n.locale,
+        direction: i18n.direction,
+        uploadLimit: uploadLimit,
+        csrfToken: csrfToken
+      }"
+      load="idle"
+    >
+      <section class="admin-card settings-card">
+        <h2>{{ t('Restore a backup') }}</h2>
+        <p>
+          {{ t('Verify a backup here, then restore it in the installer of a fresh HaxePress site.')
+          }}
+        </p>
+        <form>
+          <label for="backup-to-restore">{{ t('Backup file') }}</label>
+          <input id="backup-to-restore" type="file" accept=".hxpress" required />
+          <button class="button button-outline" type="submit" disabled>
+            {{ t('Verify backup') }}
+          </button>
+        </form>
+      </section>
+    </Island>
+  </div>
+  <section :if="supported" class="admin-card backup-schedules">
+    <div class="extension-card-title">
+      <h2>{{ t('Backup schedules') }}</h2>
+      <button :if="editing" class="button button-outline" type="button" disabled>
+        {{ t('Add schedule') }}
+      </button>
+      <a :else class="button button-outline" href="/admin/backups?schedule=new"
+        >{{ t('Add schedule') }}</a
+      >
+    </div>
+    <Alert error :message="error('schedules')" />
+    <form
+      :if="scheduleForm"
+      class="backup-schedule-form"
+      method="post"
+      action="{{ scheduleForm.action }}"
+    >
+      <Alert error :message="error('schedule')" />
+      <fieldset>
+        <label
+          >{{ t('Schedule name') }}<input
+            name="name"
+            required
+            maxlength="100"
+            value="{{ scheduleForm.name }}"
+        /></label>
+        <div class="backup-schedule-fields">
+          <label
+            >{{ t('Repeat every') }}<input
+              type="number"
+              name="every"
+              min="1"
+              max="{{ scheduleForm.everyMaximum }}"
+              required
+              value="{{ scheduleForm.every }}"
+          /></label>
+          <label
+            >{{ t('Interval unit') }}<select name="period">
+              <option
+                :for="period in scheduleForm.periods"
+                value="{{ period.seconds }}"
+                :selected="period.selected"
+              >
+                {{ t(period.label) }}
+              </option>
+            </select></label
+          >
+          <label
+            >{{ t('Keep latest backups') }}<input
+              type="number"
+              name="retain"
+              min="1"
+              max="50"
+              required
+              value="{{ scheduleForm.retain }}"
+          /></label>
+          <label
+            >{{ t('Next run (local time)') }}<input
+              type="datetime-local"
+              data-epoch-field="firstRun"
+          /></label>
+        </div>
+        <p class="field-help">
+          {{ t('Choose a start time or let the first backup run after one interval.') }}
+        </p>
+        <div class="backup-schedule-options">
+          <label class="checkbox-label"
+            ><input type="checkbox" name="content" value="1" :checked="scheduleForm.content" />{{
+            t('Content') }}</label
+          >
+          <label class="checkbox-label"
+            ><input type="checkbox" name="themes" value="1" :checked="scheduleForm.themes" />{{
+            t('Themes') }}</label
+          >
+          <label class="checkbox-label"
+            ><input type="checkbox" name="plugins" value="1" :checked="scheduleForm.plugins" />{{
+            t('Plugins') }}</label
+          >
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              name="encrypted"
+              value="1"
+              :checked="scheduleForm.encrypted"
+              data-well-toggle="schedule-encrypted-warning"
+            />{{ t('Encrypt with APP_KEY (.hxpress)') }}</label
+          >
+          <label class="checkbox-label"
+            ><input type="checkbox" name="enabled" value="1" :checked="scheduleForm.enabled" />{{
+            t('Enable schedule') }}</label
+          >
+        </div>
+        <div
+          id="schedule-encrypted-warning"
+          class="alert error"
+          role="alert"
+          :hidden="not scheduleForm.encrypted"
+        >
+          {{ icon('alert') }}{{ t('This file is unusable on projects with a different APP_KEY. If
+          the original APP_KEY is lost, the backup is permanently unrecoverable.') }}
+        </div>
+      </fieldset>
+      <input type="hidden" name="firstRun" value="" />
+      <Island name="local-datetime" :props="{}" load="eager"></Island>
+      <div class="package-actions">
+        <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+          {{ t('Save schedule') }}
+        </button>
+        <a class="button button-outline" href="/admin/backups">{{ t('Cancel') }}</a>
+      </div>
+    </form>
+    <p :if="not schedules and not scheduleForm" class="field-help">
+      {{ t('No backup schedules yet.') }}
+    </p>
+    <div :for="schedule in schedules" class="backup-schedule-row">
+      <div>
+        <h3>{{ schedule.name }}</h3>
+        <p class="field-help">{{ schedule.summaryLabel }}</p>
+        <p class="field-help">{{ schedule.statusLabel }}</p>
+        <Alert error :message="schedule.lastError" />
+      </div>
+      <form
+        class="package-actions"
+        method="post"
+        action="/admin/backups/schedules/{{ schedule.id }}/delete"
+      >
+        <a class="button button-outline" href="/admin/backups?files={{ schedule.id }}"
+          >{{ t('View backups') }}</a
+        >
+        <button :if="editing" class="button button-outline" type="button" disabled>
+          {{ t('Edit') }}
+        </button>
+        <a :else class="button button-outline" href="/admin/backups?schedule={{ schedule.id }}"
+          >{{ t('Edit') }}</a
+        >
+        <button
+          class="button button-outline"
+          type="submit"
+          :disabled="editing or schedule.running"
+          data-well-confirm="{{ t('Delete this schedule and its saved backups?') }}"
+        >
+          {{ t('Delete') }}
+        </button>
+      </form>
+    </div>
+    <div :if="savedFiles" class="backup-saved-files">
+      <h3>{{ t('Saved backups for {name}', name: savedFiles.name) }}</h3>
+      <p :if="not savedFiles.archives" class="field-help">
+        {{ t('This schedule has no saved backups.') }}
+      </p>
+      <div :for="archive in savedFiles.archives" class="backup-schedule-row">
+        <div>
+          <strong>{{ archive.createdLabel }}</strong>
+          <p class="field-help">{{ archive.detailsLabel }}</p>
+          <code>MD5 {{ archive.md5 }}</code>
+        </div>
+        <a class="button button-outline" href="{{ archive.download }}">{{ t('Download') }}</a>
+      </div>
+    </div>
+  </section>
+</AdminLayout>

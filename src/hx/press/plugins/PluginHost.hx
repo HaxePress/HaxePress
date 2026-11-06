@@ -8,4 +8,7 @@ package hx.press.plugins;
 interface PluginHost {
     public function admin(routes:Void->Void):Void;
     public function can(capability:String):Bool;
+    public function schedule(pluginId:String, key:String, intervalSeconds:Int,
+        ?payload:String):Void;
+    public function unschedule(pluginId:String, key:String):Bool;
 }

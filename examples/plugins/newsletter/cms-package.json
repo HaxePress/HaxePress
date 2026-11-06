@@ -2,6 +2,7 @@
   "apiVersion": 4,
   "cmsVersion": "2.16.0",
   "kind": "plugin",
+  "pluginId": "7a6695a4-bc82-4d96-8df6-14a6435837bb",
   "slug": "newsletter",
   "name": "Newsletter",
   "version": "2.16.0",

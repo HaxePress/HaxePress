@@ -23,7 +23,7 @@ def run():
     with FixtureStore.from_environment() as fixtures:
         verify(owner, public, fixtures)
     print(
-        "PASS Theme builder: create, all templates, draft isolation, publish/activate, SSR, validation, version conflicts, CSRF, permissions and media retention",
+        "PASS Theme builder: create, all templates, draft isolation, publish/activate, server rendering, validation, version conflicts, CSRF, permissions and media retention",
         flush=True,
     )
 
@@ -170,7 +170,7 @@ def verify(owner, public, fixtures):
             'data-layout="builder"' in html
             and "Published design heading" in html
             and image["url"] in html,
-            "Visual theme did not render with React SSR",
+            "Visual theme did not render as server HTML",
         )
         draft = copy.deepcopy(design)
         draft["templates"]["Home"][0]["blocks"] = draft["templates"]["Home"][0]["blocks"][:-1]

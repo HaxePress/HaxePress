@@ -4,6 +4,7 @@ import hx.well.config.IConfig;
 #if !cms_plugin
 import hx.press.provider.BootProvider;
 import hx.press.provider.DatabaseProvider;
+import hx.press.provider.ResponseEncodingProvider;
 #end
 import hx.well.provider.AbstractProvider;
 #if cms_tests
@@ -21,6 +22,7 @@ class ProviderConfig implements IConfig {
             #if cms_tests
             TestProvider,
             #end
+            ResponseEncodingProvider,
             DatabaseProvider,
             BootProvider
         ];

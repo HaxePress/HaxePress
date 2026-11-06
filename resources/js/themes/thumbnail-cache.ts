@@ -55,6 +55,51 @@ async function storePreview(source: string, image: Blob): Promise<void> {
   }
 }
 
+const viewportWidth = 1280;
+const viewportHeight = 800;
+
+/**
+ * Captures the first screen of a loaded, same-origin preview frame. The frame's
+ * load event has already waited for its stylesheets and images; fonts and
+ * lazily loaded images in view are awaited here.
+ */
+async function captureDocument(page: Document): Promise<Blob> {
+  if (!page.querySelector('[data-cms-site]')) throw new Error('Theme preview is unavailable.');
+  await page.fonts.ready;
+  const visibleImages = Array.from(page.images).filter((image) => {
+    const bounds = image.getBoundingClientRect();
+    return bounds.top < viewportHeight && bounds.bottom > 0;
+  });
+  await Promise.all(
+    visibleImages.map(async (image) => {
+      image.loading = 'eager';
+      await image.decode().catch(() => undefined);
+    }),
+  );
+  const { toBlob } = await import('html-to-image');
+  const image = await toBlob(page.body, {
+    width: viewportWidth,
+    height: viewportHeight,
+    canvasWidth: viewportWidth,
+    canvasHeight: viewportHeight,
+    pixelRatio: 1,
+    includeQueryParams: true,
+    fetchRequestInit: { credentials: 'same-origin' },
+    filter: (node) => !['SCRIPT', 'NOSCRIPT', 'IFRAME'].includes(node.nodeName),
+    style: {
+      margin: '0',
+      width: `${viewportWidth}px`,
+      height: `${viewportHeight}px`,
+      overflow: 'hidden',
+    },
+  });
+  if (!image || image.type !== 'image/png' || image.size === 0) {
+    throw new Error('Theme preview could not be captured.');
+  }
+  return image;
+}
+
+/** Renders one preview in a temporary frame, which is removed as soon as its PNG is ready. */
 function capturePreview(source: string, signal: AbortSignal): Promise<Blob> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
@@ -62,7 +107,6 @@ function capturePreview(source: string, signal: AbortSignal): Promise<Blob> {
       return;
     }
     const frame = document.createElement('iframe');
-    const captureId = crypto.randomUUID();
     frame.className = 'theme-thumbnail-capture-frame';
     frame.title = 'Theme preview capture';
     frame.tabIndex = -1;
@@ -74,47 +118,35 @@ function capturePreview(source: string, signal: AbortSignal): Promise<Blob> {
       settled = true;
       clearTimeout(timeout);
       signal.removeEventListener('abort', cancel);
-      window.removeEventListener('message', captured);
       frame.remove();
       if (image) resolve(image);
       else reject(error);
     };
     const cancel = () => finish(undefined, aborted());
-    const captured = (event: MessageEvent) => {
-      if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
-      const result = event.data;
-      if (result?.type !== 'haxepress:theme-preview' || result.captureId !== captureId) return;
-      if (
-        result.image instanceof Blob &&
-        result.image.type === 'image/png' &&
-        result.image.size > 0
-      ) {
-        finish(result.image);
-      } else {
-        finish(undefined, new Error('Theme preview could not be captured.'));
-      }
-    };
     const timeout = window.setTimeout(
       () => finish(undefined, new Error('Theme preview timed out.')),
       captureTimeout,
     );
     signal.addEventListener('abort', cancel, { once: true });
-    window.addEventListener('message', captured);
     frame.addEventListener('error', () =>
       finish(undefined, new Error('Theme preview could not be loaded.')),
     );
     frame.addEventListener(
       'load',
       () => {
-        if (!frame.contentDocument?.querySelector('[data-cms-site]')) {
+        const page = frame.contentDocument;
+        if (!page) {
           finish(undefined, new Error('Theme preview is unavailable.'));
+          return;
         }
+        captureDocument(page).then(
+          (image) => finish(image),
+          (error: unknown) => finish(undefined, error),
+        );
       },
       { once: true },
     );
-    const url = new URL(source, location.origin);
-    url.searchParams.set('thumbnailCapture', captureId);
-    frame.src = url.href;
+    frame.src = new URL(source, location.origin).href;
     document.body.appendChild(frame);
   });
 }

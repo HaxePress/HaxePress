@@ -10,6 +10,7 @@ import hx.press.model.InstalledPackage;
 
 typedef PackageRecord = {
     var id:String;
+    @:optional var plugin_id:Null<String>;
     var kind:String;
     var slug:String;
     var name:String;
@@ -23,6 +24,7 @@ typedef PackageRecord = {
 
 typedef PackageSummary = {
     var id:String;
+    @:optional var plugin_id:Null<String>;
     var kind:String;
     var slug:String;
     var name:String;
@@ -41,6 +43,7 @@ class PackageData {
     public static inline var MAX_ACTIVE_PLUGINS = 32;
     static final runtimeColumns = [
         "id",
+        "plugin_id",
         "kind",
         "slug",
         "name",
@@ -53,6 +56,7 @@ class PackageData {
     ];
     static final summaryColumns = [
         "id",
+        "plugin_id",
         "kind",
         "slug",
         "name",
@@ -139,6 +143,15 @@ class PackageData {
                 .first();
             return row == null ? null : cast row.toObject();
         });
+    }
+
+    public static function enabledPlugin(pluginId:String):Null<PackageRecord> {
+        var row = InstalledPackage.query.select(runtimeColumns)
+            .where("plugin_id", pluginId)
+            .where("enabled", 1)
+            .limit(1)
+            .first();
+        return row == null ? null : cast row.toObject();
     }
 
     public static function activeDirectory(id:String):Null<String> {

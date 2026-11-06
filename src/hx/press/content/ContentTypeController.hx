@@ -6,7 +6,8 @@ import hx.press.CmsAccess;
 import hx.press.CmsController;
 import hx.press.Pagination;
 import hx.press.SiteController;
-import hx.well.facades.Inertia;
+import hx.press.content.ContentTypeForm;
+import hx.press.view.View;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
@@ -26,14 +27,20 @@ class ContentTypeController {
         var count = ContentTypes.count(search, capabilities);
         var links = Pagination.links("/admin/collections", ["q" => search], page, cursor, count,
             type -> type.key, type -> null);
+        var collections = page.items.map(type -> {
+            var row:Dynamic = Reflect.copy(type);
+            var owned = type.owner != null && type.owner != "";
+            row.active = type.enabled == 1 && (!owned || (type.owner_active ?? 0) > 0);
+            return row;
+        });
         var props = {
-            collections: page.items,
+            collections: collections,
             pagination: links,
             query: search,
             canManage: CmsAccess.can("settings"),
             notice: request.query("notice", "")
         };
-        return Inertia.render("Admin/Collections", props);
+        return View.render("Admin/Collections", props);
     }
 
     public static function editor(request:Request, creating:Bool = false, error:String = "",
@@ -51,17 +58,28 @@ class ContentTypeController {
         if (redirect != null) {
             return redirect;
         }
+        // A redirected or failed form submission is shown again as submitted.
+        var flashed:Dynamic = View.flashed(request, "old");
+        var source:Dynamic = flashed != null ? flashed : error != "" ? request.all() : null;
+        var submitted = source == null ? null : ContentTypeForm.reader(source);
+        var system = type != null && type.system;
+        var input:Dynamic = ContentTypeForm.initial(type);
+        if (submitted != null && ContentTypeForm.submitted(submitted)) {
+            input = ContentTypeForm.read(submitted, system);
+        }
         var props:Map<String, Dynamic> = [
             "definition" => type,
             "isNew" => creating,
             "supportedFeatures" => ContentTypes.supportedFeatures,
             "fieldKinds" => ContentTypes.fieldKinds,
-            "notice" => request.query("notice", "")
+            "notice" => request.query("notice", ""),
+            "typeForm" => ContentTypeForm.view(input, type, creating),
+            "kindOptions" => ContentTypeForm.kindOptions()
         ];
         if (error != "") {
             props.set("errors", ["structure" => error]);
         }
-        return Inertia.render("Admin/ContentTypeEditor", props).status(status);
+        return View.render("Admin/ContentTypeEditor", props).status(status);
     }
 
     public static function remove(request:Request):AbstractResponse {

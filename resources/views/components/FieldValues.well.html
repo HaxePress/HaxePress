@@ -1,0 +1,17 @@
+<props definitions="List<FieldDefinitionView>?" values="Map<String, Any>?" />
+<template :for="list in [fieldValues(definitions, values)]">
+  <dl :if="list" class="content-field-values">
+    <div :for="field in list">
+      <dt>{{ field.label }}</dt>
+      <dd>
+        <img
+          :if="field.image"
+          src="{{ field.image }}"
+          alt="{{ field.label }}"
+          loading="lazy"
+        /><template :else-if="field.kind == 'boolean'">{{ t(field.text) }}</template
+        ><template :else>{{ field.text }}</template>
+      </dd>
+    </div>
+  </dl>
+</template>

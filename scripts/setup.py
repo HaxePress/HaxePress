@@ -58,17 +58,6 @@ def prepare_environment(project_root):
             lines.append(f"APP_KEY={generated_key}")
         content = f"{'\n'.join(lines)}\n"
 
-    defaults = {
-        "VITE_USE_BUILD": "true",
-        "INERTIA_SSR_ENABLED": "true",
-        "INERTIA_SSR_URL": "http://127.0.0.1:13714/render",
-        "INERTIA_SSR_TIMEOUT": "3",
-    }
-    for key, value in defaults.items():
-        if key not in values:
-            if content and not content.endswith("\n"):
-                content += "\n"
-            content += f"{key}={value}\n"
     if not created and content == config.read_text():
         config.chmod(0o600)
         return False
@@ -198,8 +187,12 @@ def main():
         file.write_text(file.read_text())
     paths["haxe-concurrent"] = concurrent
 
-    overrides = {"hxwell": "HXWELL_PATH", "hxwell-crossbyte": "HXWELL_CROSSBYTE_PATH"}
-    for name in ("hxwell", "hxwell-crossbyte", "hxwell-inertia", "crossbyte", "emitter"):
+    overrides = {
+        "hxwell": "HXWELL_PATH",
+        "hxwell-crossbyte": "HXWELL_CROSSBYTE_PATH",
+        "wellout": "WELLOUT_PATH",
+    }
+    for name in ("hxwell", "hxwell-crossbyte", "crossbyte", "emitter", "wellout"):
         override = os.environ.get(overrides[name]) if name in overrides else None
         source = Path(override).resolve() if override else locked_source(name)
         destination = ROOT / ".deps" / name
@@ -218,10 +211,12 @@ def main():
         ("hxwell", "hxwell-query-builder.patch"),
         ("hxwell", "hxwell-config-package.patch"),
         ("hxwell", "hxwell-plugin-routes.patch"),
+        ("hxwell", "hxwell-response-slices.patch"),
         ("hxwell-crossbyte", "hxwell-crossbyte-sessions.patch"),
+        ("hxwell-crossbyte", "hxwell-crossbyte-response-slices.patch"),
         ("haxe-concurrent", "haxe-concurrent-cppia.patch"),
-        ("hxwell-inertia", "hxwell-inertia.patch"),
         ("crossbyte", "crossbyte-ascii-headers.patch"),
+        ("crossbyte", "crossbyte-request-body-limits.patch"),
         ("haxe-std", "haxe-jdbc-autocommit.patch"),
         ("haxe-std", "haxe-jdbc-column-labels.patch"),
         ("haxe-std", "haxe-jdbc-value-types.patch"),
@@ -284,7 +279,7 @@ def main():
             "Created private .env with HxWell's application key. Start the site and open /admin/install from 127.0.0.1. Configure INSTALL_TRUSTED_IPS for other addresses."
         )
     print(
-        "Project-local Haxe, Crossbyte, and Inertia are ready. Global Haxelib registrations are unchanged."
+        "Project-local Haxe, Crossbyte and Wellout are ready. Global Haxelib registrations are unchanged."
     )
 
 

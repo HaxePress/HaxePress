@@ -178,6 +178,14 @@ class CmsSchema {
             Schema.table("cms_packages",
                 table -> table.integer("restart_required").defaultValue(0));
         }
+        if (!Schema.hasColumn("cms_packages", "plugin_id")) {
+            Schema.table("cms_packages", table -> table.string("plugin_id", 36).nullable());
+        }
+        if (!Schema.hasIndex("cms_packages", "cms_packages_plugin_identity")) {
+            Schema.table("cms_packages",
+                table -> table.unique(["plugin_id"], "cms_packages_plugin_identity"));
+        }
+        SchedulingSchema.up();
         if (!Schema.hasTable("package_uploads")) {
             Schema.create("package_uploads", table -> {
                 table.string("key").primary();

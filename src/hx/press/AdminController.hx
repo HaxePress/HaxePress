@@ -1,6 +1,11 @@
 package hx.press;
 
-import hx.well.facades.Inertia;
+import hx.press.ai.AdminMcpAccess;
+import hx.press.view.View;
+import hx.press.media.MediaReferences;
+import hx.press.AdminForms;
+import hx.press.SiteSettingsStore;
+import hx.press.model.Category;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.Response;
@@ -24,13 +29,31 @@ class AdminController {
 
     public static function validationRedirect(request:Request, scope:String, message:String,
             url:String):Null<Response> {
-        if (message == "" || !Inertia.isInertiaRequest(request)) {
+        if (message == "" || !View.redirectsValidation(request)
+            || request.getAttribute(AdminMcpAccess.INTERNAL, false)) {
             return null;
         }
 
         var errors = [scope => message];
-        Inertia.flash("errors", errors);
+        View.flash("errors", errors);
+        View.flash("old", submittedInput(request));
         return ResponseBuilder.asRedirect(url, 303);
+    }
+
+    /** The submitted form values without secrets, shown again after a failed submission. **/
+    public static function submittedInput(request:Request):Map<String, String> {
+        var values:Map<String, String> = [];
+        for (key => value in request.all()) {
+            var lowered = key.toLowerCase();
+            if (key == "_token" || lowered.indexOf("password") >= 0
+                || lowered.indexOf("secret") >= 0) {
+                continue;
+            }
+            if (Std.isOfType(value, String) && (value : String).length <= 20000) {
+                values.set(key, value);
+            }
+        }
+        return values;
     }
 
     public static function loginPage(request:Request):AbstractResponse {
@@ -39,7 +62,7 @@ class AdminController {
         }
 
         var props = {email: ""};
-        return Inertia.render("Admin/Login", props);
+        return View.render("Admin/Login", props);
     }
 
     public static function loginForm(request:Request, error:String,
@@ -54,7 +77,7 @@ class AdminController {
         var errors = ["credentials" => error];
 
         var props = {email: email, errors: errors};
-        return Inertia.render("Admin/Login", props).status(status);
+        return View.render("Admin/Login", props).status(status);
     }
 
     public static function dashboard(request:Request):AbstractResponse {
@@ -95,7 +118,16 @@ class AdminController {
         var links = Pagination.links("/admin/categories", ["q" => query], page, cursor, total,
             category -> category.id, category -> null);
         var categories = page.items;
-        var categoryForm = form ?? {id: "", name: ""};
+        var editing = request.query("edit", "");
+        var editedCategory = form == null
+            && ~/^[1-9][0-9]*$/.match(editing) ? Category.query.select(["id", "name"])
+                .where("id", Std.parseInt(editing))
+                .limit(1)
+                .first() : null;
+        var categoryForm = form ?? (editedCategory == null ? {id: "", name: ""} : {
+            id: Std.string(editedCategory.id),
+            name: editedCategory.name
+        });
         var props:Map<String, Dynamic> = [
             "categoryList" => categories,
             "notice" => message,
@@ -109,7 +141,7 @@ class AdminController {
             props.set("errors", ["category" => error]);
         }
 
-        return Inertia.render("Admin/Categories", props).status(status);
+        return View.render("Admin/Categories", props).status(status);
     }
 
     public static function settings(request:Request):AbstractResponse {
@@ -131,12 +163,43 @@ class AdminController {
             return redirect;
         }
 
-        var props:Map<String, Dynamic> = ["notice" => notice];
+        var settings = SiteSettingsStore.settings();
+        var resubmitted = AdminForms.resubmitted(request, "site_name");
+        var value = (key:String) -> {
+            var stored = settings.get(key) ?? "";
+            return resubmitted ? AdminForms.old(request, key, stored) : stored;
+        };
+        var settingsForm = {
+            site_name: value("site_name"),
+            site_logo: value("site_logo"),
+            publisher_name: value("publisher_name"),
+            description: value("description"),
+            about_site: value("about_site"),
+            locale: value("locale"),
+            home_mode: value("home_mode"),
+            home_type: value("home_type"),
+            home_page: value("home_page"),
+            home_size: value("home_size"),
+            home_template: value("home_template")
+        };
+        var homeCollections = AdminForms.publicCollections();
+        var homeTypeKnown = Lambda.exists(homeCollections,
+            collection -> collection.key == settingsForm.home_type);
+        var homePageId = Std.parseInt(settingsForm.home_page) ?? 0;
+        var homePage = AdminForms.publishedContent(homePageId);
+        var props:Map<String, Dynamic> = [
+            "notice" => notice,
+            "settingsForm" => settingsForm,
+            "homeCollections" => homeCollections,
+            "homeTypeKnown" => homeTypeKnown,
+            "homePage" => homePage,
+            "logoRules" => MediaReferences.rules()
+        ];
 
         if (error != "") {
             props.set("errors", [scope => error]);
         }
 
-        return Inertia.render("Admin/Settings", props).status(status);
+        return View.render("Admin/Settings", props).status(status);
     }
 }

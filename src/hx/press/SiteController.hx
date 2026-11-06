@@ -1,6 +1,6 @@
 package hx.press;
 
-import hx.well.facades.Inertia;
+import hx.press.view.View;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
@@ -11,10 +11,36 @@ import hx.press.content.ContentFields.ContentFieldFilter;
 import hx.press.content.ContentTypeDefinition;
 import hx.press.data.ContentItemRecord;
 import hx.press.plugins.PluginRuntime;
+import hx.press.ContentItemData.DraftContentDetails;
 
 using StringTools;
 
 class SiteController {
+    /**
+        The public values of a preview rendered inside the administration:
+        theme templates there see the site as a visitor does, without the
+        administrator's account or CSRF token.
+    **/
+    public static function appearance(theme:Dynamic, path:String):Map<String, Dynamic> {
+        return [
+            "auth" => null,
+            "csrfToken" => null,
+            "theme" => theme,
+            "navigation" => theme == null ? null : NavigationData.forRegions(theme.navigation),
+            "pluginNavigation" => {
+                header: theme == null ? [] : PluginRuntime.navigation("header", []),
+                footer: theme == null ? [] : PluginRuntime.navigation("footer", []),
+                admin: []
+            },
+            "extensions" => {
+                assets: theme == null ? [] : PluginRuntime.assets(),
+                blocks: theme == null ? [] : PluginRuntime.blocks("site.shared", {
+                    path: path
+                })
+            }
+        ];
+    }
+
     public static function home(request:Request):AbstractResponse {
         var settings = SiteSettingsStore.settings();
         var homeType = settings.get("home_type") ?? "entry";
@@ -56,7 +82,7 @@ class SiteController {
         var template = settings.get("home_template") ?? "Home";
         request.setAttribute("hx.press.theme.template", template);
         request.setAttribute("hx.press.theme.fallback", "Home");
-        return Inertia.render(template, props);
+        return View.render(template, props);
     }
 
     public static function index(request:Request, kind:String,
@@ -126,7 +152,7 @@ class SiteController {
         };
         request.setAttribute("hx.press.theme.template", type.archiveTemplate);
         request.setAttribute("hx.press.theme.fallback", "ContentIndex");
-        return Inertia.render(type.archiveTemplate, props);
+        return View.render(type.archiveTemplate, props);
     }
 
     public static function content(request:Request, kind:String,
@@ -148,9 +174,10 @@ class SiteController {
     }
 
     public static function renderDocument(request:Request, item:ContentItemRecord,
-            type:ContentTypeDefinition, home:Bool = false):AbstractResponse {
+            type:ContentTypeDefinition, home:Bool = false,
+            ?draft:DraftContentDetails):AbstractResponse {
         var relatedRecords = type.hasArchive ? ContentQueries.related(item.id, type.key) : [];
-        var content = ContentItemData.detail(item, true);
+        var content = ContentItemData.detail(item, true, type, draft);
         content.content = PluginRuntime.render(content);
         if (home) {
             content.url = "/";
@@ -164,18 +191,18 @@ class SiteController {
         };
         request.setAttribute("hx.press.theme.template", type.template);
         request.setAttribute("hx.press.theme.fallback", type.hasArchive ? "ContentDetail" : "Page");
-        return Inertia.render(type.template, props);
+        return View.render(type.template, props);
     }
 
     public static function about(request:Request):AbstractResponse {
         request.setAttribute("hx.press.theme.template", "About");
         request.setAttribute("hx.press.theme.fallback", "About");
-        return Inertia.render("About");
+        return View.render("About");
     }
 
     public static function notFound(request:Request):AbstractResponse {
         request.setAttribute("hx.press.theme.template", "NotFound");
         request.setAttribute("hx.press.theme.fallback", "NotFound");
-        return Inertia.render("NotFound").status(404);
+        return View.render("NotFound").status(404);
     }
 }

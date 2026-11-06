@@ -1,4 +1,3 @@
-import { Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../i18n';
 import type { MediaImage } from '../types';
@@ -132,9 +131,9 @@ export default function MediaReferences({
               <span>{t(reference.type)}</span>
               <strong>
                 {reference.href ? (
-                  <Link href={reference.href} onClick={onClose}>
+                  <a href={reference.href} onClick={onClose}>
                     {reference.title}
-                  </Link>
+                  </a>
                 ) : (
                   reference.title
                 )}
@@ -144,9 +143,9 @@ export default function MediaReferences({
             {reference.restricted ? (
               <Icon name="lock" />
             ) : reference.href ? (
-              <Link href={reference.href} onClick={onClose} aria-label={t('Open reference')}>
+              <a href={reference.href} onClick={onClose} aria-label={t('Open reference')}>
                 <Icon name="arrow-up-right" />
-              </Link>
+              </a>
             ) : null}
           </li>
         ))}

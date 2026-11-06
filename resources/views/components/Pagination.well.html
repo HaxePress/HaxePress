@@ -1,0 +1,16 @@
+<props links="PageLinksView" count="Int" noun="String = 'content items'" />
+<nav :if="links.previous or links.next" class="pagination" aria-label="{{ t('Pagination') }}">
+  <span
+    >{{ t('Showing {count} of {total} {items}', count: count, total: links.total, items: t(noun))
+    }}</span
+  >
+  <div>
+    <a :if="links.previous" class="button button-outline" href="{{ links.previous }}"
+      >{{ icon('arrow-left') }} {{ t('Previous') }}</a
+    >
+    <span :else></span>
+    <a :if="links.next" class="button button-outline" href="{{ links.next }}"
+      >{{ t('Next') }} {{ icon('arrow-right') }}</a
+    >
+  </div>
+</nav>

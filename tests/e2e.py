@@ -89,7 +89,7 @@ class Client:
             token = None if binary else re.search(r'name="_token" value="([^"]+)"', text)
             if token:
                 self.csrf = html.unescape(token.group(1))
-            if not binary and dict((k.lower(), v) for k, v in fields).get("x-inertia") == "true":
+            if not binary and normalized.get("x-well-data") == "true":
                 page = json.loads(text)
                 if page.get("props", {}).get("csrfToken"):
                     self.csrf = page["props"]["csrfToken"]
@@ -131,15 +131,42 @@ def check(condition, message):
         raise AssertionError(message)
 
 
-class InertiaPageParser(HTMLParser):
+DATA_HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
+
+
+class IslandParser(HTMLParser):
+    """Collects the typed props of each `<well-island>` in server-rendered HTML."""
+
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.pages = []
+        self.islands = {}
+        self.names = []
+        self.reading = None
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
-        if tag == "div" and values.get("id") == "app" and "data-page" in values:
-            self.pages.append(json.loads(values["data-page"]))
+        if tag == "well-island":
+            self.names.append(values.get("data-name", ""))
+        elif tag == "script" and "data-well-props" in values and self.names:
+            self.reading = []
+
+    def handle_endtag(self, tag):
+        if tag == "well-island" and self.names:
+            self.names.pop()
+        elif tag == "script" and self.reading is not None:
+            self.islands[self.names[-1]] = json.loads("".join(self.reading))
+            self.reading = None
+
+    def handle_data(self, data):
+        if self.reading is not None:
+            self.reading.append(data)
+
+
+def island_props(text, name):
+    parser = IslandParser()
+    parser.feed(text)
+    island = parser.islands.get(name)
+    return None if island is None else island["props"]
 
 
 def run():
@@ -166,85 +193,74 @@ def run():
         check(
             "set-cookie" not in headers and not public.cookies, "public homepage creates a session"
         )
-        parser = InertiaPageParser()
-        parser.feed(text)
         check(
-            len(parser.pages) == 1 and parser.pages[0]["component"] == "Home",
-            "single Inertia hydration root",
+            "<main" in text
+            and "data-cms-site" in text
+            and "data-page=" not in text
+            and 'id="app"' not in text,
+            "homepage was not rendered as server HTML without a client hydration root",
         )
         check(
-            isinstance(parser.pages[0]["props"]["items"], list),
-            "HTML strings were not replaced with props",
+            "well-fragment" in headers.get("vary", "").lower(),
+            f"fragment Vary header: vary={headers.get('vary')!r}",
         )
-        covers = [parser.pages[0]["props"]["featured"], *parser.pages[0]["props"]["items"]]
+        status, home_headers, payload = public.request("/", extra_headers=DATA_HEADERS)
+        home = json.loads(payload)
+        check(
+            status == 200
+            and home_headers.get("x-well-data") == "true"
+            and home["component"] == "Home",
+            "homepage page data",
+        )
+        check(isinstance(home["props"]["items"], list), "HTML strings were not replaced with props")
+        covers = [home["props"]["featured"], *home["props"]["items"]]
         check(
             all(item["image"].startswith("/media/") for item in covers),
             "existing site covers were not moved into upload storage",
         )
-        version = parser.pages[0]["version"]
+        rendered_text = html.unescape(text)
         check(
-            bool(version) and "x-inertia" in headers.get("vary", "").lower(),
-            f"Inertia version and Vary header: version={version!r}, vary={headers.get('vary')!r}",
+            all(item["title"] in rendered_text for item in covers),
+            "server HTML is missing homepage content from its page data",
         )
         stylesheet = re.search(r'<link rel="stylesheet" href="(/build/[^\"]+)"', text)
         check(stylesheet is not None, "Vite stylesheet is missing")
-        mark("English React SSR, single hydration root, Vite assets, and response headers")
-        inertia_headers = {
-            "X-Inertia": "true",
-            "X-Inertia-Version": version,
-            "Accept": "application/json",
-        }
-        status, xhr_headers, payload = public.request(
-            "/content?category=Getting%20started", extra_headers=inertia_headers
+        mark("English server-rendered HTML, page data, Vite assets, and response headers")
+        status, data_headers, payload = public.request(
+            "/content?category=Getting%20started", extra_headers=DATA_HEADERS
         )
         check(
             status == 200,
-            f"Inertia navigation status={status}, headers={xhr_headers}, body={payload[:150]!r}",
+            f"page data status={status}, headers={data_headers}, body={payload[:150]!r}",
         )
         check(
-            xhr_headers.get("x-inertia") == "true",
-            f"Inertia JSON header missing: headers={xhr_headers}, body={payload[:180]!r}",
+            data_headers.get("x-well-data") == "true",
+            f"page data header missing: headers={data_headers}, body={payload[:180]!r}",
         )
         page = json.loads(payload)
-        check(
-            status == 200
-            and xhr_headers.get("x-inertia") == "true"
-            and page["component"] == "ContentIndex",
-            "Inertia page navigation",
-        )
+        check(page["component"] == "ContentIndex", "content index page data")
         check(
             len(page["props"]["items"]) == 1 and "category=Getting%20started" in page["url"],
-            "Inertia props and query-string URL",
+            "page-data props and query-string URL",
         )
         check(
             page["props"].get("auth") is None
             and page["props"].get("csrfToken") is None
-            and "set-cookie" not in xhr_headers,
-            "public Inertia session isolation",
+            and "set-cookie" not in data_headers,
+            "public page-data session isolation",
         )
-        status, _, payload = public.request(
-            "/content?category=Getting%20started",
-            extra_headers={
-                **inertia_headers,
-                "X-Inertia-Partial-Component": "ContentIndex",
-                "X-Inertia-Partial-Data": "items",
-            },
-        )
-        partial = json.loads(payload)
-        check(
-            status == 200 and "items" in partial["props"] and "query" not in partial["props"],
-            "partial props reload",
-        )
-        status, mismatch, _ = public.request(
-            "/content?category=Getting%20started",
-            extra_headers={**inertia_headers, "X-Inertia-Version": "outdated-version"},
+        status, fallback_headers, fallback = public.request(
+            "/content?category=Getting%20started", extra_headers={"Well-Fragment": "missing"}
         )
         check(
-            status == 409
-            and "category=Getting%20started" in mismatch.get("x-inertia-location", ""),
-            "asset-version reload preserves query",
+            status == 200
+            and "well-fragment" not in fallback_headers
+            and "<html" in fallback
+            and "Create and organize content" in fallback
+            and "set-cookie" not in fallback_headers,
+            "unknown fragment request did not fall back to the full session-free page",
         )
-        mark("Inertia JSON navigation, partial reloads, versioning, and stateless public props")
+        mark("Page data, fragment fallback, and stateless public props")
         status, _, text = public.request("/content?category=Getting%20started")
         check(
             status == 200
@@ -338,7 +354,10 @@ def run():
         check(status == 303 and headers.get("location") == "/admin", "admin login")
         status, headers, text = admin.request("/admin")
         check(
-            status == 200 and "Sign in" in text and headers.get("cache-control") == "no-store",
+            status == 200
+            and "<h1>Overview</h1>" in text
+            and 'action="/admin/logout"' in text
+            and headers.get("cache-control") == "private, no-store",
             "authenticated dashboard",
         )
         for path in [
@@ -356,13 +375,30 @@ def run():
                     "Cover image URL" not in page and 'id="cover-url"' not in page,
                     "manual cover URL field remains",
                 )
-                editor = InertiaPageParser()
-                editor.feed(page)
+                editor = island_props(page, "content-editor")
                 check(
-                    editor.pages[0]["props"]["item"]["image"] == "",
+                    editor is not None and editor["editor"]["item"]["image"] == "",
                     "new content should not have an automatic stock cover",
                 )
-                check("No cover image yet." in page, "empty upload-only cover state")
+                check(
+                    "image" in editor["editor"]["contentType"]["features"]
+                    and editor["editor"]["mediaRules"]["uploadUrl"] == "/admin/media/upload",
+                    "empty upload-only cover state",
+                )
+        status, headers, fragment = admin.request(
+            "/admin/media", extra_headers={"Well-Fragment": "media-workspace"}
+        )
+        check(
+            status == 200
+            and headers.get("well-fragment") == "media-workspace"
+            and fragment.startswith(
+                '<div class="media-workspace" data-well-fragment="media-workspace">'
+            )
+            and "<html" not in fragment
+            and "<nav" not in fragment
+            and headers.get("cache-control") == "private, no-store",
+            "fragment request did not return only the requested fragment",
+        )
         mark(
             (
                 "HxWell admin auth guard and regenerated session ("
@@ -377,7 +413,7 @@ def run():
             == 303,
             "create category",
         )
-        status, _, payload = admin.request("/admin/categories", extra_headers=inertia_headers)
+        status, _, payload = admin.request("/admin/categories", extra_headers=DATA_HEADERS)
         category_props = json.loads(payload)["props"]
         created = next(
             (value for value in category_props["categoryList"] if value["name"] == category_name),
@@ -388,7 +424,7 @@ def run():
             "new category management row and content item count",
         )
         category_id = created["id"]
-        _, _, public_categories = public.request("/content", extra_headers=inertia_headers)
+        _, _, public_categories = public.request("/content", extra_headers=DATA_HEADERS)
         check(
             category_name in json.loads(public_categories)["props"]["categories"],
             "public categories are not database-backed",
@@ -402,13 +438,13 @@ def run():
             "/admin/categories/save",
             "POST",
             {"id": "", "name": category_name.upper()},
-            extra_headers=inertia_headers,
+            extra_headers=DATA_HEADERS,
         )
         check(
             status == 303 and redirect.get("location") == "/admin/categories",
-            "Inertia category validation redirect",
+            "page-data category validation redirect",
         )
-        status, _, payload = admin.request("/admin/categories", extra_headers=inertia_headers)
+        status, _, payload = admin.request("/admin/categories", extra_headers=DATA_HEADERS)
         check(
             json.loads(payload)["props"]["errors"].get("category"),
             "category validation errors missing",
@@ -560,7 +596,7 @@ def run():
             admin.request(f"/admin/categories/{str(category_id)}/delete", "POST", {})[0] == 422,
             "category with a draft was deleted",
         )
-        _, _, payload = admin.request("/admin/categories", extra_headers=inertia_headers)
+        _, _, payload = admin.request("/admin/categories", extra_headers=DATA_HEADERS)
         check(
             next(
                 value
@@ -572,7 +608,7 @@ def run():
         )
         check(public.request(f"/content/{slug}")[0] == 404, "created draft is public")
         status, _, payload = admin.request(
-            f"/admin/content/{content_id}/edit", extra_headers=inertia_headers
+            f"/admin/content/{content_id}/edit", extra_headers=DATA_HEADERS
         )
         check(
             status == 200 and json.loads(payload)["props"]["item"]["image"] == "",
@@ -622,7 +658,7 @@ def run():
                 "invalid site date did not render a validation error",
             )
         _, _, payload = admin.request(
-            f"/admin/content/{content_id}/edit", extra_headers=inertia_headers
+            f"/admin/content/{content_id}/edit", extra_headers=DATA_HEADERS
         )
         before_rename = json.loads(payload)["props"]["item"]
         renamed_category = f"Renamed {suffix}"
@@ -634,7 +670,7 @@ def run():
             "rename an assigned category",
         )
         _, _, payload = admin.request(
-            f"/admin/content/{content_id}/edit", extra_headers=inertia_headers
+            f"/admin/content/{content_id}/edit", extra_headers=DATA_HEADERS
         )
         after_rename = json.loads(payload)["props"]["item"]
         check(
@@ -645,7 +681,7 @@ def run():
         )
         _, _, payload = public.request(
             f"/content?category={urllib.parse.quote(renamed_category)}",
-            extra_headers=inertia_headers,
+            extra_headers=DATA_HEADERS,
         )
         renamed_page = json.loads(payload)
         check(
@@ -661,13 +697,13 @@ def run():
             f"/admin/categories/{str(category_id)}/delete",
             "POST",
             {},
-            extra_headers=inertia_headers,
+            extra_headers=DATA_HEADERS,
         )
         check(
             status == 303 and redirect.get("location") == "/admin/categories",
-            "used category deletion error did not use Inertia redirect",
+            "used category deletion error did not redirect back",
         )
-        _, _, payload = admin.request("/admin/categories", extra_headers=inertia_headers)
+        _, _, payload = admin.request("/admin/categories", extra_headers=DATA_HEADERS)
         check(
             json.loads(payload)["props"]["errors"].get("category"),
             "used category deletion error is missing",
@@ -681,19 +717,19 @@ def run():
             admin.request("/admin/content/save", "POST", bad)[0] == 422, "duplicate slug accepted"
         )
         status, redirect, _ = admin.request(
-            "/admin/content/save", "POST", bad, extra_headers=inertia_headers
+            "/admin/content/save", "POST", bad, extra_headers=DATA_HEADERS
         )
         check(
             status == 303 and redirect.get("location") == f"/admin/content/{content_id}/edit",
-            "Inertia validation redirect",
+            "page-data validation redirect",
         )
-        status, _, payload = admin.request(redirect["location"], extra_headers=inertia_headers)
+        status, _, payload = admin.request(redirect["location"], extra_headers=DATA_HEADERS)
         validation = json.loads(payload)
         check(
             status == 200
             and validation["component"] == "Admin/Editor"
             and validation["props"]["errors"].get("content"),
-            "Inertia validation errors",
+            "page-data validation errors",
         )
         check(
             "password" not in validation["props"]["auth"]["admin"],
@@ -738,10 +774,10 @@ def run():
         data["image"] = ""
         mark("Upload-only covers and Markdown images, empty covers, and legacy image import")
         mark("Eloquent draft creation, update, publishing, Markdown, XSS escaping and unique slugs")
-        _, _, payload = public.request("/", extra_headers=inertia_headers)
+        _, _, payload = public.request("/", extra_headers=DATA_HEADERS)
         featured_id = json.loads(payload)["props"]["featured"]["id"]
         _, _, payload = admin.request(
-            f"/admin/content/{str(featured_id)}/edit", extra_headers=inertia_headers
+            f"/admin/content/{str(featured_id)}/edit", extra_headers=DATA_HEADERS
         )
         original_featured = json.loads(payload)["props"]["item"]
         data["featured"] = "1"
@@ -749,7 +785,7 @@ def run():
             admin.request("/admin/content/save", "POST", data)[0] == 303,
             "feature the cached content item",
         )
-        _, _, payload = public.request("/", extra_headers=inertia_headers)
+        _, _, payload = public.request("/", extra_headers=DATA_HEADERS)
         check(
             str(json.loads(payload)["props"]["featured"]["id"]) == content_id,
             "featured homepage cache is stale",
@@ -764,7 +800,7 @@ def run():
             and slug not in public.request("/rss.xml")[2],
             "unpublished cached content item remains public",
         )
-        _, _, payload = public.request("/content", extra_headers=inertia_headers)
+        _, _, payload = public.request("/content", extra_headers=DATA_HEADERS)
         check(
             all(item["slug"] != slug for item in json.loads(payload)["props"]["items"]),
             "unpublished content item remains in cached lists",
@@ -782,7 +818,7 @@ def run():
             and public.request(f"/content/{slug}")[0] == 200,
             "old or new content item slug cache is stale",
         )
-        _, _, payload = public.request("/", extra_headers=inertia_headers)
+        _, _, payload = public.request("/", extra_headers=DATA_HEADERS)
         check(
             json.loads(payload)["props"]["featured"]["slug"] == slug
             and slug in public.request("/rss.xml")[2],
@@ -826,7 +862,7 @@ def run():
             "CSV export content",
         )
         mark("Persistent Eloquent newsletter signup, deduplication, management and CSV export")
-        _, _, payload = admin.request("/admin/settings", extra_headers=inertia_headers)
+        _, _, payload = admin.request("/admin/settings", extra_headers=DATA_HEADERS)
         original_settings = json.loads(payload)["props"]["site"]
         updated_settings = {**original_settings, "site_name": f"HaxePress {suffix}"}
         try:
@@ -834,7 +870,7 @@ def run():
                 admin.request("/admin/settings", "POST", updated_settings)[0] == 303,
                 "save cached site settings",
             )
-            _, _, payload = public.request("/", extra_headers=inertia_headers)
+            _, _, payload = public.request("/", extra_headers=DATA_HEADERS)
             check(
                 json.loads(payload)["props"]["site"]["site_name"] == updated_settings["site_name"],
                 "public settings cache is stale",
@@ -848,7 +884,7 @@ def run():
                 == 422,
                 "invalid settings accepted",
             )
-            _, _, payload = public.request("/about", extra_headers=inertia_headers)
+            _, _, payload = public.request("/about", extra_headers=DATA_HEADERS)
             check(
                 json.loads(payload)["props"]["site"]["site_name"] == updated_settings["site_name"],
                 "failed settings update changed cached content",
@@ -858,7 +894,7 @@ def run():
                 admin.request("/admin/settings", "POST", original_settings)[0] == 303,
                 "restore site settings",
             )
-        _, _, payload = public.request("/", extra_headers=inertia_headers)
+        _, _, payload = public.request("/", extra_headers=DATA_HEADERS)
         check(
             json.loads(payload)["props"]["site"]["site_name"] == original_settings["site_name"],
             "restored settings cache is stale",
@@ -895,7 +931,7 @@ def run():
             "delete unused category",
         )
         category_id = None
-        _, _, payload = public.request("/content", extra_headers=inertia_headers)
+        _, _, payload = public.request("/content", extra_headers=DATA_HEADERS)
         check(
             renamed_category not in json.loads(payload)["props"]["categories"],
             "deleted category remains in public filters",

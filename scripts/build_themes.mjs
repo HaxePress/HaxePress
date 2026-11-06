@@ -1,6 +1,5 @@
-import { build } from 'esbuild';
 import postcss from 'postcss';
-import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,35 +29,17 @@ for (const entry of await readdir(source, { withFileTypes: true })) {
   const directory = join(source, entry.name);
   const manifest = JSON.parse(await readFile(join(directory, 'cms-package.json'), 'utf8'));
   const destination = join(output, entry.name);
+  // Start from an empty folder, so files a theme no longer has never reach its ZIP.
+  await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
   await cp(directory, destination, { recursive: true });
-  if (manifest.assets.renderer) {
-    const input = join(directory, 'src/index.ts');
-    const result = await build({
-      entryPoints: [input],
-      outfile: join(destination, 'public', manifest.assets.renderer),
-      bundle: true,
-      format: 'esm',
-      platform: 'neutral',
-      target: 'es2022',
-      jsx: 'transform',
-      jsxFactory: 'React.createElement',
-      jsxFragment: 'React.Fragment',
-      tsconfigRaw: {
-        compilerOptions: {
-          jsx: 'react',
-          jsxFactory: 'React.createElement',
-          jsxFragmentFactory: 'React.Fragment',
-        },
-      },
-      metafile: true,
-      minify: false,
-      legalComments: 'eof',
-    });
-    const embeddedRuntime = Object.keys(result.metafile.inputs).some((file) =>
-      /node_modules\/(react|react-dom|@inertiajs)\//.test(file),
-    );
-    if (embeddedRuntime) throw new Error('Themes must use the host React/Inertia runtime.');
+  if (manifest.assets.views) {
+    // Gallery and Notebook share the Fieldnotes templates and differ in style only.
+    if (entry.name !== 'fieldnotes') {
+      await cp(join(source, 'fieldnotes/views'), join(destination, manifest.assets.views), {
+        recursive: true,
+      });
+    }
     let css = await readFile(join(source, 'fieldnotes/public/theme.css'), 'utf8');
     if (entry.name !== 'fieldnotes') {
       css += `\n${await readFile(join(directory, 'public/theme.css'), 'utf8')}`;
@@ -71,4 +52,4 @@ for (const entry of await readdir(source, { withFileTypes: true })) {
     await writeFile(join(destination, 'public/theme.css'), scopedStyles(css));
   }
 }
-console.log('Built packaged theme renderers. The default theme is part of the application.');
+console.log('Built packaged themes. The default theme is part of the application.');

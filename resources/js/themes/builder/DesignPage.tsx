@@ -1,4 +1,4 @@
-import { usePage } from '@inertiajs/react';
+import { usePage } from '../../page';
 import {
   createElement,
   Fragment,

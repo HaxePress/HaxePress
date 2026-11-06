@@ -29,7 +29,6 @@ import hx.well.validator.ValidatorRule;
 import hx.well.http.RequestStatic.request;
 import hx.press.validation.ValidationResponder;
 import hx.press.content.ContentTypes;
-import hx.press.content.ContentTypeDefinition;
 import hx.press.content.ContentFields;
 import hx.press.i18n.I18n;
 
@@ -101,55 +100,9 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         if (existing != null && !CmsAccess.canEdit(existing.author_id)) {
             return CmsController.forbidden(request);
         }
-        var form = readForm(request, type, id, existing);
+        var form = ContentItemData.fromEditor(request, type, id, existing);
         return ContentController.editor(request, form.toObject(),
             "Check the content fields and their length limits before saving.", 422);
-    }
-
-    function readForm(request:Request, type:ContentTypeDefinition, id:Int,
-            existing:ContentItem):ContentItem {
-        var admin = CmsAccess.current();
-        var form = new ContentItem();
-        form.id = id;
-        form.content_type = type.key;
-        form.author_id = existing == null ? admin.id : existing.author_id;
-        form.version = existing == null ? 1 : existing.version;
-        form.title = AdminController.input(request, "title", 500);
-        form.slug = AdminController.input(request, "slug", 500).toLowerCase();
-        form.excerpt = AdminController.input(request, "excerpt", 2000);
-        var rawContent:Dynamic = request.input("content", "");
-        form.content = (rawContent is String) ? rawContent : "";
-        form.category = ContentTypes.supports(type,
-            "categories") ? AdminController.input(request, "category",
-                100) : existing == null ? "" : existing.category;
-        form.image = AdminController.input(request, "image", 2000);
-        form.image_alt = AdminController.input(request, "image_alt", 500);
-        form.status = AdminController.input(request, "status", 30);
-        form.featured = ContentTypes.supports(type, "featured")
-            && request.input("featured", "0") == "1" ? 1 : 0;
-        form.published_at = AdminController.input(request, "published_at", 50);
-        form.seo_title = AdminController.input(request, "seo_title", 200);
-        form.seo_description = AdminController.input(request, "seo_description", 600);
-        form.scheduled_epoch = Std.parseFloat(AdminController.input(request, "scheduled_epoch",
-            32));
-        if (!Math.isFinite(form.scheduled_epoch)) {
-            form.scheduled_epoch = 0;
-        }
-        if (!ContentTypes.supports(type, "body")) {
-            form.content = existing == null ? "" : existing.content;
-        }
-        if (!ContentTypes.supports(type, "excerpt")) {
-            form.excerpt = existing == null ? "" : existing.excerpt;
-        }
-        if (!ContentTypes.supports(type, "image")) {
-            form.image = existing == null ? "" : existing.image;
-            form.image_alt = existing == null ? "" : existing.image_alt;
-        }
-        if (!ContentTypes.supports(type, "seo")) {
-            form.seo_title = existing == null ? "" : existing.seo_title;
-            form.seo_description = existing == null ? "" : existing.seo_description;
-        }
-        return form;
     }
 
     public function execute(request:Request):AbstractResponse {
@@ -188,7 +141,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         if (existing != null && !CmsAccess.canEdit(existing.author_id)) {
             return CmsController.forbidden(request);
         }
-        var form = readForm(request, type, id, existing);
+        var form = ContentItemData.fromEditor(request, type, id, existing);
 
         var error = "";
         if (form.title.length < type.minimumTitleLength) {

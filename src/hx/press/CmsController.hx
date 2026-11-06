@@ -6,7 +6,10 @@ import hx.press.ContentCache;
 import hx.press.Pagination;
 import hx.press.SiteSettingsStore;
 import hx.well.facades.DBStatic;
-import hx.well.facades.Inertia;
+import hx.press.view.View;
+import hx.press.AdminForms;
+import hx.press.TagData.TagRecord;
+import hx.press.TagData.TagSummary;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
@@ -15,11 +18,17 @@ import hx.press.model.Tag;
 
 using StringTools;
 
+typedef TagFormRecord = {
+    var id:String;
+    var name:String;
+    var slug:String;
+    var description:String;
+}
+
 class CmsController {
     public static function forbidden(request:Request):AbstractResponse {
-        return Inertia.render("Admin/Forbidden",
-            {message: "Your account does not have access to this area."})
-            .status(403);
+        var props = {message: "Your account does not have access to this area."};
+        return View.render("Admin/Forbidden", props).status(403);
     }
 
     public static function tags(request:Request, error:String = "",
@@ -27,7 +36,8 @@ class CmsController {
         if (!CmsAccess.can("taxonomy")) {
             return forbidden(request);
         }
-        var redirect = AdminController.validationRedirect(request, "tag", error, "/admin/tags");
+        var returnUrl = AdminForms.returnUrl(request, "/admin/tags");
+        var redirect = AdminController.validationRedirect(request, "tag", error, returnUrl);
         if (redirect != null) {
             return redirect;
         }
@@ -42,17 +52,54 @@ class CmsController {
             case "deleted": "The tag and its content assignments have been removed.";
             default: "";
         };
+        var tagForm = tagForm(request, page.items);
         var props:Map<String, Dynamic> = [
             "tags" => page.items,
             "total" => total,
             "query" => search,
             "pagination" => links,
-            "notice" => notice
+            "notice" => notice,
+            "tagForm" => tagForm
         ];
         if (error != "") {
             props.set("errors", ["tag" => error]);
         }
-        return Inertia.render("Admin/Tags", props).status(status);
+        return View.render("Admin/Tags", props).status(status);
+    }
+
+    /** The tag form: a failed submission, the tag in `?edit=`, or an empty form. **/
+    static function tagForm(request:Request, listed:Array<TagSummary>):TagFormRecord {
+        if (AdminForms.resubmitted(request, "name")) {
+            return {
+                id: AdminForms.old(request, "id", ""),
+                name: AdminForms.old(request, "name", ""),
+                slug: AdminForms.old(request, "slug", ""),
+                description: AdminForms.old(request, "description", "")
+            };
+        }
+        var editId = AdminForms.editId(request);
+        var edited:Null<TagRecord> = Lambda.find(listed, tag -> tag.id == editId);
+        if (edited == null && editId > 0) {
+            var row = Tag.query.select(["id", "name", "slug", "description"])
+                .where("id", editId)
+                .limit(1)
+                .first();
+            edited = row == null ? null : cast row.toObject();
+        }
+        if (edited == null) {
+            return {
+                id: "",
+                name: "",
+                slug: "",
+                description: ""
+            };
+        }
+        return {
+            id: Std.string(edited.id),
+            name: edited.name,
+            slug: edited.slug,
+            description: edited.description ?? ""
+        };
     }
 
     public static function deleteTag(request:Request):AbstractResponse {

@@ -1,0 +1,74 @@
+<props pluginPage="PluginPageView" />
+<AdminLayout :title="translate(pluginPage.namespace ?? 'cms', pluginPage.title)">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ translate(pluginPage.namespace ?? 'cms', pluginPage.title) }}</h1>
+      <p>{{ translate(pluginPage.namespace ?? 'cms', pluginPage.description) }}</p>
+    </div>
+    <div>
+      <template :for="action in pluginPage.actions"
+        ><a :if="action.download" class="button button-outline" href="{{ action.href }}" download
+          >{{ icon('download') }}{{ translate(pluginPage.namespace ?? 'cms', action.label) }}</a
+        ><a :else class="button button-outline" href="{{ action.href }}"
+          >{{ icon('download') }}{{ translate(pluginPage.namespace ?? 'cms', action.label) }}</a
+        ></template
+      >
+    </div>
+  </div>
+  <section class="admin-card">
+    <div class="admin-card-heading">
+      <h2>
+        {{ translate(pluginPage.namespace ?? 'cms', pluginPage.title) }}
+        <span class="count-badge">{{ pluginPage.total }}</span>
+      </h2>
+    </div>
+    <div :if="pluginPage.rows" class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th :for="column in pluginPage.columns">
+              {{ translate(pluginPage.namespace ?? 'cms', column.label) }}
+            </th>
+            <th :if="pluginPage.rowAction">
+              <span class="sr-only">{{ t('Actions') }}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for="row in pluginPage.rows">
+            <td :for="column in pluginPage.columns">
+              <strong :if="loop.first">{{ row[column.key] | string }}</strong
+              ><template :else>{{ row[column.key] | string }}</template>
+            </td>
+            <td :if="pluginPage.rowAction">
+              <form
+                action="{{ pluginPage.rowAction.path | replace('{id}', row['id'] | string | encode) }}"
+                method="post"
+              >
+                <button
+                  class="icon-button danger"
+                  aria-label="{{ translate(pluginPage.namespace ?? 'cms', pluginPage.rowAction.label) }} {{ row[pluginPage.columns[0].key ?? 'id'] | string }}"
+                  data-well-confirm="{{ translate(pluginPage.namespace ?? 'cms', pluginPage.rowAction.confirm) }}"
+                >
+                  {{ icon('trash') }}
+                </button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div :else class="empty-state">
+      {{ icon('users') }}
+      <h2>
+        {{ t('No {items} yet.', items: translate(pluginPage.namespace ?? 'cms', pluginPage.noun)) }}
+      </h2>
+      <p>{{ t('New entries will appear here.') }}</p>
+    </div>
+    <Pagination
+      :links="pluginPage.pagination"
+      :count="size(pluginPage.rows)"
+      :noun="translate(pluginPage.namespace ?? 'cms', pluginPage.noun)"
+    />
+  </section>
+</AdminLayout>

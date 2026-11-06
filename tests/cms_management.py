@@ -132,6 +132,11 @@ def verify(fixtures):
         "writer opened another author editor",
     )
     check(
+        writer.request("/admin/content/preview", "POST", {**document, "id": str(another_id)})[0]
+        == 403,
+        "writer previewed another author's document",
+    )
+    check(
         writer.request(
             "/admin/content/working-copy",
             "POST",

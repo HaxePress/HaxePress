@@ -1,0 +1,30 @@
+<props editor="ContentEditorView" />
+<AdminLayout :title="editor.heading">
+  <Island
+    name="content-editor"
+    :props="{
+      translations: translations,
+      locale: i18n.locale,
+      direction: i18n.direction,
+      csrfToken: csrfToken,
+      siteUrl: siteUrl,
+      error: error('content') ?? '',
+      editor: editor
+    }"
+    load="eager"
+  >
+    <div class="admin-page-heading editor-heading">
+      <div>
+        <a class="back-link" href="{{ editor.contentType.adminBase }}"
+          >{{ icon('arrow-left') }} {{ t('Back to') }} {{ t(editor.contentType.name) }}</a
+        >
+        <h1>{{ editor.heading }}</h1>
+      </div>
+    </div>
+    <Alert :message="editor.notice" />
+    <Alert error :message="error('content')" />
+    <div class="editor-session-status">
+      <span role="status">{{ t('Loading…') }}</span>
+    </div>
+  </Island>
+</AdminLayout>

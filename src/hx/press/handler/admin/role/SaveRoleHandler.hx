@@ -26,13 +26,16 @@ class SaveRoleHandler extends AbstractHandler implements ValidationResponder {
         if (routeKey != null && !Roles.canManage(CmsAccess.current().role, routeKey)) {
             return true;
         }
-        return current.validate([
+        var rules:Map<String, Array<ValidatorRule>> = [
             "key" => [Required, String, Min(1), Max(32)],
             "name" => [Required, String, Min(1), Max(100)],
             "description" => [String, Max(500)],
-            "capabilities" => [Required, String, Max(16000)],
             "enabled" => [String, Regex("^[01]$")]
-        ]);
+        ];
+        if (!RoleController.capabilityFields(current)) {
+            rules.set("capabilities", [Required, String, Max(16000)]);
+        }
+        return current.validate(rules);
     }
 
     public function validationFailed(request:Request):AbstractResponse {
@@ -55,11 +58,20 @@ class SaveRoleHandler extends AbstractHandler implements ValidationResponder {
             if (!creating && !Roles.canManage(actor.role, key)) {
                 return CmsController.forbidden(request);
             }
-            var source:Dynamic = Json.parse(AdminController.input(request, "capabilities", 16000));
-            if (!(source is Array)) {
-                throw new Exception("Choose a list of role capabilities.");
+            var requested:Array<Dynamic>;
+            if (RoleController.capabilityFields(request)) {
+                requested = cast RoleController.submittedGrants(request.all());
+                if (requested.length > 128) {
+                    throw new Exception("A role can contain at most 128 capabilities.");
+                }
+            } else {
+                var source:Dynamic = Json.parse(AdminController.input(request, "capabilities",
+                    16000));
+                if (!(source is Array)) {
+                    throw new Exception("Choose a list of role capabilities.");
+                }
+                requested = source;
             }
-            var requested:Array<Dynamic> = source;
             var grants:Array<String> = [];
             var actorGrants = CmsAccess.capabilities(actor.role);
             for (value in requested) {

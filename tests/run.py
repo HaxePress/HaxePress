@@ -17,17 +17,16 @@ from content_cache import stamps, verify as verify_content_cache
 from migrations import prepare as prepare_migrations, verify as verify_migrations
 from fixture_store import FixtureStore, CONTENT_COLUMNS, TEST_BINARY
 from build import build
-from e2e import InertiaPageParser
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_ROOT = Path(os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
-SSR_BINARY = Path(os.environ.get("CMS_TEST_SSR_PATH", ROOT / "bootstrap/ssr/ssr.js"))
 parser = argparse.ArgumentParser(description="Run isolated JVM integration suites.")
 parser.add_argument(
     "--only",
     choices=[
         "e2e",
         "installation",
+        "site_backup",
         "auth",
         "validation",
         "native_api",
@@ -41,6 +40,7 @@ parser.add_argument(
         "theme_export",
         "theme_assets",
         "theme_mcp",
+        "admin_mcp",
         "websocket_lifecycle",
         "builtin_theme",
         "cms_content",
@@ -80,13 +80,26 @@ def wait_ready(port, process):
             body = response.read().decode()
             client.close()
             if response.status == 200:
-                if "<main" not in body or "data-cms-site" not in body:
-                    raise RuntimeError("Inertia SSR did not render the homepage.")
+                if "<main" not in body or "data-cms-site" not in body or "data-page=" in body:
+                    raise RuntimeError("The server did not render the homepage HTML.")
                 return body
         except (OSError, http.client.HTTPException):
             pass
         time.sleep(0.2)
     raise RuntimeError("Crossbyte did not become ready within 90 seconds.")
+
+
+def page_data(port, path):
+    client = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        client.request("GET", path, headers={"X-Well-Data": "true", "Accept": "application/json"})
+        response = client.getresponse()
+        payload = response.read().decode()
+    finally:
+        client.close()
+    if response.status != 200 or response.getheader("X-Well-Data") != "true":
+        raise RuntimeError(f"{path} did not return page data: {str(response.status)}")
+    return json.loads(payload)
 
 
 def stop(process):
@@ -136,9 +149,6 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
-    with socket.socket() as reservation:
-        reservation.bind(("127.0.0.1", 0))
-        ssr_port = reservation.getsockname()[1]
     for folder in ("sessions", "cache"):
         (work / "storage" / folder).mkdir(parents=True, exist_ok=True)
     for folder in ("public", "database"):
@@ -164,44 +174,10 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
         "ADMIN_PASSWORD": password,
         "TEST_GUARD_PATH": str(work / "query-guard.json"),
     }
-    values.update(
-        VITE_USE_BUILD="true",
-        VITE_INCLUDE_PAGE_ENTRY="false",
-        INERTIA_SSR_ENABLED="true",
-        INERTIA_SSR_URL=f"http://127.0.0.1:{str(ssr_port)}/render",
-        INERTIA_SSR_TIMEOUT="3",
-    )
+    values.update(WELL_DATA_RESPONSES="1")
     (work / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
     (work / ".env").chmod(0o600)
     with (work / "server.log").open("w+") as log:
-        ssr_env = os.environ.copy()
-        ssr_env["INERTIA_SSR_PORT"] = str(ssr_port)
-        ssr_env["CMS_STORAGE_PATH"] = str(work / "storage")
-        ssr = subprocess.Popen(
-            ["node", str(SSR_BINARY)],
-            cwd=ROOT,
-            env=ssr_env,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-        )
-        ssr_deadline = time.monotonic() + 45
-        while time.monotonic() < ssr_deadline and ssr.poll() is None:
-            try:
-                probe = http.client.HTTPConnection("127.0.0.1", ssr_port, timeout=0.5)
-                probe.request("GET", "/health")
-                ready = probe.getresponse()
-                ready.read()
-                probe.close()
-                if ready.status == 200:
-                    break
-            except OSError:
-                time.sleep(0.1)
-        else:
-            stop(ssr)
-            log.flush()
-            log.seek(0)
-            print(log.read()[-12000:], file=sys.stderr)
-            raise RuntimeError("Inertia SSR process failed to start within 45 seconds.")
         process = subprocess.Popen(COMMAND, cwd=work, stdout=log, stderr=subprocess.STDOUT)
         fixtures = None
         try:
@@ -224,6 +200,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                 else [
                     "e2e",
                     "installation",
+                    "site_backup",
                     "auth",
                     "validation",
                     "native_api",
@@ -237,6 +214,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                     "theme_export",
                     "theme_assets",
                     "theme_mcp",
+                    "admin_mcp",
                     "websocket_lifecycle",
                     "builtin_theme",
                     "cms_content",
@@ -269,9 +247,8 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                 raise RuntimeError(
                     "Content caches were unnecessarily discarded or rewritten after restart."
                 )
-            rendered = InertiaPageParser()
-            rendered.feed(body)
-            if len(rendered.pages) != 1 or rendered.pages[0]["props"]["count"] != 7:
+            home = page_data(port, "/")
+            if home["component"] != "Home" or home["props"]["count"] != 7:
                 raise RuntimeError("Initial data was duplicated or lost after restart.")
             images = list((work / "storage/media").glob("*.jpg"))
             if not images:
@@ -293,13 +270,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                 "PASS Persistent database, content cache and idempotent boot after Crossbyte restart",
                 flush=True,
             )
-            verifier = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-            verifier.request(
-                "GET", "/admin/login", headers={"X-Inertia": "true", "Accept": "application/json"}
-            )
-            verified = verifier.getresponse()
-            assert json.loads(verified.read())["props"]["pluginRestartRequired"] is False
-            verifier.close()
+            assert page_data(port, "/admin/login")["props"]["pluginRestartRequired"] is False
             stop(process)
             # Reproduce the previous release: named content categories, no category table.
             fixtures.call("drop_categories")
@@ -322,14 +293,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                 "PASS Migration of existing content item categories without content or edit-date changes",
                 flush=True,
             )
-            client = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-            client.request(
-                "GET", "/content", headers={"X-Inertia": "true", "Accept": "application/json"}
-            )
-            response = client.getresponse()
-            payload = response.read().decode()
-            client.close()
-            if response.status != 200 or "Legacy notebook" not in payload:
+            if "Legacy notebook" not in json.dumps(page_data(port, "/content")):
                 raise RuntimeError("Category migration left a stale content cache.")
             print("PASS Data migrations invalidate affected content caches", flush=True)
             stop(process)
@@ -360,5 +324,4 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
             if fixtures is not None:
                 fixtures.close()
             stop(process)
-            stop(ssr)
 print("All fresh-install, upload, and HTTP integration checks passed.", flush=True)

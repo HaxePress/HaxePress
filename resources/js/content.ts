@@ -42,7 +42,7 @@ export type CustomFieldValue = string | number | boolean | null;
 export type CustomFieldValues = Record<string, CustomFieldValue>;
 
 export function collectionLabel(
-  type: ContentTypeDefinition,
+  type: Pick<ContentTypeDefinition, 'labels' | 'singular'>,
   key: string,
   translate: (key: string, parameters?: Record<string, string | number>) => string,
 ) {

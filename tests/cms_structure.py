@@ -12,7 +12,7 @@ from cms_content import props
 from cms_packages import install, zip_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
+HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
 
 
 def login(client, email, password):
@@ -56,12 +56,14 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
         "name": "Runtime partial theme",
         "version": "1.0.0",
         "layout": "runtime-layout",
-        "assets": {"stylesheet": "theme.css", "renderer": "renderer.js"},
+        "assets": {"stylesheet": "theme.css", "views": "views"},
         "fields": [],
         "templates": [{"name": "RuntimeDetail", "label": "Runtime detail", "scope": "detail"}],
         "navigation": [{"key": region, "name": "Runtime links", "maxLinks": 5}],
     }
-    renderer = "export function createTheme({React}) { function RuntimeDetail({item}) { return React.createElement('main', {'data-runtime-template':'true'}, item.title, React.createElement('span', null, String(item.fields.price))); } return {pages:{RuntimeDetail}}; }"
+    template = """<props item="ContentItemView" />
+<main data-runtime-template="true">{{ item.title }}<span :if="item.fields">{{ item.fields['price'] | string }}</span></main>
+"""
     install(
         owner,
         "themes",
@@ -69,7 +71,7 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
             manifest,
             {
                 "public/theme.css": ".runtime-template {color:#123456;}",
-                "public/renderer.js": renderer,
+                "views/RuntimeDetail.well.html": template,
             },
         ),
     )
@@ -92,6 +94,44 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
         check(
             'data-runtime-template="true"' in public.request(f"/{prefix}/{slug}")[2],
             "Named partial theme did not render an initial HTML request",
+        )
+        preview_path = f"/admin/collections/{definition['key']}/preview"
+        draft = {
+            "id": str(identifier),
+            "title": "Unsaved themed preview",
+            "slug": slug,
+            "custom_fields": json.dumps({"price": 35.5, "secret": "Private preview value"}),
+        }
+        status, headers, html = owner.request(preview_path, "POST", draft)
+        check(
+            status == 200
+            and headers.get("x-frame-options") == "SAMEORIGIN"
+            and headers.get("cache-control") == "private, no-store"
+            and headers.get("x-robots-tag") == "noindex, nofollow"
+            and re.search(
+                r'<main data-runtime-template="true">Unsaved themed preview.*<span>35\.5</span>',
+                html,
+            )
+            and "Private preview value" not in html,
+            "The editor preview did not render the active template and public draft fields",
+        )
+        status, _, payload = owner.request(preview_path, "POST", draft, extra_headers=HEADERS)
+        page = json.loads(payload)
+        check(
+            status == 200
+            and page["component"] == "RuntimeDetail"
+            and page["props"]["theme"]["id"] == theme_id
+            and page["props"]["auth"] is None
+            and page["props"]["csrfToken"] is None,
+            "The preview used the wrong theme or exposed administration props",
+        )
+        check(
+            owner.request(preview_path, "POST", draft, csrf=False)[0] == 419,
+            "Content preview bypassed CSRF validation",
+        )
+        check(
+            "Unsaved themed preview" not in public.request(f"/{prefix}/{slug}")[2],
+            "Preview changed the published item",
         )
         check(public.request("/")[0] == 200, "Partial theme lost its standard homepage fallback")
         frame = owner.request(f"/admin/themes/{theme_id}/preview/frame/{prefix}/{slug}")

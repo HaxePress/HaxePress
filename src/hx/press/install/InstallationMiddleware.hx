@@ -14,6 +14,7 @@ class InstallationMiddleware extends AbstractMiddleware {
         var path = request.path;
         if (StringTools.startsWith(path, "/build/assets/")
             || StringTools.startsWith(path, "/fonts/")
+            || StringTools.startsWith(path, "/_wellout/")
             || path == "/favicon.svg"
             || path == "/favicon.ico"
             || path == "/admin/install"

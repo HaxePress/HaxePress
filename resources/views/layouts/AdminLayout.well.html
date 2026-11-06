@@ -1,0 +1,86 @@
+<props title="String" description="String?" />
+<Document>
+  <Asset css="css/site.css" />
+  <Asset css="css/cms.css" />
+  <Asset css="css/admin.css" />
+  <PageHead :title="title" :description="description" admin />
+  <div class="admin-body">
+    <a class="skip-link" href="#main">{{ t('Skip to content') }}</a>
+    <aside class="admin-sidebar"><AdminSidebar /></aside>
+    <dialog
+      id="admin-mobile-navigation"
+      class="admin-mobile-drawer"
+      aria-label="{{ t('Admin navigation') }}"
+      data-well-dismiss
+    >
+      <button
+        type="button"
+        class="icon-button sidebar-close"
+        aria-label="{{ t('Close navigation') }}"
+        data-well-close
+      >
+        {{ icon('x') }}
+      </button>
+      <AdminSidebar />
+    </dialog>
+    <div class="admin-workspace">
+      <header class="admin-topbar">
+        <div class="admin-location">
+          <button
+            type="button"
+            class="icon-button admin-menu-toggle"
+            aria-label="{{ t('Open navigation') }}"
+            aria-controls="admin-mobile-navigation"
+            aria-expanded="false"
+            data-well-open="admin-mobile-navigation"
+          >
+            {{ icon('menu') }}
+          </button>
+          <nav class="admin-breadcrumbs" aria-label="{{ t('Breadcrumb') }}">
+            <span>{{ adminLocation.group }}</span>{{ icon('chevron-right') }}<template
+              :if="adminLocation.parentHref"
+              ><span
+                ><a href="{{ adminLocation.parentHref }}">{{ adminLocation.parentLabel }}</a></span
+              >{{ icon('chevron-right') }}</template
+            ><strong>{{ adminLocation.current }}</strong>
+          </nav>
+        </div>
+        <div class="admin-topbar-actions">
+          <Island
+            :if="auth"
+            name="admin-ai"
+            :props="{
+              translations: translations,
+              locale: i18n.locale,
+              direction: i18n.direction,
+              adminId: auth.admin.id,
+              csrfToken: csrfToken
+            }"
+            load="idle"
+            ><button
+              class="button button-outline admin-ai-trigger"
+              type="button"
+              aria-label="{{ t('Connect AI') }}"
+              aria-haspopup="dialog"
+            >
+              {{ icon('sparkles') }}<span>{{ t('Connect AI') }}</span>
+            </button></Island
+          >
+          <LanguageSwitcher />
+          <a href="/" class="button button-outline admin-website-link"
+            >{{ t('View website') }} {{ icon('external') }}</a
+          >
+        </div>
+      </header>
+      <main id="main" class="admin-main">
+        <Alert
+          :if="pluginRestartRequired"
+          error
+          :message="t('A plugin failed during creation or destruction. The server may not function as expected until it is restarted.')"
+        />
+        <slot />
+      </main>
+    </div>
+    <ConfirmDialog />
+  </div>
+</Document>

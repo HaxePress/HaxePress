@@ -1,0 +1,12 @@
+<props name="String" />
+<div
+  class="extension-slot extension-slot-{{ name | replace('.', '-') }}"
+  data-extension-slot="{{ name }}"
+  :inert="theme.studioSession"
+>
+  <template :for="block in extensions.blocks"
+    ><div :if="block.slot == name" class="extension-block">
+      {{ markdown(block.content) }}
+    </div></template
+  >
+</div>

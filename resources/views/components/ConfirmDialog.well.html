@@ -1,0 +1,13 @@
+<dialog id="well-confirm" class="confirm-dialog">
+  <div class="confirm-symbol">{{ icon('trash') }}</div>
+  <h2>{{ t('Just making sure.') }}</h2>
+  <p data-well-confirm-message></p>
+  <div class="confirm-actions">
+    <button class="button button-outline" type="button" data-well-answer="cancel">
+      {{ t('Keep it') }}
+    </button>
+    <button class="button button-danger" type="button" data-well-answer="confirm">
+      {{ t('Delete') }}
+    </button>
+  </div>
+</dialog>

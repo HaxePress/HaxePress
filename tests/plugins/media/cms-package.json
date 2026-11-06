@@ -2,6 +2,7 @@
   "apiVersion": 4,
   "cmsVersion": "2.16.0",
   "kind": "plugin",
+  "pluginId": "aed1a355-292b-4e50-b46e-070db03fd2ef",
   "slug": "media-test",
   "name": "Media dependency test",
   "version": "2.16.0",

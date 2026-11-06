@@ -169,15 +169,15 @@ def verify(owner, public, fixtures):
         status, headers, _ = post_json(owner, "/admin/account", {"name": []}, HEADERS)
         check(
             status == 303 and headers["location"] == "/admin/account",
-            "Inertia validation did not redirect",
+            "Page-data validation did not redirect",
         )
         check(
             props(owner, "/admin/account")["errors"].get("account"),
-            "Inertia validation lost its scoped flash error",
+            "Page-data validation lost its scoped flash error",
         )
         check(
             not props(owner, "/admin/account")["errors"],
-            "Inertia validation errors were not consumed",
+            "Page-data validation errors were not consumed",
         )
         for path, values in [
             ("/admin/categories/save", {"id": "2147483647", "name": []}),
@@ -252,7 +252,7 @@ def verify(owner, public, fixtures):
         owner.request(f"/admin/media/{str(image_id)}/delete", "POST", {})
         owner.request("/admin/logout", "POST", {})
     print(
-        "PASS Native validation: all write handlers, plugin forwarding, JSON/Inertia responses, no writes, byte limits, permissions and 404/409 precedence",
+        "PASS Native validation: all write handlers, plugin forwarding, JSON/page-data responses, no writes, byte limits, permissions and 404/409 precedence",
         flush=True,
     )
 

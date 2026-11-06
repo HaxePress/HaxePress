@@ -1,0 +1,12 @@
+<props item="ContentItemView" />
+<article class="content-summary">
+  <h2><a href="{{ item.url }}">{{ item.title }}</a></h2>
+  <p :if="item.excerpt">{{ item.excerpt }}</p>
+  <FieldValues :definitions="item.fieldDefinitions" :values="item.fields" />
+  <div class="content-summary-meta">
+    <time datetime="{{ item.published_at }}">{{ item.publishedLabel }}</time
+    ><a :if="item.category" href="{{ url(item.archiveUrl, category: item.category) }}"
+      >{{ item.category }}</a
+    >
+  </div>
+</article>

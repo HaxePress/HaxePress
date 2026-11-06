@@ -1,16 +1,12 @@
 package hx.press.themes;
 
 import haxe.crypto.Sha256;
+import hx.press.ai.AdminMcpAccess;
 import hx.press.themes.ThemeAiPermissions.AiPermissions;
-import hx.well.cache.FileSystemSessionCacheStore;
 import hx.well.facades.Cache;
 import hx.well.facades.Config;
-import hx.well.session.Session;
-import hx.well.session.SessionDataType;
 import hx.press.CmsAccess;
-import hx.press.ContentCache;
 import hx.press.model.Admin;
-import hx.press.model.ThemeAiConnection;
 import hx.press.model.ThemeDesign;
 import hx.well.http.Request;
 import hx.well.internal.SecureToken;
@@ -21,57 +17,24 @@ typedef ThemeAiActor = {
     var name:String;
     var mediaAllowed:Bool;
     var permissions:AiPermissions;
+    var uploadKey:String;
 }
 
 class ThemeAiAccess {
     public static inline var ACTOR = "hx.press.theme.ai.actor";
     static inline var BROWSER_PREFIX = "cms:theme-browser:";
 
-    public static inline var LIFETIME = 24 * 60 * 60 * 1000;
-
-    public static function create(themeId:String, admin:Admin):{token:String, expires:Float} {
-        var token = 'hxp_${SecureToken.generate(32)}';
-        var expires = Date.now().getTime() + LIFETIME;
-        ThemeAiConnection.query.upsert([
-            "id" => SecureToken.generate(32),
-            "theme_id" => themeId,
-            "admin_id" => admin.id,
-            "token_hash" => Sha256.encode(token),
-            "auth_version" => Sha256.encode(admin.password),
-            "expires_epoch" => expires
-        ],
-            ["theme_id", "admin_id"], ["token_hash", "auth_version", "expires_epoch"]);
-        ContentCache.changed("theme-ai");
-        ThemeCollaboration.revokeLlm(themeId, admin.id);
-        return {token: token, expires: expires};
-    }
-
-    public static function revoke(themeId:String, adminId:Int):Void {
-        ThemeAiConnection.query.where("theme_id", themeId).where("admin_id", adminId).delete();
-        ContentCache.changed("theme-ai");
-        ThemeCollaboration.revokeLlm(themeId, adminId);
-    }
-
-    public static function expires(themeId:String, adminId:Null<Int> = null):Float {
-        var record:Null<{expires_epoch:Float}> = ContentCache.remember("theme-ai", "connection",
-            [themeId, adminId], () -> {
-                var query = ThemeAiConnection.query.select(["expires_epoch"])
-                    .where("theme_id", themeId);
-                if (adminId != null) {
-                    query.where("admin_id", adminId);
-                }
-                var model = query.orderBy("expires_epoch", "DESC").limit(1).first();
-                return model == null ? null : cast model.toObject();
-            });
-        return record == null ? 0 : record.expires_epoch;
-    }
-
     public static function authenticate(request:Request):Null<ThemeAiActor> {
         var authorization = request.header("Authorization", "");
         if (request.header("Origin", "") != "") {
             return null;
         }
-        return authenticateToken(request.route("id"), authorization);
+        var themeId = request.route("id");
+        if (StringTools.startsWith(authorization, "Bearer hxb_")) {
+            return authenticateToken(themeId, authorization);
+        }
+        var actor = AdminMcpAccess.delegated(request);
+        return actor == null ? null : forAdmin(themeId, actor.admin, actor.sessionKey);
     }
 
     public static function allowedOrigin(origin:String):Bool {
@@ -102,19 +65,7 @@ class ThemeAiAccess {
             }
             return authenticateBrowser(themeId, ticket.sessionKey);
         }
-        if (!~/^Bearer hxp_[A-Za-z0-9_-]{32}$/.match(authorization)) {
-            return null;
-        }
-        var connection = ThemeAiConnection.query.select(["admin_id", "auth_version"])
-            .where("theme_id", themeId)
-            .where("token_hash", Sha256.encode(authorization.substr(7)))
-            .where("expires_epoch", ">", Date.now().getTime())
-            .limit(1)
-            .first();
-        if (connection == null) {
-            return null;
-        }
-        return actor(themeId, connection.admin_id, connection.auth_version, true);
+        return null;
     }
 
     public static function browserCredential(themeId:String, sessionKey:String):String {
@@ -135,33 +86,12 @@ class ThemeAiAccess {
 
     public static function authenticateBrowser(themeId:String,
             sessionKey:String):Null<ThemeAiActor> {
-        var stored:Null<Map<String, Dynamic>> = Cache.store(FileSystemSessionCacheStore)
-            .get('session.${sessionKey}');
-        if (stored == null || !ThemeDesign.query.where("id", themeId).exists()) {
-            return null;
-        }
-        var session = new Session();
-        session.data = stored;
-        var adminId:Null<Int> = session.getWithEnum(SessionDataType.AUTH_ID("admin"));
-        var authVersion:String = session.get("auth_version", "");
-        if (adminId == null || authVersion == "") {
-            return null;
-        }
-        return actor(themeId, adminId, authVersion, false);
+        return forAdmin(themeId, AdminMcpAccess.browser(sessionKey), sessionKey);
     }
 
-    static function actor(themeId:String, adminId:Int, authVersion:String,
-            hashed:Bool):Null<ThemeAiActor> {
-        var admin = Admin.query.select(["id", "name", "role", "active", "password"])
-            .where("id", adminId)
-            .where("active", 1)
-            .limit(1)
-            .first();
-        if (admin == null) {
-            return null;
-        }
-        var currentVersion = hashed ? Sha256.encode(admin.password) : admin.password;
-        if (currentVersion != authVersion) {
+    static function forAdmin(themeId:String, admin:Null<Admin>,
+            sessionKey:String):Null<ThemeAiActor> {
+        if (admin == null || !ThemeDesign.query.where("id", themeId).exists()) {
             return null;
         }
         var grants = CmsAccess.capabilities(admin.role);
@@ -174,7 +104,8 @@ class ThemeAiAccess {
             id: admin.id,
             name: admin.name,
             mediaAllowed: permissions.media,
-            permissions: permissions
+            permissions: permissions,
+            uploadKey: 'theme-mcp:${sessionKey}:${themeId}'
         };
     }
 }

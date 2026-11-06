@@ -12,6 +12,7 @@ typedef AdminNavigationLink = {
     var exact:Bool;
     var activePaths:Array<String>;
     var position:Int;
+    @:optional var parent:String;
 }
 
 typedef AdminNavigationGroup = {
@@ -31,6 +32,7 @@ typedef AdminRouteNavigation = {
     @:optional var exact:Bool;
     @:optional var anyCapabilities:Array<String>;
     @:optional var activePaths:Array<String>;
+    @:optional var parent:String;
 }
 
 /** Navigation follows native route metadata and the current collection definitions. */
@@ -73,14 +75,18 @@ class AdminNavigation {
             if (!permitted) {
                 continue;
             }
-            append(entry.group ?? "Extensions", entry.groupPosition ?? 40, {
+            var link:AdminNavigationLink = {
                 href: route.value,
                 label: I18n.t(entry.label, null, entry.namespace ?? "cms"),
                 icon: entry.icon ?? "file",
                 exact: entry.exact == true,
                 activePaths: entry.activePaths ?? [],
                 position: entry.position ?? 50
-            });
+            };
+            if (entry.parent != null) {
+                link.parent = entry.parent;
+            }
+            append(entry.group ?? "Extensions", entry.groupPosition ?? 40, link);
         }
         if (contentAccess) {
             for (type in ContentTypes.navigation(request.route("kind") ?? "", grants)) {

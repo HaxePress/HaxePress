@@ -1,0 +1,10 @@
+<props published="String" />
+<div class="author-meta">
+  <span class="author-avatar" aria-hidden="true"
+    >{{ (site.publisher_name ? site.publisher_name : site.site_name) | slice(0, 1) | lower }}.</span
+  >
+  <div>
+    <strong>{{ site.publisher_name ? site.publisher_name : site.site_name }}</strong
+    ><span>{{ published }}</span>
+  </div>
+</div>

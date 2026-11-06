@@ -30,6 +30,22 @@ The first administrator is signed in with the explicit `admin` guard. Applicatio
 
 If initialization fails, the main environment file is not replaced. Use an empty writable database before retrying; partial tables from a failed external database initialization may require operator cleanup. The wizard does not delete an existing database automatically.
 
+## Site backups
+
+HaxePress installs the bundled **Backups** plugin on JVM sites using SQLite or MySQL. **Backup / Restore** appears directly under **Administration** while the plugin is active. The Owner role has **Manage site backups** by default. Grant the capability separately in **Roles** to allow another administrator to prepare, verify, schedule and download backups.
+
+Use **Backup schedules** to set a fixed interval, optional first run, section selection, encryption and retention for each rule. For example, keep the latest five daily content backups and keep a separate weekly encrypted backup with plugins. The browser uses its local time when you pick the first run. The worker uses the saved interval after that and runs one overdue occurrence after downtime.
+
+Scheduled files remain in private storage and can be downloaded repeatedly by administrators with the backup capability. The retention limit applies to each rule. Deleting a rule removes its saved files. Deactivating Backups from **Plugins** pauses its jobs and removes its admin page while preserving rules and retained files. The fresh-site installer can open a recovery archive before the plugin runtime starts.
+
+Both plaintext and encrypted backups use `.hxpress`. The public header starts with `HXPRESS` and a zero byte. The following bytes record envelope version `2`, file type `1` for a site backup, encryption flag `0` or `1`, and the length of the UTF-8 CMS version. The version string and a four-byte big-endian ZIP length follow. Encrypted headers then include a 32-byte random salt. The installer checks the exact CMS version before opening the payload.
+
+Every backup includes site settings, administrator accounts and shared media. Content, themes and plugins are independent selections. When plugins are excluded, their collections, content, packages, tables and jobs are omitted. Saved backup files are kept separately from the exported site data. The payload stores portable table definitions and bounded row streams, with per-item and archive MD5 checks. HaxePress rehearses each backup in an isolated SQLite database before making it available. Manual downloads expire after 15 minutes or are removed when the download closes.
+
+Choose **Encrypt with APP_KEY (.hxpress)** to encrypt the ZIP in authenticated 64 KiB frames. The original `APP_KEY` is required to open the file. Set it in the target `.env` before starting HaxePress. Losing the original key makes the archive permanently unrecoverable. The public header is authenticated as additional data with every encrypted frame.
+
+Use **Verify backup** to rehearse an uploaded file. For an empty installation of the same HaxePress version, use **Restore a HaxePress backup**. The installer can create a new SQLite file or restore into a verified empty SQLite or MySQL database. **Skip damaged content items** recovers intact content and reports skipped IDs. Verification and restore send bounded chunks to private, session-bound staging and use disk streams for assembly and extraction.
+
 ## Existing installations
 
 `APP_INSTALLED=true` preserves the ordinary application bootstrap. For installations predating that flag, an existing administrator record is detected through the native ORM and the installer remains closed. If an existing database cannot be verified, installation fails closed instead of treating an outage as a new site. Deployment backups retain `.env` and managed data.
@@ -38,4 +54,4 @@ If initialization fails, the main environment file is not replaced. Use an empty
 
 The same suite runs HxWell's actual `new` and `generate:key` commands in private temporary projects. It checks key uniqueness, private file permissions, repeat setup, preservation of existing keys/settings and retention of the framework key through web installation and restart. A missing environment file cannot be recreated by the web installer, and browser-supplied `APP_KEY` values are ignored.
 
-`tests/installation.py` launches isolated JVM/SSR applications and covers the automatic `127.0.0.1` exception with missing/wrong/invalid configuration, explicit nonlocal and IPv6 trust rules, forwarded-header rejection, no blocked sessions or database files, CSRF, path validation, native database/DDL checks, administrator creation, optional sample content, private `.env`, literal password reload, disabled setup and restart/login. A real isolated MySQL server can also be exercised through `verify_mysql`; its database is created/dropped with the test-only native Schema fixture.
+`tests/installation.py` launches isolated JVM applications and covers the automatic `127.0.0.1` exception with missing/wrong/invalid configuration, explicit nonlocal and IPv6 trust rules, forwarded-header rejection, no blocked sessions or database files, CSRF, path validation, native database/DDL checks, administrator creation, optional sample content, private `.env`, literal password reload, disabled setup and restart/login. A real isolated MySQL server can also be exercised through `verify_mysql`; its database is created/dropped with the test-only native Schema fixture.

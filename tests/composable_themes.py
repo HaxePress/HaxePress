@@ -1,9 +1,10 @@
-"""Verify composable themes over native HTTP, SSR, ORM queries and managed media."""
+"""Verify composable themes over native HTTP, server rendering, ORM queries and managed media."""
 
 import copy
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 
 from cms_content import props
@@ -357,15 +358,24 @@ def verify(owner, public, fixtures):
         check(set(public_props["themeFeeds"]) == {"used"}, "Public source context is incorrect")
         check(len(public_props["themeFeeds"]["used"]) == 2, "Public source lost its SQL limit")
         html = public.request("/")[2]
+        for expected in ["A composed layout", "Reusable notice", "Composable source 000"]:
+            check(expected in html, f"Composed server HTML is missing: {expected}")
+        design_link = re.search(r'<link rel="stylesheet" href="(/theme-design/[^"]+\.css)"', html)
+        check(design_link is not None, "Composed server HTML did not link its design stylesheet")
+        css_status, css_headers, css = public.request(design_link.group(1))
+        check(
+            css_status == 200
+            and "text/css" in css_headers.get("content-type", "")
+            and "immutable" in css_headers.get("cache-control", "")
+            and "set-cookie" not in css_headers,
+            "Composed design stylesheet was not served as a cacheable, session-free asset",
+        )
         for expected in [
-            "A composed layout",
-            "Reusable notice",
-            "Composable source 000",
             "@scope (.hp-design)",
             "grid-template-columns:1.2fr 0.8fr",
             "max-width:600px",
         ]:
-            check(expected in html, f"Composed SSR output is missing: {expected}")
+            check(expected in css, f"Composed design stylesheet is missing: {expected}")
         check(html.count("Reusable notice") >= 2, "Shared component did not render both instances")
         check(
             owner.request(f"/admin/media/{str(media_id)}/delete", "POST", {})[0] == 422,

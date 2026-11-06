@@ -1,4 +1,3 @@
-import { router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 export default function useWorkingCopy<T extends { id: string }>({
@@ -47,11 +46,7 @@ export default function useWorkingCopy<T extends { id: string }>({
           const url = new URL(window.location.href);
           if (url.searchParams.get('draft') !== result.key) {
             url.searchParams.set('draft', result.key);
-            router.replace({
-              url: `${url.pathname}${url.search}`,
-              preserveState: true,
-              preserveScroll: true,
-            });
+            window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`);
           }
         }
       } catch (failure) {

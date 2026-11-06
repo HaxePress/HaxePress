@@ -1,4 +1,4 @@
-import { Link as InertiaLink, usePage } from '@inertiajs/react';
+import { Link as PageLink, usePage } from '../page';
 import { forwardRef, type ComponentProps } from 'react';
 import type { SharedProps } from '../types';
 
@@ -40,11 +40,10 @@ export function useSiteHref() {
     previewHref(href, theme?.previewBase, i18n.locale, theme?.customizeSession);
 }
 
-export const SiteLink = forwardRef<unknown, ComponentProps<typeof InertiaLink>>(function SiteLink(
-  { href, ...props },
-  ref,
-) {
-  const siteHref = useSiteHref();
-  const destination = typeof href === 'string' ? siteHref(href) : href;
-  return <InertiaLink {...props} href={destination} ref={ref} />;
-});
+export const SiteLink = forwardRef<HTMLAnchorElement, ComponentProps<typeof PageLink>>(
+  function SiteLink({ href, ...props }, ref) {
+    const siteHref = useSiteHref();
+    const destination = typeof href === 'string' ? siteHref(href) : href;
+    return <PageLink {...props} href={destination} ref={ref} />;
+  },
+);

@@ -8,6 +8,7 @@ import re
 import secrets
 import shutil
 import subprocess
+from uuid import UUID
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from plugin_build import (
@@ -77,6 +78,13 @@ def build_php_plugin(plugin, folder, manifest):
 
 def build_plugin(plugin, output, api_info, application=None):
     manifest = json.loads((plugin / "cms-package.json").read_text())
+    identity = manifest.get("pluginId", "")
+    try:
+        identifier = UUID(identity)
+    except (ValueError, TypeError, AttributeError):
+        raise RuntimeError(f"{plugin.name} must declare a stable lowercase pluginId UUID") from None
+    if str(identifier) != identity or identifier.version not in range(1, 9):
+        raise RuntimeError(f"{plugin.name} must declare a stable lowercase pluginId UUID")
     base = [str(compiler()), *host_options()]
     namespace = manifest["server"]["entrypoint"].rsplit(".", 1)[0]
     folder = output / manifest["slug"]

@@ -9,7 +9,7 @@
   "layout": "fieldnotes",
   "assets": {
     "stylesheet": "theme.css",
-    "renderer": "theme.mjs"
+    "views": "views"
   },
   "fields": [
     {

@@ -1,0 +1,31 @@
+<props
+  kind="String"
+  base="String"
+  packageInfo="ExtensionPackageInfoView"
+  packageName="String"
+  settingFields="List<ExtensionSettingFieldView>"
+  notice="String"
+/>
+<AdminLayout :title="t('{name} settings', name: packageName)">
+  <div class="admin-page-heading">
+    <div>
+      <a href="{{ base }}" class="back-link"
+        >{{ t('Back to') }} {{ kind == 'theme' ? t('themes') : t('plugins') }}</a
+      >
+      <h1>{{ packageName }}</h1>
+      <p>{{ t('Settings for version') }} {{ packageInfo.version }}.</p>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('package')" />
+  <Island name="package-settings" :props="{}" load="eager">
+    <form
+      class="admin-card settings-card extension-settings"
+      method="post"
+      action="{{ base }}/{{ packageInfo.id }}/settings"
+    >
+      <PackageSettingField :for="field in settingFields" :field="field" />
+      <button class="button" data-well-busy="{{ t('Saving…') }}">{{ t('Save settings') }}</button>
+    </form>
+  </Island>
+</AdminLayout>

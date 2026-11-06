@@ -1,6 +1,11 @@
 package hx.press.themes;
 
 import haxe.Json;
+#if (target.threaded)
+import sys.thread.Mutex;
+#else
+import hx.well.thread.FakeMutex as Mutex;
+#end
 import hx.press.ContentCache;
 import hx.press.model.ThemeDesign;
 import hx.press.model.InstalledPackage;
@@ -13,6 +18,10 @@ typedef ThemeDesignRecord = {
 }
 
 class ThemeDesignData {
+    static inline var MAX_PARSED_DOCUMENTS = 64;
+    static final parsedDocuments:Map<String, {source:String, document:Dynamic}> = [];
+    static final parsedDocumentsLock = new Mutex();
+
     public static function status(id:String):Null<{version:Int, published_version:Int}> {
         return ContentCache.remember("extensions", "theme-design-status", [id], () -> {
             var model = ThemeDesign.query.select(["version", "published_version"])
@@ -68,8 +77,29 @@ class ThemeDesignData {
         if (source == "") {
             return null;
         }
-        var document:Dynamic = Json.parse(source);
-        return document.schema == 1 ? ThemeDesignSchema.parse(source) : document;
+        return parsedDocument('${id}:${preview}', source);
+    }
+
+    /**
+        Parsed documents are shared read-only between requests. A document is
+        parsed again only when its stored JSON differs from the cached source.
+    **/
+    static function parsedDocument(key:String, source:String):Dynamic {
+        parsedDocumentsLock.acquire();
+        var cached = parsedDocuments.get(key);
+        parsedDocumentsLock.release();
+        if (cached != null && cached.source == source) {
+            return cached.document;
+        }
+        var parsed:Dynamic = Json.parse(source);
+        var document:Dynamic = parsed.schema == 1 ? ThemeDesignSchema.parse(source) : parsed;
+        parsedDocumentsLock.acquire();
+        if (!parsedDocuments.exists(key) && Lambda.count(parsedDocuments) >= MAX_PARSED_DOCUMENTS) {
+            parsedDocuments.clear();
+        }
+        parsedDocuments.set(key, {source: source, document: document});
+        parsedDocumentsLock.release();
+        return document;
     }
 
     public static function identifiers(ids:Array<String>):Array<String> {

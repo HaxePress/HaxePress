@@ -20,6 +20,9 @@ class CollectionRoutes {
             request -> ContentController.edit(request, resolve(request)))
             .whereNumber("id");
         Route.post('${prefix}/save', new SaveContentHandler(resolve));
+        Route.post('${prefix}/preview',
+            request -> ContentController.preview(request, resolve(request)))
+            .attribute("content.preview", true);
         Route.post('${prefix}/{id}/delete', new DeleteContentHandler(resolve)).whereNumber("id");
         Route.post('${prefix}/working-copy', new SaveWorkingCopyHandler(resolve));
         Route.post('${prefix}/{id}/discard-working',

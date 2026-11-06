@@ -1,0 +1,244 @@
+<props
+  notice="String"
+  settingsForm="AdminSettingsFormView"
+  homeCollections="List<AdminCollectionChoiceView>"
+  homeTypeKnown="Bool"
+  homePage="AdminContentChoiceView?"
+  logoRules="SettingsMediaRulesView"
+/>
+<AdminLayout :title="t('Settings')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Settings') }}</h1>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <div class="settings-grid">
+    <section class="admin-card settings-card">
+      <h2>{{ t('Site details') }}</h2>
+      <Alert error :message="error('settings')" />
+      <Island name="admin-form" :props="{ translations: translations }" load="idle">
+        <form action="/admin/settings" method="post">
+          <Island
+            name="site-logo"
+            :props="{
+              translations: translations,
+              locale: i18n.locale,
+              direction: i18n.direction,
+              csrfToken: csrfToken,
+              logo: settingsForm.site_logo,
+              siteName: settingsForm.site_name,
+              mediaRules: logoRules
+            }"
+            load="idle"
+          >
+            <input type="hidden" name="site_logo" value="{{ settingsForm.site_logo }}" />
+            <fieldset class="site-logo-field">
+              <legend>{{ t('Site logo') }}</legend>
+              <div class="site-logo-preview">
+                <img
+                  :if="settingsForm.site_logo"
+                  src="{{ settingsForm.site_logo }}"
+                  alt="{{ t('Site logo preview') }}"
+                />
+                <span :else
+                  >{{ settingsForm.site_name ? settingsForm.site_name : t('Site name') }}</span
+                >
+              </div>
+              <div class="site-logo-actions">
+                <label class="button button-outline package-upload-button"
+                  >{{ icon('upload') }}{{ t('Upload logo') }}<input
+                    type="file"
+                    accept="{{ join(logoRules.mimeTypes, ',') }}"
+                /></label>
+                <button class="button button-outline" type="button">
+                  {{ t('Choose from library') }}
+                </button>
+                <button :if="settingsForm.site_logo" class="button button-outline" type="button">
+                  {{ t('Remove logo') }}
+                </button>
+              </div>
+              <p class="field-help">
+                {{ t('PNG, JPEG or GIF. Up to 5 MB. Transparent backgrounds are supported.') }}
+              </p>
+              <p class="field-help">
+                {{ t('Without a logo, your theme displays the site name in its own font.') }}
+              </p>
+            </fieldset>
+          </Island>
+          <label for="site-name">{{ t('Site name') }}</label>
+          <input
+            id="site-name"
+            name="site_name"
+            value="{{ settingsForm.site_name }}"
+            required
+            maxlength="100"
+          />
+          <label for="publisher-name">{{ t('Publisher name') }}</label>
+          <input
+            id="publisher-name"
+            name="publisher_name"
+            value="{{ settingsForm.publisher_name }}"
+            maxlength="100"
+          />
+          <p class="field-help">
+            {{ t('Optional. A person, team or organization behind the site.') }}
+          </p>
+          <label for="site-description">{{ t('Site description') }}</label>
+          <textarea id="site-description" name="description" rows="3" maxlength="500">
+{{ settingsForm.description }}</textarea>
+          <label for="about-site">{{ t('About this site') }}</label>
+          <textarea id="about-site" name="about_site" rows="4" maxlength="1500">
+{{ settingsForm.about_site }}</textarea>
+          <label for="site-language">{{ t('Default language') }}</label>
+          <select id="site-language" name="locale">
+            <option
+              :for="choice in i18n.locales"
+              value="{{ choice.code }}"
+              :selected="choice.code == settingsForm.locale"
+            >
+              {{ choice.name }}
+            </option>
+          </select>
+          <!-- prettier-ignore -->
+          <p class="field-help">{{ t('Visitors can choose their own language. Content keeps the language it was written in.') }}</p>
+          <h2 class="settings-subheading">{{ t('Homepage') }}</h2>
+          <label for="home-mode">{{ t('Homepage display') }}</label>
+          <select id="home-mode" name="home_mode">
+            <option value="collection" :selected="settingsForm.home_mode == 'collection'">
+              {{ t('Latest content from a collection') }}
+            </option>
+            <option value="page" :selected="settingsForm.home_mode == 'page'">
+              {{ t('A published content item') }}
+            </option>
+          </select>
+          <label for="home-type">{{ t('Primary collection') }}</label>
+          <select id="home-type" name="home_type">
+            <option :if="not homeTypeKnown" value="{{ settingsForm.home_type }}" selected>
+              {{ settingsForm.home_type }}
+            </option>
+            <option
+              :for="type in homeCollections"
+              value="{{ type.key }}"
+              :selected="type.key == settingsForm.home_type"
+            >
+              {{ t(type.name) }}
+            </option>
+          </select>
+          <label
+            for="home-page"
+            data-show-when="home-mode=page"
+            :hidden="settingsForm.home_mode != 'page'"
+            >{{ t('Homepage content') }}</label
+          >
+          <div
+            class="content-picker"
+            data-show-when="home-mode=page"
+            data-picker-url="/admin/content-options"
+            data-picker-items="items"
+            data-picker-value="id"
+            data-picker-label="title"
+            data-picker-error="{{ t('Published content could not be loaded.') }}"
+            :hidden="settingsForm.home_mode != 'page'"
+          >
+            <label class="sr-only" for="home-page-search"
+              >{{ t('Search published content') }}</label
+            >
+            <input
+              id="home-page-search"
+              type="search"
+              maxlength="100"
+              placeholder="{{ t('Search published content') }}"
+              :disabled="settingsForm.home_mode != 'page'"
+            />
+            <select
+              id="home-page"
+              name="home_page"
+              required
+              :disabled="settingsForm.home_mode != 'page'"
+            >
+              <option value="0">{{ t('Choose published content') }}</option>
+              <option :if="homePage" value="{{ homePage.id }}" selected>
+                {{ homePage.title }}
+              </option>
+            </select>
+          </div>
+          <label
+            for="home-size"
+            data-show-when="home-mode=collection"
+            :hidden="settingsForm.home_mode == 'page'"
+            >{{ t('Homepage content count') }}</label
+          >
+          <input
+            id="home-size"
+            name="home_size"
+            type="number"
+            min="1"
+            max="24"
+            value="{{ settingsForm.home_size }}"
+            data-show-when="home-mode=collection"
+            :hidden="settingsForm.home_mode == 'page'"
+            :disabled="settingsForm.home_mode == 'page'"
+          />
+          <label
+            for="home-template"
+            data-show-when="home-mode=collection"
+            :hidden="settingsForm.home_mode == 'page'"
+            >{{ t('Homepage template') }}</label
+          >
+          <input
+            id="home-template"
+            name="home_template"
+            maxlength="80"
+            value="{{ settingsForm.home_template }}"
+            data-show-when="home-mode=collection"
+            :hidden="settingsForm.home_mode == 'page'"
+            :disabled="settingsForm.home_mode == 'page'"
+          />
+          <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+            {{ icon('check') }}{{ t('Save your changes') }}
+          </button>
+        </form>
+      </Island>
+    </section>
+    <section class="admin-card settings-card password-card">
+      <div class="login-icon">{{ icon('lock') }}</div>
+      <h2>{{ t('Account password') }}</h2>
+      <Alert error :message="error('password')" />
+      <form action="/admin/password" method="post">
+        <label for="current-password">{{ t('Current password') }}</label>
+        <input
+          id="current-password"
+          name="current_password"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
+        <label for="new-password">{{ t('New password') }}</label>
+        <input
+          id="new-password"
+          name="new_password"
+          type="password"
+          autocomplete="new-password"
+          minlength="12"
+          maxlength="72"
+          required
+        />
+        <p class="field-help">{{ t('At least 12 characters.') }}</p>
+        <label for="confirm-password">{{ t('Confirm new password') }}</label>
+        <input
+          id="confirm-password"
+          name="confirm_password"
+          type="password"
+          autocomplete="new-password"
+          minlength="12"
+          maxlength="72"
+          required
+        />
+        <button class="button button-outline" type="submit" data-well-busy="{{ t('Updating…') }}">
+          {{ t('Update password') }}
+        </button>
+      </form>
+    </section>
+  </div>
+</AdminLayout>

@@ -1,0 +1,17 @@
+<FieldnotesLayout>
+  <PageHead :title="t('About this site')" />
+  <section class="about-page wrap">
+    <div class="about-page-copy">
+      <p class="intro-label"><span></span> {{ t('About this site') }}</p>
+      <h1>{{ site.site_name }}</h1>
+      <p class="about-lead">{{ site.description }}</p>
+      <p :if="site.about_site">{{ site.about_site }}</p>
+      <a class="button" href="{{ primaryArchive }}"
+        >{{ t('View content') }} {{ icon('arrow-up-right') }}</a
+      >
+    </div>
+    <div class="about-photo">
+      <img src="{{ themeAsset('images/forest.jpg') }}" alt="{{ t('Sunlight in a forest') }}" />
+    </div>
+  </section>
+</FieldnotesLayout>

@@ -1,12 +1,12 @@
 # Theme previews and the built-in default
 
-Create CMS-managed themes with sections, blocks and responsive live previews from **Themes → Create theme**. See [the visual theme builder](THEME-BUILDER.md) for drafts, publishing, templates and media protection. Existing ZIP themes retain their renderer and customization workflows.
+Create CMS-managed themes with sections, blocks and responsive live previews from **Themes → Create theme**. See [the visual theme builder](THEME-BUILDER.md) for drafts, publishing, templates and media protection. ZIP themes provide Wellout views and keep their customization workflow.
 
 ## Optional live customization
 
 A theme developer declares its editable options in the existing optional `fields` list in `cms-package.json`. Omit the list or use `"fields": []` for a theme without customization controls. Only declared non-secret fields appear in **Customize** on the full preview; private settings remain on the protected settings page. Text, textarea, color, number, select and boolean controls use the package's labels, help, defaults and validation rules.
 
-Draft changes update the isolated iframe immediately through same-origin, frame/session-checked messages and Inertia's native `replaceProp("theme.settings", values)`. Themes continue reading `usePage().props.theme.settings`; renderers or frontend modules decide how each setting affects the theme. Navigation inside the preview preserves the customization session and reapplies the draft. The database and active site's appearance change only after **Save changes**; **Discard changes** restores the saved values. Saving uses the existing admin/CSRF-protected package settings endpoint and native handler validation.
+Draft changes reach the isolated iframe as the changed values in its `preview_settings` query, only for the theme's declared keys and up to 2000 characters each. The server renders the frame with those values in `theme.settings`, so templates read settings the same way with and without a draft. The page replaces the frame's document in place, so the preview keeps its scroll position and does not flash. Links inside the preview keep the customization session and the draft. The database and active site's appearance change only after **Save changes**; **Discard changes** restores the saved values. Saving uses the existing admin/CSRF-protected package settings endpoint and native handler validation.
 
 For example, a developer can add an optional button color:
 
@@ -30,11 +30,11 @@ Verification: `outputs/theme-customizer-full-test.log` includes the native save/
 
 ## Cached cards and full previews
 
-Theme cards cache PNG images of the real rendered homepage. A single shared capture queue opens at most one temporary authenticated preview iframe at a time, at 1280 × 800. Rendering and PNG conversion happen inside that iframe; it is removed as soon as its PNG is ready, releasing its document and renderer resources. Cards near the viewport request captures, while the rest remain deferred. Completed cards contain ordinary images.
+Theme cards cache PNG images of the real rendered homepage. A single shared capture queue opens at most one temporary authenticated preview iframe at a time, at 1280 × 800. The server renders the page in that iframe; the administration page converts it to a PNG and removes the iframe as soon as the PNG is ready, releasing its document. Cards near the viewport request captures, while the rest remain deferred. Completed cards contain ordinary images.
 
-The frame URL includes a `thumbnailCapture` identifier. A capture component mounted alongside the page waits for React/Inertia Head to commit, then for the theme stylesheet, page load, fonts and visible images. It captures its own document and sends its PNG to the parent with `postMessage`; the parent verifies the frame window, origin and identifier before accepting it. The full preview has no capture parameter and stays interactive.
+The frame is same-origin. After its load event, which waits for the theme stylesheet and images, the capture waits for fonts and decodes the images in view, then draws the first screen of the frame's document. The page renders with no capture code of its own, so the full preview and the captured frame are the same page.
 
-The browser Cache API retains at most 32 PNGs for 30 minutes. Keys include the theme update, locale, admin identity, frontend asset version and the content/category/tag/settings/navigation/structure/extension/media cache revisions. Relevant writes therefore produce a new preview key. A warm reload reads PNGs without opening capture frames. Navigating away cancels pending work and removes the active frame; failed or timed-out captures also remove it. Disabled/full browser storage still allows current captures to display. Clicking a card opens the live full preview, whose isolated iframe and desktop/tablet/mobile controls remain available.
+The browser Cache API retains at most 32 PNGs for 30 minutes. Keys include the theme update, locale, admin identity, front-end build version and the content/category/tag/settings/navigation/structure/extension/media cache revisions. Relevant writes therefore produce a new preview key. A warm reload reads PNGs without opening capture frames. Navigating away cancels pending work and removes the active frame; failed or timed-out captures also remove it. Disabled/full browser storage still allows current captures to display. Clicking a card opens the live full preview, whose isolated iframe and desktop/tablet/mobile controls remain available.
 
 Simple is part of HaxePress. Its manifest and English/Turkish catalogues are compiled as Haxe resources from `resources/themes/simple/`; its CSS is bundled into the application from `resources/css/themes/simple.css`. It has no installed package directory and needs no theme ZIP, renderer module or external theme stylesheet. Fresh installations work without a package download directory.
 

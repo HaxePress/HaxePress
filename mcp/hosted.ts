@@ -8,6 +8,7 @@ import {
   WebStandardStreamableHTTPServerTransport,
 } from '@modelcontextprotocol/server';
 import { createThemeServer } from './factory';
+import { createAdminServer } from './admin';
 import { MAX_MCP_REQUEST_BYTES } from '../resources/js/themes/builder/types';
 
 interface Bootstrap {
@@ -48,8 +49,13 @@ const server = createServer(async (incoming, outgoing) => {
     return;
   }
   const match = /^\/themes\/(theme-[a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(incoming.url || '');
+  const admin = incoming.url === '/admin';
   const authorization = incoming.headers.authorization || '';
-  if (!match || match[1].length > 80 || !/^Bearer hx[pb]_[A-Za-z0-9_-]{32}$/.test(authorization)) {
+  const ticket = String(incoming.headers['x-haxepress-admin-request'] || '');
+  const valid = admin
+    ? /^[A-Za-z0-9_-]{32}$/.test(ticket)
+    : match && match[1].length <= 80 && /^Bearer hxb_[A-Za-z0-9_-]{32}$/.test(authorization);
+  if (!valid) {
     outgoing.writeHead(400).end();
     return;
   }
@@ -73,8 +79,9 @@ const server = createServer(async (incoming, outgoing) => {
     }
     const permissions = JSON.parse(String(incoming.headers['x-haxepress-permissions'] || 'null'));
     if (
-      !permissions ||
-      !['read', 'edit', 'media'].every((key) => typeof permissions[key] === 'boolean')
+      !admin &&
+      (!permissions ||
+        !['read', 'edit', 'media'].every((key) => typeof permissions[key] === 'boolean'))
     ) {
       outgoing.writeHead(403).end();
       return;
@@ -109,20 +116,21 @@ const server = createServer(async (incoming, outgoing) => {
       signal: controller.signal,
       ...(method === 'POST' ? { body } : {}),
     });
-    const factory = () =>
-      createThemeServer({
-        origin: bootstrap.origin,
-        themeId: match[1],
-        token: authorization.slice(7),
-        signal: controller.signal,
-        permissions,
-      });
+    const instance = admin
+      ? await createAdminServer({ origin: bootstrap.origin, ticket, signal: controller.signal })
+      : createThemeServer({
+          origin: bootstrap.origin,
+          themeId: match![1],
+          token: authorization.slice(7),
+          signal: controller.signal,
+          permissions,
+        });
+    const factory = () => instance;
     let response: Response;
     if (
       method === 'POST' &&
       (await isLegacyRequest(request, undefined, { maxRequestBodySize: maxBody }))
     ) {
-      const instance = factory();
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,

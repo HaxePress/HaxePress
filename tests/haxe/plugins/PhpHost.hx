@@ -216,4 +216,13 @@ class PhpTestPluginHost implements PluginHost {
     public function can(capability:String):Bool {
         return true;
     }
+
+    public function schedule(pluginId:String, key:String, intervalSeconds:Int,
+            ?payload:String):Void {
+        throw new Exception("Scheduling requires the application host.");
+    }
+
+    public function unschedule(pluginId:String, key:String):Bool {
+        throw new Exception("Scheduling requires the application host.");
+    }
 }

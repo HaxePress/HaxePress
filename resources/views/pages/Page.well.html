@@ -1,0 +1,21 @@
+<props item="ContentItemView" />
+<SiteLayout>
+  <PageHead
+    :title="item.seo_title ? item.seo_title : item.title"
+    :exactTitle="item.seo_title ? true : false"
+    :description="item.seo_description ? item.seo_description : item.excerpt"
+  />
+  <article class="simple-content">
+    <header>
+      <h1>{{ item.title }}</h1>
+      <p :if="item.excerpt" class="simple-deck">{{ item.excerpt }}</p>
+    </header>
+    <img :if="item.image" class="content-cover" src="{{ item.image }}" alt="{{ item.image_alt }}" />
+    <div class="content-prose">
+      <ExtensionSlot name="content.before" />
+      {{ markdown(item.content ?? '') }}
+      <FieldValues :definitions="item.fieldDefinitions" :values="item.fields" />
+      <ExtensionSlot name="content.after" />
+    </div>
+  </article>
+</SiteLayout>

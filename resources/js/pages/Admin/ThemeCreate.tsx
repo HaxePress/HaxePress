@@ -1,6 +1,5 @@
-import { Link, useForm, usePage } from '@inertiajs/react';
-import { useState, type ReactNode } from 'react';
-import AdminLayout from '../../layouts/AdminLayout';
+import { Link, useForm, usePage } from '../../page';
+import { useState } from 'react';
 import PageHead from '../../components/PageHead';
 import Alert from '../../components/Alert';
 import Icon from '../../components/Icon';
@@ -209,4 +208,3 @@ export default function ThemeCreate({ baseDocument }: { baseDocument: ThemeDocum
     </>
   );
 }
-ThemeCreate.layout = (page: ReactNode) => <AdminLayout>{page}</AdminLayout>;

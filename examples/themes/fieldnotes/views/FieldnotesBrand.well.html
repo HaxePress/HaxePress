@@ -1,0 +1,14 @@
+<props footer="Bool = false" />
+<img
+  :if="site.site_logo"
+  class="site-brand-logo"
+  src="{{ site.site_logo }}"
+  alt="{{ site.site_name }}"
+/><template :else-if="footer"
+  ><span class="brand-mark" aria-hidden="true">✳</span>{{ site.site_name }}<span class="brand-dot"
+    >.</span
+  ></template
+><template :else
+  ><span class="brand-mark" aria-hidden="true">✳</span
+  ><span>{{ site.site_name }}<span class="brand-dot">.</span></span></template
+>

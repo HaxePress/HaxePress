@@ -1,0 +1,58 @@
+<Document>
+  <Asset css="css/site.css" />
+  <Asset css="css/cms.css" />
+  <Asset css="css/themes/simple.css" />
+  <well:head>
+    <link
+      :if="theme and theme.layout == 'simple' and theme.stylesheet"
+      rel="stylesheet"
+      href="{{ theme.stylesheet }}"
+    />
+  </well:head>
+  <SiteExtensions />
+  <div
+    class="cms-site simple-site"
+    data-cms-site
+    data-layout="simple"
+    style="{{ themeVariables() | variables }}"
+  >
+    <div class="simple-shell">
+      <ExtensionSlot name="site.top" />
+      <a class="skip-link" href="#main">{{ t('Skip to content') }}</a>
+      <header class="simple-header">
+        <a class="simple-wordmark" href="/" aria-label="{{ site.site_name }}"
+          ><img
+            :if="site.site_logo"
+            class="site-brand-logo"
+            src="{{ site.site_logo }}"
+            alt="{{ site.site_name }}"
+          /><template :else>{{ site.site_name }}</template></a
+        >
+        <nav aria-label="{{ t('Main navigation') }}">
+          <SiteNavigation :links="navigation['header'] ?? defaultNavigation()" /><a
+            :for="link in pluginNavigation.header"
+            href="{{ link.href }}"
+            >{{ link.label }}</a
+          >
+        </nav>
+        <p :if="site.description">{{ site.description }}</p>
+      </header>
+      <main id="main" class="simple-main"><slot /></main>
+      <ExtensionSlot name="site.before-footer" />
+      <footer class="simple-footer">
+        <nav aria-label="{{ t('Footer navigation') }}">
+          <SiteNavigation :links="navigation['footer'] ?? defaultNavigation()" /><a
+            :for="link in pluginNavigation.footer"
+            href="{{ link.href }}"
+            >{{ link.label }}</a
+          ><a href="/admin/login">{{ t('Admin') }}</a>
+        </nav>
+        <div class="simple-footer-meta">
+          <span>© {{ year() }} {{ site.site_name }}</span>
+          <LanguageSwitcher />
+        </div>
+      </footer>
+      <ExtensionSlot name="site.footer" />
+    </div>
+  </div>
+</Document>

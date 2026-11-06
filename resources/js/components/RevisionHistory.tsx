@@ -1,8 +1,8 @@
 import { useTranslation } from '../i18n';
-import { router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import Markdown from './Markdown';
-import type { ContentItem, SharedProps } from '../types';
+import { postForm } from '../post-form';
+import type { ContentItem } from '../types';
 
 interface Revision {
   id: number;
@@ -16,13 +16,14 @@ export default function RevisionHistory({
   base,
   id,
   beforeRestore,
+  csrfToken,
 }: {
   base: string;
   id: string;
   beforeRestore: () => void;
+  csrfToken: string | null;
 }) {
   const { t } = useTranslation();
-  const { csrfToken } = usePage<SharedProps>().props;
   const [open, setOpen] = useState(false);
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [preview, setPreview] = useState<{ revision: Revision; snapshot: ContentItem } | null>(
@@ -116,11 +117,9 @@ export default function RevisionHistory({
                 type="button"
                 onClick={() => {
                   beforeRestore();
-                  router.post(
-                    `${base}/${id}/history/${preview.revision.id}/restore`,
-                    { _token: csrfToken },
-                    { preserveState: false },
-                  );
+                  postForm(`${base}/${id}/history/${preview.revision.id}/restore`, {
+                    _token: csrfToken || '',
+                  });
                 }}
               >
                 {t('Restore version')} {preview.revision.version} {t('as working copy')}

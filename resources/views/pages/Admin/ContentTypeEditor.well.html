@@ -1,0 +1,374 @@
+<props
+  typeForm="ContentAdminTypeFormView"
+  kindOptions="List<ContentAdminChoiceView>"
+  isNew="Bool"
+  notice="String"
+/>
+<AdminLayout :title="isNew ? t('New collection') : t('Edit collection')">
+  <form action="{{ typeForm.savePath }}" method="post">
+    <Island
+      name="content-type-editor"
+      :props="{ siteUrl: siteUrl, creating: isNew }"
+      load="idle"
+    ></Island>
+    <input type="hidden" name="field_count" value="{{ typeForm.fieldCount }}" />
+    <input type="hidden" name="position" value="{{ typeForm.position }}" />
+    <div class="admin-page-heading">
+      <div>
+        <a class="back-link" href="/admin/collections"
+          >{{ icon('arrow-left') }} {{ t('All collections') }}</a
+        >
+        <h1>{{ isNew ? t('New collection') : typeForm.heading }}</h1>
+      </div>
+      <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+        {{ icon('check') }} {{ t('Save collection') }}
+      </button>
+    </div>
+    <Alert error :message="error('structure')" />
+    <Alert :message="notice == 'saved' ? t('The collection definition has been saved.') : ''" />
+    <Alert
+      :if="typeForm.owner"
+      :message="t('This collection is provided by {plugin}. Its data and your settings are retained when the plugin is disabled.', plugin: typeForm.owner)"
+    />
+    <div class="editor-grid structure-grid">
+      <div class="editor-main-column">
+        <section class="admin-card editor-card">
+          <h2>{{ t('Collection details') }}</h2>
+          <label for="type-name">{{ t('Collection name') }}</label>
+          <input
+            id="type-name"
+            name="name"
+            value="{{ typeForm.name }}"
+            required
+            maxlength="100"
+            placeholder="{{ t('Products') }}"
+          />
+          <label for="type-singular">{{ t('Singular name') }}</label>
+          <input
+            id="type-singular"
+            name="singular"
+            value="{{ typeForm.singular }}"
+            required
+            maxlength="80"
+            placeholder="{{ t('Product') }}"
+          />
+          <label for="type-key">{{ t('Stable key') }}</label>
+          <input
+            id="type-key"
+            name="key"
+            value="{{ typeForm.key }}"
+            required
+            maxlength="32"
+            pattern="[a-z][a-z0-9_]{0,31}"
+            :readonly="not isNew"
+          />
+          <p class="field-help">
+            {{ t('The key identifies stored content and cannot be changed after creation.') }}
+          </p>
+          <label for="type-description">{{ t('Description') }}</label>
+          <textarea id="type-description" name="description" rows="3" maxlength="500">
+{{ typeForm.description }}</textarea>
+        </section>
+        <section class="admin-card editor-card">
+          <h2>{{ t('Editor features') }}</h2>
+          <p class="field-help">
+            {{ t('The same editor and publishing workflow adapts to the features you enable.') }}
+          </p>
+          <div class="structure-feature-grid">
+            <label :for="feature in typeForm.features" class="checkbox-label"
+              ><input
+                type="checkbox"
+                name="feature_{{ feature.value }}"
+                value="1"
+                :checked="feature.checked"
+              /><span>{{ t(feature.label) }}</span></label
+            >
+          </div>
+        </section>
+        <section id="custom-fields" class="admin-card editor-card">
+          <div class="section-heading">
+            <div>
+              <h2>{{ t('Custom fields') }}</h2>
+              <!-- prettier-ignore -->
+              <p class="field-help">{{ t('Add structured data without changing the content table or writing a new editor.') }}</p>
+            </div>
+            <button
+              class="button button-outline"
+              type="submit"
+              name="action"
+              value="add-field"
+              formnovalidate
+              :disabled="not typeForm.canAddField"
+            >
+              {{ icon('plus') }} {{ t('Add field') }}
+            </button>
+          </div>
+          <p :if="not typeForm.fields" class="field-help">
+            {{ t('This collection has no custom fields yet.') }}
+          </p>
+          <fieldset
+            :for="field in typeForm.fields"
+            id="custom-field-{{ loop.index }}"
+            class="structure-field"
+          >
+            <legend>
+              {{ field.label ? field.label : t('New field') }}
+              <span class="field-help">{{ loop.number }}</span>
+            </legend>
+            <div class="structure-field-actions">
+              <button
+                class="icon-button"
+                type="submit"
+                name="action"
+                value="up-{{ loop.index }}"
+                formnovalidate
+                :disabled="loop.first"
+                aria-label="{{ t('Move field up') }}"
+              >
+                {{ icon('arrow-up') }}
+              </button>
+              <button
+                class="icon-button"
+                type="submit"
+                name="action"
+                value="down-{{ loop.index }}"
+                formnovalidate
+                :disabled="loop.last"
+                aria-label="{{ t('Move field down') }}"
+              >
+                {{ icon('arrow-down') }}
+              </button>
+              <button
+                class="icon-button"
+                type="submit"
+                name="action"
+                value="remove-{{ loop.index }}"
+                formnovalidate
+                aria-label="{{ t('Remove field') }}"
+              >
+                {{ icon('trash') }}
+              </button>
+            </div>
+            <div class="structure-field-grid">
+              <div>
+                <label for="field-label-{{ loop.index }}">{{ t('Field label') }}</label>
+                <input
+                  id="field-label-{{ loop.index }}"
+                  name="field_{{ loop.index }}_label"
+                  required
+                  maxlength="100"
+                  value="{{ field.label }}"
+                />
+              </div>
+              <div>
+                <label for="field-key-{{ loop.index }}">{{ t('Field key') }}</label>
+                <input
+                  id="field-key-{{ loop.index }}"
+                  name="field_{{ loop.index }}_key"
+                  required
+                  maxlength="32"
+                  pattern="[a-z][a-z0-9_]{0,31}"
+                  value="{{ field.key }}"
+                />
+              </div>
+              <div>
+                <label for="field-kind-{{ loop.index }}">{{ t('Field type') }}</label>
+                <select id="field-kind-{{ loop.index }}" name="field_{{ loop.index }}_kind">
+                  <option
+                    :for="kind in kindOptions"
+                    value="{{ kind.value }}"
+                    :selected="kind.value == field.kind"
+                  >
+                    {{ t(kind.label) }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label for="field-help-{{ loop.index }}">{{ t('Help text') }}</label>
+                <input
+                  id="field-help-{{ loop.index }}"
+                  name="field_{{ loop.index }}_help"
+                  maxlength="300"
+                  value="{{ field.help }}"
+                />
+              </div>
+            </div>
+            <div :hidden="field.kind != 'select'" data-field-choices>
+              <label for="field-options-{{ loop.index }}">{{ t('Choices') }}</label>
+              <textarea
+                id="field-options-{{ loop.index }}"
+                name="field_{{ loop.index }}_options"
+                rows="3"
+                placeholder="in-stock | In stock"
+              >
+{{ field.options }}</textarea>
+              <p class="field-help">
+                {{ t('One choice per line: stable value | display label.') }}
+              </p>
+            </div>
+            <div class="structure-field-flags">
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  name="field_{{ loop.index }}_inList"
+                  value="1"
+                  :disabled="not field.scalar"
+                  :checked="field.inList"
+                /><span>{{ t('Show in lists') }}</span></label
+              >
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  name="field_{{ loop.index }}_required"
+                  value="1"
+                  :checked="field.required"
+                /><span>{{ t('Required for publication') }}</span></label
+              >
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  name="field_{{ loop.index }}_publicVisible"
+                  value="1"
+                  :checked="field.publicVisible"
+                /><span>{{ t('Visible on the website') }}</span></label
+              >
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  name="field_{{ loop.index }}_filterable"
+                  value="1"
+                  :disabled="not field.canFilter"
+                  :checked="field.filterable"
+                /><span>{{ t('Collection filter') }}</span></label
+              >
+            </div>
+          </fieldset>
+          <!-- prettier-ignore -->
+          <p class="field-help">{{ t('Removing a field from the editor retains its stored values and revision history.') }}</p>
+        </section>
+      </div>
+      <aside class="editor-side-column">
+        <section class="admin-card editor-card">
+          <h2>{{ t('Availability') }}</h2>
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              name="dedicatedAccess"
+              value="1"
+              :checked="typeForm.dedicatedAccess"
+            /><span>{{ t('Use a dedicated collection permission') }}</span></label
+          >
+          <p class="field-help">
+            {{ t('Assign this collection permission to roles that should manage its content.') }}
+          </p>
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              name="enabled"
+              value="1"
+              :disabled="typeForm.system"
+              :checked="typeForm.enabled"
+            /><span>{{ t('Collection enabled') }}</span></label
+          >
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              name="publicVisible"
+              value="1"
+              :checked="typeForm.publicVisible"
+            /><span>{{ t('Public content') }}</span></label
+          >
+          <label class="checkbox-label"
+            ><input
+              type="checkbox"
+              name="hasArchive"
+              value="1"
+              :checked="typeForm.hasArchive"
+            /><span>{{ t('Public archive') }}</span></label
+          >
+          <!-- prettier-ignore -->
+          <p class="field-help">{{ t('Private collections remain available to authorized administrators and are excluded from public routes.') }}</p>
+          <label for="type-public-path">{{ t('Public path') }}</label>
+          <input
+            id="type-public-path"
+            name="publicPath"
+            value="{{ typeForm.publicPath }}"
+            required
+            maxlength="60"
+            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          />
+          <p class="field-help" data-public-url>{{ siteUrl }}/{{ typeForm.publicPath }}/{slug}</p>
+          <p class="field-help">
+            {{ t('Previous collection paths keep redirecting when this address changes.') }}
+          </p>
+        </section>
+        <section class="admin-card editor-card">
+          <h2>{{ t('Presentation') }}</h2>
+          <label for="type-icon">{{ t('Navigation icon') }}</label>
+          <input id="type-icon" name="icon" value="{{ typeForm.icon }}" maxlength="40" />
+          <label for="type-template">{{ t('Detail template') }}</label>
+          <input
+            id="type-template"
+            name="template"
+            value="{{ typeForm.template }}"
+            required
+            maxlength="80"
+          />
+          <label for="type-archive-template">{{ t('Archive template') }}</label>
+          <input
+            id="type-archive-template"
+            name="archiveTemplate"
+            value="{{ typeForm.archiveTemplate }}"
+            required
+            maxlength="80"
+          />
+          <!-- prettier-ignore -->
+          <p class="field-help">{{ t('Themes can provide these named templates. The standard content view is used when a template is unavailable.') }}</p>
+        </section>
+        <section class="admin-card editor-card">
+          <h2>{{ t('Validation') }}</h2>
+          <div :for="limit in typeForm.limits">
+            <label for="type-{{ limit.key }}">{{ t(limit.label) }}</label>
+            <input
+              id="type-{{ limit.key }}"
+              name="{{ limit.key }}"
+              type="number"
+              min="{{ limit.minimum }}"
+              max="{{ limit.maximum }}"
+              value="{{ limit.value }}"
+            />
+          </div>
+        </section>
+        <section class="admin-card editor-card">
+          <h2>{{ t('Interface labels') }}</h2>
+          <div :for="label in typeForm.labels">
+            <label for="label-{{ label.key }}">{{ t(label.label) }}</label>
+            <input
+              id="label-{{ label.key }}"
+              name="label_{{ label.key }}"
+              value="{{ label.value }}"
+              maxlength="300"
+            />
+          </div>
+          <p class="field-help">
+            {{ t('Leave labels empty to generate them from the collection name.') }}
+          </p>
+        </section>
+        <section :if="typeForm.removable" class="admin-card editor-card">
+          <h2>{{ t('Remove collection') }}</h2>
+          <!-- prettier-ignore -->
+          <p class="field-help">{{ t('Only empty collections without working copies can be removed. Disable a collection to retain its data.') }}</p>
+          <button
+            class="button button-outline danger"
+            type="submit"
+            formaction="{{ typeForm.deletePath }}"
+            formnovalidate
+            data-well-confirm="{{ t('Remove this empty collection definition?') }}"
+          >
+            {{ t('Remove collection') }}
+          </button>
+        </section>
+      </aside>
+    </div>
+  </form>
+</AdminLayout>

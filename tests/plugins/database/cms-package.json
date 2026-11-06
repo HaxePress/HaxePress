@@ -2,6 +2,7 @@
   "apiVersion": 4,
   "cmsVersion": "2.16.0",
   "kind": "plugin",
+  "pluginId": "77d99746-4363-45cd-9a25-a244d5cda2b1",
   "slug": "database-test",
   "name": "Database persistence test",
   "version": "2.16.0",

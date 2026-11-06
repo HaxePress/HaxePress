@@ -1,0 +1,99 @@
+diff --git a/src/hx/well/http/driver/crossbyte/CrossbyteDriverContext.hx b/src/hx/well/http/driver/crossbyte/CrossbyteDriverContext.hx
+index 52eae2e..6c9b1b5 100644
+--- a/src/hx/well/http/driver/crossbyte/CrossbyteDriverContext.hx
++++ b/src/hx/well/http/driver/crossbyte/CrossbyteDriverContext.hx
+@@ -102,6 +102,19 @@ class CrossbyteDriverContext implements IDriverContext {
+         if(closed || responseStarted) throw new Exception("HTTP response already started or closed");
+         if(response == null) return;
+         var head = new ResponseHead(response, inheritedResponse(), request.header("Accept-Encoding", ""));
++        if(head.deflate == null && head.status != 204 && head.status != 304) {
++            // A body already in a reusable buffer goes to the runtime as it
++            // is: no Input, no read-ahead buffer and no copy of the slice.
++            var slice = response.slice();
++            if(slice != null) {
++                responseStarted = true;
++                closed = true;
++                bridge.respondSlice(head, slice);
++                release();
++                if(response.after != null) response.after();
++                return;
++            }
++        }
+         var source = response.toInput();
+         try {
+             var bodiless = head.status == 204 || head.status == 304;
+diff --git a/src/hx/well/http/driver/crossbyte/internal/ResponseBridge.hx b/src/hx/well/http/driver/crossbyte/internal/ResponseBridge.hx
+index 77c812b..a6ec166 100644
+--- a/src/hx/well/http/driver/crossbyte/internal/ResponseBridge.hx
++++ b/src/hx/well/http/driver/crossbyte/internal/ResponseBridge.hx
+@@ -7,6 +7,7 @@ import crossbyte.http.HTTPResponseStream;
+ import crossbyte.io.ByteArray;
+ import haxe.Exception;
+ import haxe.io.Bytes;
++import hx.well.http.ResponseSlice;
+ import sys.thread.Lock;
+ import sys.thread.Mutex;
+ 
+@@ -99,6 +100,36 @@ class ResponseBridge {
+         else if(!runtime.post(send)) throw new Exception("Crossbyte runtime has stopped");
+     }
+ 
++    /**
++     * `respond` for a body in the caller's reusable buffer. The runtime
++     * copies the bytes before `respondBytes` returns, so the slice is
++     * released right after that call, and also when it can no longer be sent.
++     */
++    public function respondSlice(head:ResponseHead, slice:ResponseSlice):Void {
++        var send = () -> {
++            if(gone || completed || started) {
++                slice.release();
++                return;
++            }
++            var current = handler;
++            started = true;
++            release();
++            handler = null;
++            stream = null;
++            try UpstreamAccess.respondSlice(current, head, slice)
++            catch(error:Dynamic) {
++                UpstreamAccess.abort(current);
++                trace(error);
++            }
++            slice.release();
++        };
++        if(runtime.__isOwnThread()) send();
++        else if(!runtime.post(send)) {
++            slice.release();
++            throw new Exception("Crossbyte runtime has stopped");
++        }
++    }
++
+     public function begin(head:ResponseHead):Void {
+         run(operation -> {
+             if(started) throw new Exception("HTTP response already started");
+diff --git a/src/hx/well/http/driver/crossbyte/internal/UpstreamAccess.hx b/src/hx/well/http/driver/crossbyte/internal/UpstreamAccess.hx
+index 4c94a29..4115af4 100644
+--- a/src/hx/well/http/driver/crossbyte/internal/UpstreamAccess.hx
++++ b/src/hx/well/http/driver/crossbyte/internal/UpstreamAccess.hx
+@@ -3,6 +3,7 @@ package hx.well.http.driver.crossbyte.internal;
+ import crossbyte.http.HTTPRequestHandler;
+ import crossbyte.http.HTTPResponseStream;
+ import haxe.io.Bytes;
++import hx.well.http.ResponseSlice;
+ 
+ /**
+  * Crossbyte 1.0.1 has public body/path/response APIs, but no complete HTTP header
+@@ -64,6 +65,13 @@ class UpstreamAccess {
+         withNegotiation(handler, head, () -> handler.respondBytes(head.status, head.contentType, data, head.headers, head.reason));
+     }
+ 
++    /** `respondBytes` for the first `length` bytes of a reused buffer, wrapped without copying. **/
++    public static function respondSlice(handler:HTTPRequestHandler, head:ResponseHead, slice:ResponseSlice):Void {
++        var data = crossbyte.io.ByteArray.fromBytes(slice.bytes);
++        data.length = slice.length;
++        withNegotiation(handler, head, () -> handler.respondBytes(head.status, head.contentType, data, head.headers, head.reason));
++    }
++
+     static function withNegotiation(handler:HTTPRequestHandler, head:ResponseHead, call:Void->Void):Void {
+         if(head.nativeCompression) { call(); return; }
+         // Limit this response's native negotiation without changing the server's

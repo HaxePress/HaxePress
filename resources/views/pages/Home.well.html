@@ -1,0 +1,21 @@
+<props
+  featured="ContentItemView?"
+  items="List<ContentItemView>"
+  count="Int"
+  collection="PublicCollectionView?"
+/>
+<SiteLayout>
+  <PageHead :title="t('The latest content')" />
+  <h1>{{ t('The latest content') }}</h1>
+  <div class="content-list">
+    <ContentCard :if="featured" :item="featured" />
+    <ContentCard :for="item in items" :item="item" />
+  </div>
+  <p :if="not featured and not items" class="simple-empty">{{ t('No content here just yet.') }}</p>
+  <a
+    :if="collection and collection.hasArchive"
+    class="simple-archive-link"
+    href="{{ collection.publicBase }}"
+    >{{ t('All content') }} <span>({{ count }})</span></a
+  >
+</SiteLayout>

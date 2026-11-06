@@ -8,7 +8,7 @@ import hx.well.route.RouteElement;
 import hx.well.template.StatusTemplate;
 import hx.well.type.AttributeType;
 
-/** Keep each endpoint's JSON/Inertia error response after native validate() returns false. */
+/** Keep each endpoint's JSON or form-redirect error response after native validate() returns false. */
 class ValidationErrorHandler extends AbstractHandler {
     public function execute(request:Request):AbstractResponse {
         var route:RouteElement = request.getAttribute(AttributeType.RouteElement);

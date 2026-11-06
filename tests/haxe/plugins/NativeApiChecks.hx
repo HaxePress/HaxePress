@@ -2,7 +2,7 @@ package plugins;
 
 import haxe.Exception;
 import haxe.Json;
-import hx.well.facades.Inertia;
+import hx.press.view.Flash;
 import hx.well.http.Request;
 import hx.well.http.RequestStatic;
 import hx.well.session.Session;
@@ -36,26 +36,29 @@ class NativeApiChecks {
         current.session = new Session();
         RequestStatic.set(current);
         try {
-            Inertia.flash("notice", "first");
-            Inertia.flash("notice", "replacement");
-            Inertia.flash(values);
-            var flashed = Inertia.getFlashed(current);
-            check(flashed.get("notice") == "replacement"
-                && flashed.get("count") == 0
-                && flashed.get("enabled") == false
-                && flashed.get("label") == "İçerik",
-                "Native Inertia flash failed to merge calls or retain values");
-            check(!Inertia.getFlashed(current).keys().hasNext(),
-                "Native Inertia flash was consumed more than once");
+            Flash.put("notice", "first");
+            Flash.put("notice", "replacement");
+            for (key => value in values) {
+                Flash.put(key, value);
+            }
+            check(Flash.get(current, "notice") == "replacement"
+                && Flash.get(current, "count") == 0
+                && Flash.get(current, "enabled") == false
+                && Flash.get(current, "label") == "İçerik",
+                "Flash failed to merge calls or retain values");
+            var next = new Request();
+            next.path = "/admin/account";
+            next.session = current.session;
+            check(Flash.get(next, "notice") == null, "Flash was consumed more than once");
             current.session = null;
-            Inertia.flash("notice", "ignored");
-            check(current.session == null && !Inertia.getFlashed(current).keys().hasNext(),
-                "Native Inertia flash created a public session");
+            Flash.put("notice", "ignored");
+            check(current.session == null && Flash.get(new Request(), "notice") == null,
+                "Flash created a public session");
             RequestStatic.set(previous);
         } catch (error:Dynamic) {
             RequestStatic.set(previous);
             throw error;
         }
-        Sys.println("PASS Native APIs: map-to-object values, merged/single-use Inertia flash and session-free public calls");
+        Sys.println("PASS Native APIs: map-to-object values, merged/single-use flash and session-free public calls");
     }
 }

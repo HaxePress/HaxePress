@@ -4,6 +4,9 @@ import hx.well.config.IConfig;
 import hx.well.server.instance.IInstance;
 import hx.press.ServerSettings;
 import hx.press.themes.ThemeMcpHost;
+#if (jvm && !cms_plugin)
+import hx.press.backup.BackupUploads;
+#end
 #if !cms_plugin
 import hx.well.http.driver.crossbyte.CrossbyteInstance;
 #end
@@ -29,6 +32,9 @@ class InstanceConfig implements IConfig {
                     http.requestTimeout = 30;
                     http.compression.enabled = true;
                     http.rateLimiter = null;
+                    #if jvm
+                    http.maxRequestBodySizeFor = BackupUploads.bodyLimit;
+                    #end
                 })
                 .build()];
         #end

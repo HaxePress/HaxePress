@@ -8,15 +8,13 @@ import hx.well.websocket.WebSocketSession;
 import hx.well.thread.MutexPool;
 
 private typedef ThemePeer = {
-    var themeId:String;
     var adminId:Int;
-    var browser:Bool;
     var authorization:String;
     var session:WebSocketSession;
     var handler:AbstractWebSocketHandler;
 }
 
-/** Each theme has one shared channel for authenticated editors and external AI clients. */
+/** Authenticated editors receive revision and permission changes for their theme. */
 class ThemeCollaboration {
     static final mutex = new MutexPool();
     static final themes:Map<String, SynchronizedMap<String, ThemePeer>> = [];
@@ -29,12 +27,10 @@ class ThemeCollaboration {
         return result;
     }
 
-    public static function attach(themeId:String, browser:Bool, authorization:String,
-            actor:ThemeAiActor, session:WebSocketSession, handler:AbstractWebSocketHandler):Void {
+    public static function attach(themeId:String, authorization:String, actor:ThemeAiActor,
+            session:WebSocketSession, handler:AbstractWebSocketHandler):Void {
         var peer:ThemePeer = {
-            themeId: themeId,
             adminId: actor.id,
-            browser: browser,
             authorization: authorization,
             session: session,
             handler: handler
@@ -47,9 +43,7 @@ class ThemeCollaboration {
         }
         group.set(session.id, peer);
         mutex.release("themes");
-        if (browser) {
-            notify(peer, "permissions", {themeId: themeId, permissions: actor.permissions});
-        }
+        notify(peer, "permissions", {themeId: themeId, permissions: actor.permissions});
         presenceChanged(themeId);
     }
 
@@ -68,9 +62,6 @@ class ThemeCollaboration {
         }
         mutex.release("themes");
         if (peer != null) {
-            if (peer.browser) {
-                ThemeAiAccess.forgetBrowserCredential(peer.authorization);
-            }
             presenceChanged(themeId);
         }
     }
@@ -89,23 +80,19 @@ class ThemeCollaboration {
         }
     }
 
-    public static function presence(themeId:String):{browsers:Int, llms:Int} {
-        var result = {browsers: 0, llms: 0};
+    public static function presence(themeId:String):{browsers:Int} {
+        var browsers = 0;
         for (peer in peers(themeId)) {
             if (live(peer)) {
-                if (peer.browser) {
-                    result.browsers++;
-                } else {
-                    result.llms++;
-                }
+                browsers++;
             }
         }
-        return result;
+        return {browsers: browsers};
     }
 
     static function broadcast(themeId:String, event:String, data:Dynamic):Void {
         for (peer in peers(themeId)) {
-            if (!peer.browser || !live(peer)) {
+            if (!live(peer)) {
                 continue;
             }
             try {
@@ -135,22 +122,13 @@ class ThemeCollaboration {
 
     public static function permissionsChanged(themeId:String, adminId:Int):Void {
         for (peer in peers(themeId)) {
-            if (peer.browser && peer.adminId == adminId && live(peer)) {
+            if (peer.adminId == adminId && live(peer)) {
                 var actor = ThemeAiAccess.authenticateToken(themeId, peer.authorization);
                 if (actor == null) {
                     peer.session.close();
                 } else {
                     notify(peer, "permissions", {themeId: themeId, permissions: actor.permissions});
                 }
-            }
-        }
-    }
-
-    public static function revokeLlm(themeId:String, adminId:Int):Void {
-        for (peer in peers(themeId)) {
-            if (!peer.browser && peer.adminId == adminId) {
-                detach(themeId, peer.session.id);
-                peer.session.close();
             }
         }
     }

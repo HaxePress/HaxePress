@@ -1,0 +1,17 @@
+<props baseDocument="Any" />
+<AdminLayout :title="t('Create your website design')">
+  <Alert error :message="error('name')" />
+  <Asset css="css/easy-builder.css" />
+  <Asset css="css/theme-builder.css" />
+  <Island
+    name="theme-create"
+    :props="{
+      translations: translations,
+      locale: i18n.locale,
+      direction: i18n.direction,
+      baseDocument: baseDocument,
+      csrfToken: csrfToken
+    }"
+    load="eager"
+  ></Island>
+</AdminLayout>

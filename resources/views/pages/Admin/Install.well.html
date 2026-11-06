@@ -1,0 +1,353 @@
+<props install="InstallSetupView" />
+<Document>
+  <Asset css="css/site.css" />
+  <Asset css="css/cms.css" />
+  <Asset css="css/admin.css" />
+  <Asset css="css/setup.css" />
+  <well:head>
+    <title>Install HaxePress</title>
+    <meta name="robots" content="noindex,nofollow" />
+  </well:head>
+  <div class="setup-body">
+    <main class="setup-shell">
+      <aside class="setup-sidebar">
+        <div class="setup-wordmark">{{ icon('layers') }}HaxePress</div>
+        <p class="setup-sidebar-title">Installation</p>
+        <ol class="setup-steps" aria-label="Installation progress">
+          <li
+            :for="label in ['Database', 'Administrator', 'Finish']"
+            :class="install.blocked ? '' : install.step == loop.index ? 'current' : install.step > loop.index ? 'complete' : ''"
+            :aria-current="not install.blocked and install.step == loop.index ? 'step' : null"
+          >
+            <span class="setup-step-number"
+              ><template :if="not install.blocked and install.step > loop.index"
+                >{{ icon('check') }}</template
+              ><template :else>{{ loop.number }}</template></span
+            ><span>{{ label }}</span>
+          </li>
+        </ol>
+        <div class="setup-access">
+          {{ icon('lock') }}<span
+            >{{ install.blocked ? 'Setup locked' : 'Trusted connection' }}</span
+          >
+        </div>
+      </aside>
+      <section class="setup-content" aria-busy="false" fragment="setup">
+        <template :if="install.blocked">
+          <div class="setup-lock-symbol">{{ icon('lock') }}</div>
+          <h1>Setup is locked</h1>
+          <p class="setup-intro">{{ install.message }}</p>
+          <div class="setup-notice">
+            <strong>Server configuration required</strong>
+            <p>
+              Allow your IP address in the server’s <code>INSTALL_TRUSTED_IPS</code> setting. Setup
+              stays unavailable until this check passes.
+            </p>
+            <p>Use a direct connection or an SSH tunnel for installation.</p>
+          </div>
+        </template>
+        <template :else>
+          <div class="setup-page-heading">
+            <span>Step {{ install.step + 1 }} of 3</span>
+            <h1 :if="install.step == 0">Connect your database</h1>
+            <h1 :else-if="install.step == 1">Create your administrator</h1>
+            <h1 :else>Ready to install</h1>
+            <p :if="install.step == 0">
+              Choose where HaxePress will store your content and settings.
+            </p>
+            <p :else-if="install.step == 1">
+              Set the site name and the account you will use to manage it.
+            </p>
+            <p :else>
+              Review your settings. HaxePress will create its tables and save the configuration.
+            </p>
+          </div>
+          <div class="setup-error" role="alert" :hidden="not error('setup')" data-setup-error>
+            {{ icon('alert') }}<span>{{ error('setup') }}</span>
+          </div>
+          <template :if="install.step == 0">
+            <form id="setup-driver" method="get" action="/admin/install" swap="setup">
+              <input type="hidden" name="step" value="database" />
+              <noscript
+                ><button class="button button-outline" type="submit">
+                  Use this database type
+                </button></noscript
+              >
+            </form>
+            <form class="setup-form" method="post" action="/admin/install/database">
+              <input type="hidden" name="driver" value="{{ install.driver }}" />
+              <fieldset>
+                <legend class="sr-only">Database connection</legend>
+                <div class="setup-database-types" role="group" aria-label="Database type">
+                  <label :class="install.driver == 'sqlite' ? 'selected'"
+                    ><input
+                      type="radio"
+                      name="driver"
+                      value="sqlite"
+                      form="setup-driver"
+                      :checked="install.driver == 'sqlite'"
+                      data-well-autosubmit
+                    /><span
+                      ><strong>SQLite</strong><small>A local database file</small></span
+                    ></label
+                  >
+                  <label :class="install.driver == 'mysql' ? 'selected'"
+                    ><input
+                      type="radio"
+                      name="driver"
+                      value="mysql"
+                      form="setup-driver"
+                      :checked="install.driver == 'mysql'"
+                      data-well-autosubmit
+                    /><span
+                      ><strong>MySQL</strong><small>An existing database server</small></span
+                    ></label
+                  >
+                </div>
+                <div :if="install.driver == 'sqlite'" class="setup-field">
+                  <label for="database-file">Database filename</label>
+                  <input
+                    id="database-file"
+                    name="file"
+                    value="{{ install.file }}"
+                    maxlength="81"
+                    required
+                    pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,74}\.sqlite"
+                  />
+                  <p>The file is created inside the configured storage directory.</p>
+                </div>
+                <template :else>
+                  <div class="setup-field-pair">
+                    <div class="setup-field">
+                      <label for="database-host">Host</label>
+                      <input
+                        id="database-host"
+                        name="host"
+                        value="{{ install.host }}"
+                        maxlength="253"
+                        required
+                      />
+                    </div>
+                    <div class="setup-field setup-port">
+                      <label for="database-port">Port</label>
+                      <input
+                        id="database-port"
+                        name="port"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        required
+                        value="{{ install.port }}"
+                      />
+                    </div>
+                  </div>
+                  <div class="setup-field">
+                    <label for="database-name">Database name</label>
+                    <input
+                      id="database-name"
+                      name="database"
+                      autocomplete="off"
+                      required
+                      maxlength="64"
+                      value="{{ install.database }}"
+                    />
+                    <p>Use an empty database. Existing data will not be overwritten.</p>
+                  </div>
+                  <div class="setup-field">
+                    <label for="database-user">Username</label>
+                    <input
+                      id="database-user"
+                      name="username"
+                      autocomplete="off"
+                      required
+                      maxlength="100"
+                      value="{{ install.username }}"
+                    />
+                  </div>
+                  <div class="setup-field">
+                    <label for="database-password">Database password</label>
+                    <input
+                      id="database-password"
+                      name="password"
+                      type="password"
+                      autocomplete="off"
+                      maxlength="1000"
+                    />
+                  </div>
+                </template>
+                <div class="setup-form-actions">
+                  <button type="submit" class="button" data-well-busy="Checking database…">
+                    Verify connection
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+          </template>
+          <Island
+            :if="install.showRestore"
+            name="install-restore"
+            :props="{
+              restoreLimit: install.restoreLimit,
+              csrfToken: csrfToken,
+              useVerifiedDatabase: install.useVerifiedDatabase
+            }"
+            load="eager"
+          >
+            <form class="setup-form">
+              <fieldset>
+                <div class="setup-field">
+                  <label for="setup-backup">Restore a HaxePress backup</label>
+                  <input id="setup-backup" type="file" accept=".hxpress" required />
+                  <p>{{ install.restoreTarget }}</p>
+                  <p>Choose a backup you trust. Sign in with the restored account afterward.</p>
+                </div>
+                <p class="field-help" hidden data-backup-version></p>
+                <div class="alert error" role="alert" hidden data-backup-encrypted>
+                  {{ icon('alert') }}This file is unusable on projects with a different APP_KEY. If
+                  the original APP_KEY is lost, the backup is permanently unrecoverable.
+                </div>
+                <p class="field-help" hidden data-backup-key>
+                  Set the original APP_KEY in the target .env before starting HaxePress.
+                </p>
+                <label class="setup-samples"
+                  ><input type="checkbox" data-skip-damaged /><span
+                    >Skip damaged content items</span
+                  ></label
+                >
+                <div class="setup-form-actions">
+                  <button class="button button-outline" type="submit" disabled>
+                    Restore backup
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+          </Island>
+          <form
+            :if="install.step == 1"
+            class="setup-form"
+            method="post"
+            action="/admin/install/administrator"
+          >
+            <fieldset>
+              <div class="setup-verified">
+                {{ icon('check') }}<span>{{ install.verifiedLabel }} · Connection verified</span>
+              </div>
+              <div class="setup-field">
+                <label for="setup-site-name">Site name</label>
+                <input
+                  id="setup-site-name"
+                  name="site_name"
+                  value="{{ install.siteName }}"
+                  required
+                  minlength="2"
+                  maxlength="100"
+                />
+              </div>
+              <div class="setup-field">
+                <label for="setup-admin-name">Administrator name</label>
+                <input
+                  id="setup-admin-name"
+                  name="admin_name"
+                  autocomplete="name"
+                  required
+                  minlength="2"
+                  maxlength="100"
+                  value="{{ install.adminName }}"
+                />
+              </div>
+              <div class="setup-field">
+                <label for="setup-admin-email">Email address</label>
+                <input
+                  id="setup-admin-email"
+                  name="admin_email"
+                  type="email"
+                  autocomplete="username"
+                  required
+                  maxlength="254"
+                  value="{{ install.adminEmail }}"
+                />
+              </div>
+              <div class="setup-field">
+                <label for="setup-admin-password">Administrator password</label>
+                <div class="setup-password">
+                  <input
+                    id="setup-admin-password"
+                    name="admin_password"
+                    type="password"
+                    autocomplete="new-password"
+                    required
+                    minlength="12"
+                  />
+                  <button
+                    type="button"
+                    class="icon-button"
+                    aria-label="Show password"
+                    data-well-reveal="setup-admin-password"
+                    data-well-show-label="Show password"
+                    data-well-hide-label="Hide password"
+                  >
+                    <span data-well-pressed="false">{{ icon('eye') }}</span
+                    ><span data-well-pressed="true" hidden>{{ icon('eye-off') }}</span>
+                  </button>
+                </div>
+                <p>Use 12–72 bytes. The password is saved in your private .env file.</p>
+              </div>
+              <div class="setup-field">
+                <label for="setup-confirm-password">Confirm password</label>
+                <input
+                  id="setup-confirm-password"
+                  name="confirm_password"
+                  type="password"
+                  autocomplete="new-password"
+                  required
+                />
+              </div>
+              <div class="setup-form-actions">
+                <a class="button button-outline" href="/admin/install?step=database">Back</a>
+                <button type="submit" class="button">Review settings</button>
+              </div>
+            </fieldset>
+          </form>
+          <form
+            :if="install.step == 2"
+            class="setup-form"
+            method="post"
+            action="/admin/install/finish"
+          >
+            <dl class="setup-review">
+              <div>
+                <dt>Database</dt>
+                <dd>{{ install.reviewDatabase }}</dd>
+              </div>
+              <div>
+                <dt>Site name</dt>
+                <dd>{{ install.siteName }}</dd>
+              </div>
+              <div>
+                <dt>Administrator</dt>
+                <dd>{{ install.adminName }}<span>{{ install.adminEmail }}</span></dd>
+              </div>
+              <div>
+                <dt>Configuration</dt>
+                <dd>Private .env file</dd>
+              </div>
+            </dl>
+            <label class="setup-samples"
+              ><input type="checkbox" name="sample_content" value="1" /><span
+                >Include sample content<small
+                  >Start with example content you can edit or remove.</small
+                ></span
+              ></label
+            >
+            <div class="setup-form-actions">
+              <a class="button button-outline" href="/admin/install?step=administrator">Back</a>
+              <button type="submit" class="button" data-well-busy="Installing HaxePress…">
+                Install HaxePress
+              </button>
+            </div>
+          </form>
+        </template>
+      </section>
+    </main>
+  </div>
+</Document>

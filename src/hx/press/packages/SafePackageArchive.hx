@@ -11,9 +11,12 @@ import hx.press.i18n.TranslationCatalogue;
 import hx.press.plugins.PhpModuleDefinition;
 #if jvm
 import hx.press.themes.ThemeDesignPackage;
+import hx.press.view.ThemeViews;
 #end
 #if jvm
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.util.jar.JarFile;
 import java.util.zip.ZipInputStream;
 import java.NativeString;
@@ -36,15 +39,50 @@ class SafePackageArchive {
         if (disk == null) {
             disk = Storage.disk("extensions");
         }
+        prepare(disk, destination, bytes.length);
+        #if jvm
+        return unpackJvm(new ByteArrayInputStream(bytes.getData()), disk, destination);
+        #elseif (cpp || php)
+        try {
+            PortablePackageArchive.unpack(bytes, destination, disk);
+            return inspect(disk, packageRoot(disk, destination));
+        } catch (error:Dynamic) {
+            disk.deleteDirectory(destination);
+            throw error;
+        }
+        #else
+        disk.deleteDirectory(destination);
+        throw new Exception("Package uploads require a JVM, C++ or PHP host.");
+        #end
+    }
+
+    static function prepare(disk:StorageDisk, destination:String, size:Int):Void {
         if (!PackageManifest.safePath(destination)
-            || bytes.length < 4
-            || bytes.length > MAX_BYTES
+            || size < 4
+            || size > MAX_BYTES
             || disk.exists(destination)) {
             throw new Exception("Choose a ZIP package smaller than 64 MB.");
         }
         disk.makeDirectory(destination);
-        #if jvm
-        var input = new ZipInputStream(new ByteArrayInputStream(bytes.getData()));
+    }
+
+    #if jvm
+    public static function extractFile(disk:StorageDisk, path:String,
+            destination:String):InspectedPackage {
+        prepare(disk, destination, disk.size(path));
+        var source:FileInputStream;
+        try {
+            source = new FileInputStream(disk.path(path));
+        } catch (error:Dynamic) {
+            disk.deleteDirectory(destination);
+            throw error;
+        }
+        return unpackJvm(source, disk, destination);
+    }
+
+    static function unpackJvm(source:InputStream, disk:StorageDisk,
+            destination:String):InspectedPackage {
+        var input = new ZipInputStream(source);
         var budget:ArchiveBudget = {bytes: 0};
         var count = 0;
         var seen:Map<String, Bool> = [];
@@ -94,21 +132,10 @@ class SafePackageArchive {
             disk.deleteDirectory(destination);
             throw error;
         }
-        #elseif (cpp || php)
-        try {
-            PortablePackageArchive.unpack(bytes, destination, disk);
-            return inspect(disk, packageRoot(disk, destination));
-        } catch (error:Dynamic) {
-            disk.deleteDirectory(destination);
-            throw error;
-        }
-        #else
-        disk.deleteDirectory(destination);
-        throw new Exception("Package uploads require a JVM, C++ or PHP host.");
-        #end
     }
+    #end
 
-    static function inspect(disk:StorageDisk, root:String):InspectedPackage {
+    public static function inspect(disk:StorageDisk, root:String):InspectedPackage {
         var manifest = PackageManifest.parse(disk.get('${root}/${PackageManifest.FILENAME}'));
         for (asset in [manifest.module, manifest.stylesheet, manifest.renderer]) {
             if (asset != ""
@@ -116,6 +143,17 @@ class SafePackageArchive {
                     || disk.directoryExists('${root}/public/${asset}'))) {
                 throw new Exception("The package is missing a declared frontend asset.");
             }
+        }
+        if (manifest.renderer != "" && manifest.views == "") {
+            throw new Exception("Browser theme renderers are no longer supported. Package the theme's pages as Wellout templates in a views folder.");
+        }
+        if (manifest.views != "") {
+            #if jvm
+            ThemeViews.inspectPackage(disk, '${root}/${manifest.views}');
+            #else
+            // Templates are checked with Wellout, which only the JVM application includes.
+            throw new Exception("Theme template packages require the JVM host.");
+            #end
         }
         PackageManifest.serverArtifact(manifest);
         if (manifest.layout == "builder") {

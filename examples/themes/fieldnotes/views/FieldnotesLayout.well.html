@@ -1,0 +1,107 @@
+<Document>
+  <Asset css="css/site.css" />
+  <Asset css="css/cms.css" />
+  <well:head>
+    <link :if="theme.stylesheet" rel="stylesheet" href="{{ theme.stylesheet }}" />
+  </well:head>
+  <SiteExtensions />
+  <div
+    class="cms-site"
+    data-cms-site
+    data-layout="{{ theme.layout ?? 'fieldnotes' }}"
+    style="{{ {
+      green: theme.settings['accent'] | color,
+      paper: theme.settings['paper'] | color,
+      ink: theme.settings['ink'] | color,
+      themeButtonBackground: theme.settings['button_color'] | color,
+      themeButtonText: theme.settings['button_text_color'] | color,
+      contentWidth: theme.settings['width'] | pixels(960, 1440, 1180),
+      serif: theme.settings['typeface'] == 'modern' ? '\'DM Sans\', Arial, sans-serif'
+    } | cssVariables }}"
+  >
+    <ExtensionSlot name="site.top" />
+    <a class="skip-link" href="#main">{{ t('Skip to content') }}</a>
+    <header class="site-header wrap">
+      <a class="brand" href="/" aria-label="{{ site.site_name }} home"><FieldnotesBrand /></a>
+      <nav class="desktop-nav" aria-label="{{ t('Main navigation') }}">
+        <SiteNavigation :links="navigation['header'] ?? defaultNavigation()" />
+      </nav>
+      <div class="header-actions">
+        <button
+          class="icon-button search-toggle"
+          aria-label="{{ t('Search content') }}"
+          data-well-open="site-search"
+          data-well-hotkey="k"
+        >
+          {{ icon('search') }}
+        </button>
+        <a :for="link in pluginNavigation.header" class="button button-small" href="{{ link.href }}"
+          >{{ link.label }}{{ icon(link.icon) }}</a
+        >
+        <button
+          class="icon-button menu-toggle"
+          aria-label="{{ t('Open navigation') }}"
+          aria-expanded="false"
+          data-well-toggle="mobile-navigation"
+          data-well-show-label="{{ t('Open navigation') }}"
+          data-well-hide-label="{{ t('Close navigation') }}"
+        >
+          {{ icon('menu') }}
+        </button>
+      </div>
+    </header>
+    <nav
+      id="mobile-navigation"
+      class="mobile-nav wrap"
+      aria-label="{{ t('Mobile navigation') }}"
+      hidden
+    >
+      <SiteNavigation :links="navigation['header'] ?? defaultNavigation()" />
+    </nav>
+    <main id="main"><slot /></main>
+    <ExtensionSlot name="site.before-footer" />
+    <footer class="site-footer wrap">
+      <div>
+        <a class="brand footer-brand" href="/"><FieldnotesBrand footer /></a>
+        <p :if="site.description">{{ site.description }}</p>
+      </div>
+      <div class="footer-right">
+        <LanguageSwitcher />
+        <nav aria-label="{{ t('Footer navigation') }}">
+          <SiteNavigation :links="navigation['footer'] ?? defaultNavigation()" /><a
+            :for="link in pluginNavigation.footer"
+            href="{{ link.href }}"
+            >{{ link.label }}{{ icon(link.icon) }}</a
+          ><a href="/admin/login">{{ t('Admin') }} {{ icon('arrow-up-right') }}</a>
+        </nav>
+        <p>© {{ year() }} {{ site.site_name }}</p>
+      </div>
+    </footer>
+    <ExtensionSlot name="site.footer" />
+    <dialog id="site-search" class="search-dialog" aria-labelledby="search-title" data-well-dismiss>
+      <form method="get" action="/content">
+        <div class="search-dialog-heading">
+          <h2 id="search-title">{{ t('Search') }}</h2>
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="{{ t('Close search') }}"
+            data-well-close
+          >
+            {{ icon('x') }}
+          </button>
+        </div>
+        <label for="global-search">{{ t('Search content') }}</label>
+        <div class="search-input">
+          {{ icon('search') }}<input
+            id="global-search"
+            name="q"
+            type="search"
+            placeholder="{{ t('Search content') }}"
+          /><button class="button" type="submit">{{ t('Search') }}</button>
+        </div>
+        <p>{{ t('Try “home”, “morning”, or “travel”.') }}</p>
+      </form>
+    </dialog>
+  </div>
+</Document>

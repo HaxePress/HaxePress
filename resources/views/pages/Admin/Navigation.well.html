@@ -1,0 +1,273 @@
+<props
+  links="List<AdminMenuLinkView>"
+  location="String"
+  regions="List<AdminNavigationRegionView>"
+  region="AdminNavigationRegionView"
+  limit="Int"
+  notice="String"
+  regionQuery="String"
+  linkForm="AdminMenuLinkFormView"
+  linkContent="AdminContentChoiceView?"
+  linkCollection="AdminCollectionChoiceView?"
+  regionForm="AdminNavigationRegionFormView"
+/>
+<AdminLayout :title="t('Navigation')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Navigation') }}</h1>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('navigation')" />
+  <form id="navigation-regions" action="/admin/navigation" method="get"></form>
+  <section class="admin-card navigation-region-picker">
+    <label for="region-search">{{ t('Search navigation regions') }}</label>
+    <input
+      id="region-search"
+      name="region_query"
+      type="search"
+      form="navigation-regions"
+      value="{{ regionQuery }}"
+      maxlength="100"
+    />
+    <label for="region-choice">{{ t('Navigation region') }}</label>
+    <select id="region-choice" name="location" form="navigation-regions" data-well-autosubmit>
+      <option :for="choice in regions" value="{{ choice.key }}" :selected="choice.key == location">
+        {{ t(choice.name) }}
+      </option>
+    </select>
+  </section>
+  <div class="categories-grid">
+    <section class="admin-card category-collection">
+      <div class="admin-card-heading">
+        <div>
+          <h2>
+            {{ t(region.name) }} <span class="count-badge">{{ size(links) }}/{{ limit }}</span>
+          </h2>
+          <p>
+            {{ t('Managed content and collection links follow their current public address.') }}
+          </p>
+        </div>
+      </div>
+      <ol :if="links" class="category-list menu-link-list">
+        <li :for="link in links" :class="linkForm.id == (link.id | string) ? 'editing'">
+          <span class="menu-position">{{ link.position }}</span>
+          <div class="category-details">
+            <strong>{{ link.label }}</strong>
+            <!-- prettier-ignore -->
+            <span>{{ link.content_id > 0 ? t('Linked content') : link.collection_key ? t('Linked collection') : link.url }}</span>
+          </div>
+          <div class="category-actions">
+            <a
+              class="icon-button"
+              aria-label="{{ t('Edit {title}', title: link.label) }}"
+              href="{{ url('/admin/navigation', location: location, region_query: regionQuery, edit: link.id) }}#menu-label"
+              >{{ icon('edit') }}</a
+            >
+            <form action="/admin/navigation/{{ link.id }}/delete" method="post">
+              <button
+                type="submit"
+                class="icon-button danger"
+                aria-label="{{ t('Remove {title}', title: link.label) }}"
+                data-well-confirm="{{ t('Remove this navigation link?') }}"
+              >
+                {{ icon('trash') }}
+              </button>
+            </form>
+          </div>
+        </li>
+      </ol>
+      <div :else class="empty-state">
+        {{ icon('menu') }}
+        <h2>{{ t('Make a path.') }}</h2>
+        <p>{{ t('Add your first link to this menu.') }}</p>
+      </div>
+    </section>
+    <section class="admin-card settings-card category-form">
+      <h2>{{ linkForm.id ? t('Edit link') : t('Add a link') }}</h2>
+      <Island name="admin-form" :props="{ translations: translations }" load="idle">
+        <form action="/admin/navigation/save" method="post">
+          <input type="hidden" name="id" value="{{ linkForm.id }}" />
+          <input type="hidden" name="location" value="{{ location }}" />
+          <label for="menu-label">{{ t('Link label') }}</label>
+          <input
+            id="menu-label"
+            name="label"
+            required
+            maxlength="80"
+            value="{{ linkForm.label }}"
+            :autofocus="linkForm.id ? true : false"
+          />
+          <label for="menu-source">{{ t('Link target') }}</label>
+          <select id="menu-source" name="target">
+            <option value="url" :selected="linkForm.mode == 'url'">
+              {{ t('Website address') }}
+            </option>
+            <option value="content" :selected="linkForm.mode == 'content'">
+              {{ t('Published content') }}
+            </option>
+            <option value="collection" :selected="linkForm.mode == 'collection'">
+              {{ t('Collection archive') }}
+            </option>
+          </select>
+          <div
+            class="content-picker"
+            data-show-when="menu-source=content"
+            data-picker-url="/admin/content-options"
+            data-picker-items="items"
+            data-picker-value="id"
+            data-picker-label="title"
+            data-picker-error="{{ t('Published content could not be loaded.') }}"
+            :hidden="linkForm.mode != 'content'"
+          >
+            <label class="sr-only" for="menu-content-search"
+              >{{ t('Search published content') }}</label
+            >
+            <input
+              id="menu-content-search"
+              type="search"
+              maxlength="100"
+              placeholder="{{ t('Search published content') }}"
+              :disabled="linkForm.mode != 'content'"
+            />
+            <select
+              id="menu-content"
+              name="content_id"
+              required
+              :disabled="linkForm.mode != 'content'"
+            >
+              <option value="0">{{ t('Choose published content') }}</option>
+              <option :if="linkContent" value="{{ linkContent.id }}" selected>
+                {{ linkContent.title }}
+              </option>
+            </select>
+          </div>
+          <div
+            class="content-picker"
+            data-show-when="menu-source=collection"
+            data-picker-url="/admin/content-types/options?public=1&archives=1"
+            data-picker-items="types"
+            data-picker-value="key"
+            data-picker-label="name"
+            data-picker-translate
+            data-picker-error="{{ t('Collections could not be loaded.') }}"
+            :hidden="linkForm.mode != 'collection'"
+          >
+            <label class="sr-only" for="menu-collection-search"
+              >{{ t('Search collections') }}</label
+            >
+            <input
+              id="menu-collection-search"
+              type="search"
+              maxlength="100"
+              placeholder="{{ t('Search collections') }}"
+              :disabled="linkForm.mode != 'collection'"
+            />
+            <select
+              id="menu-collection"
+              name="collection_key"
+              required
+              :disabled="linkForm.mode != 'collection'"
+            >
+              <option value="">{{ t('Choose a collection') }}</option>
+              <option :if="linkCollection" value="{{ linkCollection.key }}" selected>
+                {{ t(linkCollection.name) }}
+              </option>
+            </select>
+          </div>
+          <label for="menu-url" data-show-when="menu-source=url" :hidden="linkForm.mode != 'url'"
+            >{{ t('Website address') }}</label
+          >
+          <input
+            id="menu-url"
+            name="url"
+            required
+            maxlength="1000"
+            value="{{ linkForm.url }}"
+            placeholder="/about"
+            data-show-when="menu-source=url"
+            :hidden="linkForm.mode != 'url'"
+            :disabled="linkForm.mode != 'url'"
+          />
+          <label for="menu-position">{{ t('Position') }}</label>
+          <input
+            id="menu-position"
+            name="position"
+            type="number"
+            min="0"
+            max="9999"
+            value="{{ linkForm.position }}"
+          />
+          <label class="checkbox-label"
+            ><input type="checkbox" name="new_tab" value="1" :checked="linkForm.new_tab" /><span
+              >{{ t('Open in a new tab') }}</span
+            ></label
+          >
+          <button class="button" type="submit" data-well-busy="{{ t('Save link') }}">
+            {{ icon('check') }} {{ t('Save link') }}
+          </button>
+        </form>
+      </Island>
+    </section>
+  </div>
+  <section class="admin-card settings-card navigation-region-settings">
+    <h2>{{ t('Navigation region settings') }}</h2>
+    <form action="/admin/navigation/regions/save" method="post">
+      <input type="hidden" name="location" value="{{ location }}" />
+      <div class="structure-field-grid">
+        <div>
+          <label for="region-key">{{ t('Stable key') }}</label>
+          <input
+            id="region-key"
+            name="key"
+            required
+            maxlength="40"
+            pattern="[a-z][a-z0-9_-]{0,39}"
+            value="{{ regionForm.key }}"
+          />
+        </div>
+        <div>
+          <label for="region-name">{{ t('Region name') }}</label>
+          <input
+            id="region-name"
+            name="name"
+            required
+            maxlength="100"
+            value="{{ regionForm.name }}"
+          />
+        </div>
+        <div>
+          <label for="region-limit">{{ t('Maximum links') }}</label>
+          <input
+            id="region-limit"
+            name="max_links"
+            type="number"
+            min="1"
+            max="50"
+            value="{{ regionForm.max_links }}"
+          />
+        </div>
+      </div>
+      <label class="checkbox-label"
+        ><input type="checkbox" name="enabled" value="1" :checked="regionForm.enabled" /><span
+          >{{ t('Region enabled') }}</span
+        ></label
+      >
+      <div class="editor-actions">
+        <button type="submit" class="button" data-well-busy="{{ t('Save region') }}">
+          {{ t('Save region') }}
+        </button>
+        <a
+          class="button button-outline"
+          href="{{ url('/admin/navigation', location: location, region_query: regionQuery, region: 'edit') }}#region-key"
+          >{{ t('Edit current region') }}</a
+        >
+        <a
+          class="button button-outline"
+          href="{{ url('/admin/navigation', location: location, region_query: regionQuery) }}#region-key"
+          >{{ t('New region') }}</a
+        >
+      </div>
+    </form>
+  </section>
+</AdminLayout>

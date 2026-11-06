@@ -11,7 +11,7 @@ from e2e import Client, check
 from fixture_store import FixtureStore
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
+HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
 
 
 def props(client, path):
@@ -68,6 +68,17 @@ def verify(fixtures):
         "seo_title": "A page for curious readers",
         "seo_description": "A specific search description.",
     }
+    preview_status, _, preview_html = admin.request("/admin/pages/preview", "POST", data)
+    check(
+        preview_status == 200
+        and "data-cms-site" in preview_html
+        and "<em>italic</em>" in preview_html,
+        "A new page did not render in the site layout before saving",
+    )
+    check(
+        public.request(f"/pages/{data['slug']}")[0] == 404,
+        "Preview published a new page",
+    )
     working = {**data, "draft_version": "1"}
     check(
         admin.request("/admin/pages/working-copy", "POST", working)[0] == 200,

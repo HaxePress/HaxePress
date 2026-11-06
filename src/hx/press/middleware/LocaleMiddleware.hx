@@ -20,7 +20,9 @@ class LocaleMiddleware extends AbstractMiddleware {
         var response = next(request);
         if (response != null) {
             response.header("Content-Language", selected);
-            response.header("Vary", "Cookie, X-Inertia");
+            // Replaces the Vary of the page, so it keeps the headers pages vary on: fragment
+            // requests and page data for tests and the site MCP host.
+            response.header("Vary", "Cookie, Well-Fragment, X-Well-Data");
         }
         return response;
     }

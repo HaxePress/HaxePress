@@ -4,6 +4,10 @@
 -resource resources/lang/tr.json@lang.tr
 -resource resources/lang/editor/en.json@lang.editor.en
 -resource resources/lang/editor/tr.json@lang.editor.tr
+-resource resources/lang/packages/en.json@lang.packages.en
+-resource resources/lang/packages/tr.json@lang.packages.tr
+-resource resources/lang/backups/en.json@lang.backups.en
+-resource resources/lang/backups/tr.json@lang.backups.tr
 -resource resources/themes/simple/cms-package.json@hx.press.theme.simple
 -resource resources/themes/simple/lang/en.json@hx.press.theme.simple.lang.en
 -resource resources/themes/simple/lang/tr.json@hx.press.theme.simple.lang.tr
@@ -12,4 +16,4 @@
 -D env_file=.env
 -D hxwell_config_package=hx.press.config
 -lib hxwell-crossbyte
--lib hxwell-inertia
+-lib wellout

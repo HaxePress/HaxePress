@@ -12,7 +12,7 @@ from content_cache import clear_content, content_entries
 from e2e import Client, check
 from fixture_store import FixtureStore
 
-HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
+HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
 
 
 def page(client, route, group=None):

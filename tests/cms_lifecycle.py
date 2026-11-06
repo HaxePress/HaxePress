@@ -5,9 +5,11 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import zipfile
 
 from e2e import Client, check
+from admin_mcp import call, issue, succeeded, tool_names
 from cms_content import props
 from cms_packages import install, zip_bytes
 from fixture_store import FixtureStore
@@ -168,10 +170,32 @@ def run():
         owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
 
         install(owner, "plugins", package)
+        status, _, _ = owner.request(
+            f"/admin/plugins/{identifier}/settings",
+            "POST",
+            {"schedule_probe": "true"},
+        )
+        check(status == 303, "Could not configure the plugin's schedule probe")
         check(
             owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})[0] == 303,
             "healthy creation failed",
         )
+        plugin_id = fixtures.rows(
+            "cms_packages", ["plugin_id"], [("id", "=", identifier)], limit=1
+        )[0]["plugin_id"]
+        scheduled = [("plugin_id", "=", plugin_id), ("job_key", "=", "probe")]
+        check(
+            fixtures.count("scheduled_jobs", scheduled) == 1, "The plugin did not register its job"
+        )
+        fixtures.update("scheduled_jobs", {"next_epoch": int(time.time() * 1000) - 1000}, scheduled)
+        deadline = time.monotonic() + 12
+        while time.monotonic() < deadline:
+            result = json.loads(public.request("/plugin-lifecycle")[2])
+            if result["scheduledRuns"] == 1:
+                break
+            time.sleep(0.15)
+        else:
+            raise AssertionError("The plugin did not receive its schedule.run event")
         check(
             public.request("/plugin-lifecycle")[0] == 200,
             "onCreate did not register a native route",
@@ -184,11 +208,25 @@ def run():
             owner.request("/admin/plugin-lifecycle")[0] == 200,
             "protected native plugin route failed",
         )
+        connection = issue(owner)
+        tool = "plugin_lifecycle_test_status"
+        check(
+            tool in tool_names(public, connection),
+            "The active plugin did not register its MCP tool",
+        )
+        tool_result = succeeded(call(public, connection, tool, {"message": "plugin MCP"}))
+        check(
+            tool_result["data"]["echo"] == "plugin MCP",
+            "The plugin tool did not call its native handler",
+        )
         check(
             owner.request(f"/admin/plugins/{identifier}/disable", "POST", {})[0] == 303,
             "healthy destruction failed",
         )
         check(public.request("/plugin-lifecycle")[0] == 404, "onDestroy did not remove the route")
+        check(
+            tool not in tool_names(public, connection), "A disabled plugin's MCP tool was retained"
+        )
         check(
             owner.request(f"/admin/plugins/{identifier}/enable", "POST", {})[0] == 303,
             "route/name could not be registered again",
@@ -221,6 +259,9 @@ def run():
             "dirty plugin reactivated without restart",
         )
         owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
+        check(
+            fixtures.count("scheduled_jobs", scheduled) == 0, "Uninstall retained a plugin's jobs"
+        )
         check(
             props(owner, "/admin")["pluginRestartRequired"],
             "uninstall hid the process restart warning",

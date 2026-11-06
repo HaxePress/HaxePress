@@ -2,7 +2,7 @@ package extensions.newsletter;
 
 import hx.press.Pagination;
 import hx.press.plugins.PluginHost;
-import hx.well.facades.Inertia;
+import hx.press.view.Pages;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -55,6 +55,6 @@ class ListSubscribersHandler extends AbstractHandler {
             noun: "subscribers"
         };
         var props = {pluginPage: pluginPage};
-        return Inertia.render("Admin/PluginPage", props);
+        return Pages.render("Admin/PluginPage", props);
     }
 }

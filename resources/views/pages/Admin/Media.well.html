@@ -1,0 +1,141 @@
+<props
+  images="List<ContentAdminMediaImageView>"
+  selectedImage="ContentAdminMediaImageView?"
+  referenceImages="List<ContentAdminMediaReferenceView>"
+  mediaRules="ContentAdminMediaRulesView"
+  total="Int"
+  query="String"
+  pagination="PageLinksView"
+  notice="String"
+/>
+<AdminLayout :title="t('Media library')">
+  <Island
+    name="media-upload"
+    :props="{
+      translations: translations,
+      locale: i18n.locale,
+      direction: i18n.direction,
+      csrfToken: csrfToken,
+      rules: mediaRules,
+      notice: notice,
+      error: error('media') ?? ''
+    }"
+    load="idle"
+  >
+    <div class="admin-page-heading">
+      <div>
+        <h1>{{ t('Media library') }}</h1>
+      </div>
+      <label class="button package-upload-button"
+        >{{ icon('upload') }}{{ t('Upload image') }}<input
+          type="file"
+          accept="{{ join(mediaRules.mimeTypes, ',') }}"
+      /></label>
+    </div>
+    <Alert :message="notice" />
+    <Alert error :message="error('media')" />
+  </Island>
+  <form class="category-search-form extension-search" action="/admin/media" method="get">
+    <label class="sr-only" for="media-query">{{ t('Find an image') }}</label>
+    <input
+      id="media-query"
+      name="q"
+      type="search"
+      maxlength="100"
+      value="{{ query }}"
+      placeholder="{{ t('Find images by title or description…') }}"
+    />
+    <button class="button button-outline">{{ t('Search') }}</button>
+  </form>
+  <div class="media-workspace" fragment="media-workspace">
+    <section>
+      <div class="media-library-grid">
+        <article
+          :for="image in images"
+          :class="['admin-card media-card', selectedImage and selectedImage.id == image.id ? 'selected']"
+        >
+          <a
+            class="media-select"
+            href="{{ url('/admin/media', q: query, cursor: query('cursor'), edit: image.id) }}"
+            swap="media-workspace"
+            ><img src="{{ image.url }}" alt="{{ image.alt }}" loading="lazy" /><strong
+              >{{ image.title ? image.title : image.filename }}</strong
+            ><span
+              >{{ image.width }} × {{ image.height }} · {{ image.kilobytes }} {{ t('KB') }}</span
+            ></a
+          >
+          <div class="media-card-actions">
+            <button
+              :if="not image.can_delete"
+              type="button"
+              class="button button-outline"
+              data-media-references="{{ image.id }}"
+            >
+              {{ icon('link') }} {{ t('References') }}
+            </button>
+            <span :else class="field-help">{{ t('Not in use') }}</span>
+            <button
+              type="submit"
+              form="media-delete-{{ image.id }}"
+              class="icon-button danger"
+              :disabled="not image.can_delete"
+              :title="not image.references_verified ? t('References could not be verified') : not image.can_delete ? t('Image in use') : t('Delete')"
+              :aria-label="not image.can_delete ? t('Deletion locked for {name}', name: image.title) : t('Delete {name}', name: image.title)"
+            >
+              {{ icon(image.can_delete ? 'trash' : 'lock') }}
+            </button>
+          </div>
+        </article>
+      </div>
+      <section :if="not images" class="admin-card empty-state">
+        {{ icon('image') }}
+        <h2>{{ t('No images') }}</h2>
+        <p>{{ t('Upload JPEG, PNG or GIF images up to 5 MB and 20 megapixels.') }}</p>
+      </section>
+      <Pagination :links="pagination" :count="size(images)" :noun="t('images')" />
+      <template :for="image in images"
+        ><form
+          :if="image.can_delete"
+          id="media-delete-{{ image.id }}"
+          action="/admin/media/{{ image.id }}/delete"
+          method="post"
+          data-well-confirm="{{ t('Delete “{name}”? This removes the uploaded file.', name: image.title) }}"
+        ></form
+      ></template>
+    </section>
+    <aside :if="selectedImage" class="admin-card settings-card media-details">
+      <img src="{{ selectedImage.url }}" alt="{{ selectedImage.alt }}" />
+      <h2>{{ t('Image details') }}</h2>
+      <form action="/admin/media/{{ selectedImage.id }}/save" method="post">
+        <label for="media-title">{{ t('Title') }}</label>
+        <input
+          id="media-title"
+          name="title"
+          value="{{ old('title') ?? selectedImage.title }}"
+          maxlength="180"
+        />
+        <label for="media-alt">{{ t('Image description') }}</label>
+        <textarea id="media-alt" name="alt" rows="4" maxlength="500">
+{{ old('alt') ?? selectedImage.alt }}</textarea>
+        <p class="field-help">
+          {{ t('Describe the image for readers using assistive technology.') }}
+        </p>
+        <button class="button" data-well-busy="{{ t('Saving…') }}">
+          {{ t('Save image details') }}
+        </button>
+      </form>
+    </aside>
+    <Island
+      name="media-references"
+      :props="{
+        translations: translations,
+        locale: i18n.locale,
+        direction: i18n.direction,
+        images: referenceImages
+      }"
+      load="idle"
+    ></Island>
+  </div>
+  <!-- prettier-ignore -->
+  <p class="field-help">{{ total }} {{ t('images. Referenced images are protected, including those in revisions and working copies.') }}</p>
+</AdminLayout>

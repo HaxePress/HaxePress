@@ -1,0 +1,17 @@
+<form class="language-switcher" method="post" action="/locale">
+  <input type="hidden" name="return_to" value="{{ returnPath() }}" />
+  <label
+    ><span class="sr-only">{{ t('Language') }}</span
+    ><select name="locale" aria-label="{{ t('Language') }}" data-well-autosubmit>
+      <option
+        :for="choice in i18n.locales"
+        value="{{ choice.code }}"
+        lang="{{ choice.code }}"
+        :selected="choice.code == i18n.locale"
+      >
+        {{ choice.name }}
+      </option>
+    </select></label
+  >
+  <noscript><button type="submit">{{ t('Change language') }}</button></noscript>
+</form>

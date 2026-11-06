@@ -1,6 +1,7 @@
 package hx.press.themes;
 
 import hx.press.CmsAccess;
+import hx.press.ai.AdminMcpMedia;
 import hx.press.CmsController;
 import hx.press.MediaCatalog;
 import hx.press.Pagination;
@@ -8,8 +9,6 @@ import hx.press.SiteController;
 import hx.press.content.ContentTypes;
 import hx.press.model.ContentType;
 import hx.press.model.ThemeDesign;
-import hx.press.model.MediaAsset;
-import hx.press.media.MediaReferences;
 import hx.press.themes.ThemeAiAccess.ThemeAiActor;
 import hx.well.facades.Storage;
 import hx.well.http.AbstractResponse;
@@ -26,23 +25,11 @@ class ThemeAiController {
             return SiteController.notFound(request);
         }
         var admin = CmsAccess.current();
-        var issued:Null<{token:String, expires:Float}> = null;
-        if (request.method == "POST") {
-            issued = ThemeAiAccess.create(id, admin);
-        } else if (request.method == "DELETE") {
-            ThemeAiAccess.revoke(id, admin.id);
-        }
-        var expires = issued == null ? ThemeAiAccess.expires(id, admin.id) : issued.expires;
         return ResponseBuilder.asJson({
-            token: issued == null ? null : issued.token,
-            expires: expires,
-            active: expires > Date.now().getTime(),
             permissions: ThemeAiPermissions.forAdmin(id, admin.id, CmsAccess.can("media")),
             mediaAllowed: CmsAccess.can("media"),
             presence: ThemeCollaboration.presence(id),
             browserPath: '/admin/themes/${id}/ai/ws',
-            mcpPath: '/mcp/themes/${id}',
-            websocketPath: '/mcp/themes/${id}/ws',
             hosted: ThemeMcpHost.available()
         }).header("Cache-Control", "private, no-store");
     }
@@ -124,21 +111,6 @@ class ThemeAiController {
             return ResponseBuilder.asJson({error: "This account cannot browse the media library."},
                 403);
         }
-        var image = MediaAsset.query.select(["filename", "mime_type"])
-            .where("id", Std.parseInt(request.route("media")))
-            .limit(1)
-            .first();
-        var disk = Storage.disk("media");
-        if (image == null
-            || !MediaReferences.validFilename(image.filename)
-            || !MediaReferences.mimeTypes.contains(image.mime_type)
-            || !disk.fileExists(image.filename)
-            || disk.size(image.filename) > MediaReferences.MAX_BYTES) {
-            return
-                ResponseBuilder.asJson({error: "Choose an available image from the media library."},
-                    404);
-        }
-        return disk.response(image.filename, image.filename,
-            ["Content-Type" => image.mime_type, "Cache-Control" => "private, no-store"]);
+        return AdminMcpMedia.read(Std.parseInt(request.route("media")));
     }
 }

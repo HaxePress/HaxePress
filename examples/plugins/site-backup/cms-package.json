@@ -1,0 +1,17 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "pluginId": "4731896a-89e5-4321-bdb1-565f752d3fb5",
+  "slug": "site-backup",
+  "name": "Backups",
+  "version": "2.16.0",
+  "description": "Prepare, verify and schedule private site backups.",
+  "author": "HaxePress",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.backup.BackupPlugin"
+  }
+}

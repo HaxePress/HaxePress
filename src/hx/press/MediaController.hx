@@ -2,21 +2,26 @@ package hx.press;
 
 import hx.press.AdminController;
 import hx.press.Pagination;
-import hx.well.facades.Inertia;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
 import hx.press.model.MediaAsset;
 import hx.press.media.MediaUsage;
 import hx.press.media.MediaReferenceReport;
+import hx.press.media.MediaReferences;
+import hx.press.view.View;
 import haxe.Exception;
 import hx.well.facades.Storage;
 
 class MediaController {
-    public static function index(request:Request, error:String = "",
-            status:Int = 200):AbstractResponse {
+    public static function index(request:Request, error:String = "", status:Int = 200,
+            returnUrl:String = "/admin/media"):AbstractResponse {
         if (!CmsAccess.can("media")) {
             return CmsController.forbidden(request);
+        }
+        var redirect = AdminController.validationRedirect(request, "media", error, returnUrl);
+        if (redirect != null) {
+            return redirect;
         }
         var search = StringTools.trim(request.query("q", "")).substr(0, 100);
         var cursor = Pagination.cursor(request);
@@ -41,12 +46,22 @@ class MediaController {
                 data.can_delete = false;
                 data.references_verified = false;
             }
+            data.kilobytes = Std.int(Math.ceil(image.size / 1024));
             return data;
         });
-        var redirect = AdminController.validationRedirect(request, "media", error, "/admin/media");
-        if (redirect != null) {
-            return redirect;
-        }
+        // Images in use open the references dialog, which needs only these fields.
+        var referenceImages = [
+            for (image in libraryImages)
+                if (image.can_delete != true) {
+                    id: image.id,
+                    filename: image.filename,
+                    title: image.title,
+                    alt: image.alt,
+                    url: image.url,
+                    canDelete: false,
+                    verified: image.references_verified
+                }
+        ];
         var notice = request.query("notice",
             "") == "saved" ? "Image details have been saved." : request.query("notice",
                 "") == "deleted" ? "The image has been deleted." : "";
@@ -55,12 +70,43 @@ class MediaController {
             "pagination" => links,
             "total" => total,
             "query" => search,
-            "notice" => notice
+            "notice" => notice,
+            "selectedImage" => selectedImage(request, libraryImages),
+            "referenceImages" => referenceImages,
+            "mediaRules" => MediaReferences.rules()
         ];
         if (error != "") {
             props.set("errors", ["media" => error]);
         }
-        return Inertia.render("Admin/Media", props).status(status);
+        return View.render("Admin/Media", props).status(status);
+    }
+
+    /** The image whose details are edited (`?edit=ID`), from this page or by its ID. **/
+    static function selectedImage(request:Request, images:Array<Dynamic>):Dynamic {
+        var editing = request.query("edit", "");
+        if (!~/^[1-9][0-9]{0,9}$/.match(editing)) {
+            return null;
+        }
+        var id = Std.parseInt(editing);
+        for (image in images) {
+            if (image.id == id) {
+                return image;
+            }
+        }
+        var stored = MediaAsset.query.select(["id", "filename", "title", "alt"])
+            .where("id", id)
+            .limit(1)
+            .first();
+        if (stored == null) {
+            return null;
+        }
+        return {
+            id: stored.id,
+            filename: stored.filename,
+            title: stored.title,
+            alt: stored.alt,
+            url: Storage.disk("media").url(stored.filename)
+        };
     }
 
     public static function references(request:Request):AbstractResponse {

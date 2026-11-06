@@ -2,6 +2,7 @@
   "apiVersion": 4,
   "cmsVersion": "2.16.0",
   "kind": "plugin",
+  "pluginId": "3e7d160d-52ba-47ab-860b-e91c1a33b826",
   "slug": "rss",
   "name": "RSS Feed",
   "version": "2.16.0",

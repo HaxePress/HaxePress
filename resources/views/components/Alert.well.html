@@ -1,0 +1,8 @@
+<props message="String?" error="Bool = false" />
+<div
+  :if="message"
+  class="alert {{ error ? 'error' : 'success' }}"
+  :role="error ? 'alert' : 'status'"
+>
+  {{ icon(error ? 'alert' : 'check') }}{{ t(message) }}
+</div>

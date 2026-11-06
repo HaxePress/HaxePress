@@ -1,0 +1,128 @@
+<props
+  tags="List<AdminTagView>"
+  total="Int"
+  query="String"
+  pagination="PageLinksView"
+  notice="String"
+  tagForm="AdminTagFormView"
+/>
+<AdminLayout :title="t('Tags')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Tags') }}</h1>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('tag')" />
+  <div class="categories-grid">
+    <section class="admin-card category-collection">
+      <div class="admin-card-heading">
+        <div>
+          <h2>{{ t('Your tags') }} <span class="count-badge">{{ total }}</span></h2>
+          <p>
+            {{ t('Tag archives show published content. Usage counts include drafts and pages.') }}
+          </p>
+        </div>
+      </div>
+      <form class="category-search-form" action="/admin/tags" method="get">
+        <label class="sr-only" for="tags-query">{{ t('Find a tag') }}</label>
+        <input
+          id="tags-query"
+          name="q"
+          type="search"
+          value="{{ query }}"
+          placeholder="{{ t('Find a tag by name…') }}"
+          maxlength="80"
+        />
+        <button class="button button-outline" type="submit">{{ t('Search') }}</button>
+      </form>
+      <ul :if="tags" class="category-list">
+        <li :for="tag in tags" :class="tagForm.id == (tag.id | string) ? 'editing'">
+          <div class="category-details">
+            <strong>{{ tag.name }}</strong>
+            <span
+              >{{ tag.items }} {{ t('content items') }}
+              <a href="/tags/{{ tag.slug }}" class="tag-archive-link"
+                >{{ t('View archive') }}</a
+              ></span
+            >
+          </div>
+          <div class="category-actions">
+            <a
+              class="icon-button"
+              aria-label="Edit {{ tag.name }}"
+              href="{{ url('/admin/tags', q: query, cursor: query('cursor'), edit: tag.id) }}#tag-name"
+              >{{ icon('edit') }}</a
+            >
+            <form action="/admin/tags/{{ tag.id }}/delete" method="post">
+              <button
+                type="submit"
+                class="icon-button danger"
+                aria-label="Delete {{ tag.name }}"
+                data-well-confirm="{{ t('Delete “{name}”? Its content assignments will be removed. Your content will be kept.', name: tag.name) }}"
+              >
+                {{ icon('trash') }}
+              </button>
+            </form>
+          </div>
+        </li>
+      </ul>
+      <div :else class="empty-state">
+        {{ icon('grid') }}
+        <h2>{{ t('Ideas that belong together.') }}</h2>
+        <p>{{ t('Create a tag, then add it to content in the editor.') }}</p>
+      </div>
+      <Pagination :links="pagination" :count="size(tags)" :noun="t('tags')" />
+    </section>
+    <section class="admin-card settings-card category-form">
+      <h2>{{ tagForm.id ? t('Edit tag') : t('Add a tag') }}</h2>
+      <p>{{ t('Names appear in the editor and on your public tag archives.') }}</p>
+      <Island name="admin-form" :props="{ translations: translations }" load="idle">
+        <form action="/admin/tags/save" method="post">
+          <input type="hidden" name="id" value="{{ tagForm.id }}" />
+          <label for="tag-name">{{ t('Tag name') }}</label>
+          <input
+            id="tag-name"
+            name="name"
+            value="{{ tagForm.name }}"
+            required
+            maxlength="80"
+            placeholder="{{ t('For example, Slow living') }}"
+            :autofocus="tagForm.id ? true : false"
+          />
+          <label for="tag-slug">{{ t('URL slug') }}</label>
+          <input
+            id="tag-slug"
+            name="slug"
+            value="{{ tagForm.slug }}"
+            required
+            maxlength="120"
+            data-slug-from="tag-name"
+          />
+          <p
+            class="field-help"
+            data-slug-preview="tag-slug"
+            data-slug-prefix="/tag/"
+            data-slug-empty="{{ t('your-tag') }}"
+          >
+            /tag/{{ tagForm.slug ? tagForm.slug : t('your-tag') }}
+          </p>
+          <label for="tag-description">{{ t('Description') }}</label>
+          <textarea id="tag-description" name="description" rows="4" maxlength="500">
+{{ tagForm.description }}</textarea>
+          <div class="category-form-actions">
+            <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+              {{ tagForm.id ? t('Save changes') : t('Add tag') }}
+            </button>
+            <a
+              :if="tagForm.id"
+              class="button button-outline"
+              href="{{ url('/admin/tags', q: query, cursor: query('cursor')) }}"
+              >{{ t('Cancel') }}</a
+            >
+          </div>
+        </form>
+      </Island>
+    </section>
+  </div>
+</AdminLayout>

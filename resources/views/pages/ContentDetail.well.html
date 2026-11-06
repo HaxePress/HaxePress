@@ -1,0 +1,47 @@
+<props item="ContentItemView" related="List<ContentItemView>" />
+<SiteLayout>
+  <PageHead
+    :title="item.seo_title ? item.seo_title : item.title"
+    :exactTitle="item.seo_title ? true : false"
+    :description="item.seo_description ? item.seo_description : item.excerpt"
+  />
+  <article class="simple-content">
+    <header>
+      <a href="{{ item.archiveUrl }}">{{ t('Back to content') }}</a>
+      <h1>{{ item.title }}</h1>
+      <p class="simple-deck">{{ item.excerpt }}</p>
+      <div class="simple-byline">
+        <span>{{ site.publisher_name ? site.publisher_name : site.site_name }}</span
+        ><time datetime="{{ item.published_at }}">{{ item.publishedLabel }}</time
+        ><span>{{ t('{count} min read', count: item.readMinutes) }}</span>
+      </div>
+      <nav :if="item.tags" class="simple-tags" aria-label="{{ t('Content tags') }}">
+        <template :for="tag in item.tags"
+          ><a :if="tag.url" href="{{ tag.url }}">#{{ tag.name }}</a
+          ><a :else href="/tags/{{ tag.slug | encode }}">#{{ tag.name }}</a></template
+        >
+      </nav>
+    </header>
+    <img :if="item.image" class="content-cover" src="{{ item.image }}" alt="{{ item.image_alt }}" />
+    <div class="content-prose">
+      <ExtensionSlot name="content.before" />
+      {{ markdown(item.content ?? '') }}
+      <FieldValues :definitions="item.fieldDefinitions" :values="item.fields" />
+      <ExtensionSlot name="content.after" />
+    </div>
+    <footer class="simple-content-footer">
+      <a href="{{ url(item.archiveUrl, category: item.category) }}">{{ item.category }}</a>
+      <Island name="share" :props="{ title: item.title, toast: false }" load="idle"
+        ><button class="button button-outline" type="button">
+          {{ t('Share this content item') }}
+        </button></Island
+      >
+    </footer>
+  </article>
+  <section :if="related" class="simple-related">
+    <h2>{{ t('More content') }}</h2>
+    <div class="content-list">
+      <ContentCard :for="entry in related" :item="entry" />
+    </div>
+  </section>
+</SiteLayout>

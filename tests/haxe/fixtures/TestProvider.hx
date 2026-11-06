@@ -17,14 +17,11 @@ class TestProvider extends AbstractProvider {
                 () -> new GuardedConnection(Sqlite.open(path)));
         }
         var probe = new WebSocketLifecycleProbe();
-        Route.websocket("/__fixtures/ws/lifecycle")
-            .handler(probe)
-            .attribute("inertia.share", false);
-        Route.get("/__fixtures/ws/status", request -> ResponseBuilder.asJson(probe.status()))
-            .attribute("inertia.share", false);
+        Route.websocket("/__fixtures/ws/lifecycle").handler(probe);
+        Route.get("/__fixtures/ws/status", request -> ResponseBuilder.asJson(probe.status()));
         Route.post("/__fixtures/ws/release", request -> {
             probe.release();
             return ResponseBuilder.asJson({released: true});
-        }).attribute("inertia.share", false);
+        });
     }
 }

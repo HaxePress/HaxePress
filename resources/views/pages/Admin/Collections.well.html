@@ -1,0 +1,98 @@
+<props
+  collections="List<ContentAdminCollectionView>"
+  pagination="PageLinksView"
+  query="String"
+  canManage="Bool"
+  notice="String"
+/>
+<AdminLayout :title="t('All collections')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('All collections') }}</h1>
+    </div>
+    <a :if="canManage" class="button" href="/admin/content-types/new"
+      >{{ icon('plus') }} {{ t('New collection') }}</a
+    >
+  </div>
+  <Alert
+    :message="notice == 'removed' ? t('The empty collection definition has been removed.') : ''"
+  />
+  <section class="admin-card">
+    <div class="admin-card-heading">
+      <h2>{{ t('Content types') }}</h2>
+      <form class="admin-search" action="/admin/collections" method="get">
+        {{ icon('search') }}
+        <label class="sr-only" for="collection-search">{{ t('Search collections') }}</label>
+        <input
+          id="collection-search"
+          name="q"
+          type="search"
+          value="{{ query }}"
+          maxlength="100"
+          placeholder="{{ t('Search collections') }}"
+        />
+      </form>
+    </div>
+    <div class="table-scroll">
+      <table class="content-table">
+        <thead>
+          <tr>
+            <th>{{ t('Collection') }}</th>
+            <th>{{ t('Content') }}</th>
+            <th>{{ t('Availability') }}</th>
+            <th>{{ t('Public path') }}</th>
+            <th><span class="sr-only">{{ t('Actions') }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for="type in collections">
+            <td>
+              <div class="table-content">
+                <span class="table-image-placeholder">{{ icon(type.icon) }}</span
+                ><span
+                  ><strong
+                    ><a :if="type.active" href="/admin/{{ type.admin_path }}">{{ t(type.name) }}</a
+                    ><template :else>{{ t(type.name) }}</template></strong
+                  ><small
+                    >{{ type.key }} <span :if="type.owner">{{ type.owner }}</span></small
+                  ></span
+                >
+              </div>
+            </td>
+            <td>{{ type.items }}</td>
+            <td>
+              <span class="status {{ type.active ? 'published' : 'draft' }}"
+                >{{ not type.active ? t('Disabled') : type.public_visible ? t('Public') :
+                t('Private') }}</span
+              >
+            </td>
+            <td>/{{ type.public_path }}/{slug}</td>
+            <td>
+              <div class="table-actions">
+                <a
+                  :if="type.active"
+                  class="button button-outline"
+                  href="/admin/{{ type.admin_path }}"
+                  >{{ t('Open collection') }}</a
+                >
+                <a
+                  :if="canManage"
+                  class="icon-button"
+                  href="/admin/content-types/{{ type.key }}/edit"
+                  aria-label="{{ t('Configure {name}', name: type.name) }}"
+                  >{{ icon('settings') }}</a
+                >
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div :if="not collections" class="empty-state">
+      {{ icon('layers') }}
+      <h2>{{ t('No matching collections') }}</h2>
+      <p>{{ t('Try another name or create a content type for your site.') }}</p>
+    </div>
+  </section>
+  <Pagination :links="pagination" :count="size(collections)" :noun="t('collections')" />
+</AdminLayout>

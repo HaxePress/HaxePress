@@ -4,7 +4,6 @@ import hx.well.config.IConfig;
 #if !cms_plugin
 import hx.press.middleware.SecurityMiddleware;
 import hx.press.install.InstallationMiddleware;
-import hx.press.middleware.HandleInertiaRequests;
 import hx.press.middleware.LocaleMiddleware;
 #end
 import hx.well.middleware.DatabaseMiddleware;
@@ -17,13 +16,7 @@ class MiddlewareConfig implements IConfig {
         #if cms_plugin
         return [];
         #else
-        return [
-            InstallationMiddleware,
-            DatabaseMiddleware,
-            SecurityMiddleware,
-            LocaleMiddleware,
-            HandleInertiaRequests
-        ];
+        return [InstallationMiddleware, DatabaseMiddleware, SecurityMiddleware, LocaleMiddleware];
         #end
     }
 }

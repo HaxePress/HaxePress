@@ -5,6 +5,7 @@ import haxe.Json;
 import haxe.io.Bytes;
 import haxe.io.BytesBuffer;
 import hx.press.ServerSettings;
+import hx.press.ai.AdminMcpAccess;
 import hx.well.facades.Environment;
 import hx.well.facades.Storage;
 import hx.well.internal.SecureToken;
@@ -124,6 +125,28 @@ class ThemeMcpHost {
 
     public static function exchange(themeId:String, authorization:String, method:String,
             body:Bytes, headers:Map<String, String>):McpReply {
+        return exchangePath('/themes/${StringTools.urlEncode(themeId)}', authorization, method,
+            body, headers);
+    }
+
+    public static function exchangeAdmin(sessionId:String, authorization:String, method:String,
+            body:Bytes, headers:Map<String, String>):McpReply {
+        var ticket = AdminMcpAccess.delegate(authorization, sessionId,
+            headers.get(AdminMcpAccess.BROWSER_HEADER));
+        headers.remove(AdminMcpAccess.BROWSER_HEADER);
+        headers.set(AdminMcpAccess.TICKET_HEADER, ticket);
+        try {
+            var reply = exchangePath("/admin", "", method, body, headers);
+            AdminMcpAccess.discardTicket(ticket);
+            return reply;
+        } catch (error:Dynamic) {
+            AdminMcpAccess.discardTicket(ticket);
+            throw error;
+        }
+    }
+
+    static function exchangePath(path:String, authorization:String, method:String, body:Bytes,
+            headers:Map<String, String>):McpReply {
         if (!available()) {
             throw new Exception("The site MCP service is unavailable.");
         }
@@ -131,14 +154,16 @@ class ThemeMcpHost {
             throw new Exception("The MCP request exceeds its size limit.");
         }
         #if jvm
-        var address = 'http://127.0.0.1:${port}/themes/${StringTools.urlEncode(themeId)}';
+        var address = 'http://127.0.0.1:${port}${path}';
         var connection:HttpURLConnection = cast new URL(address).openConnection();
         connection.setConnectTimeout(5000);
         connection.setReadTimeout(30000);
         connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod(method);
         connection.setRequestProperty("X-Haxepress-Bridge", secret);
-        connection.setRequestProperty("Authorization", authorization);
+        if (authorization != null && authorization != "") {
+            connection.setRequestProperty("Authorization", authorization);
+        }
         for (name => value in headers) {
             connection.setRequestProperty(name, value);
         }

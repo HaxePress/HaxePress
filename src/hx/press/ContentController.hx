@@ -6,8 +6,9 @@ import hx.press.CategoryData;
 import hx.press.Pagination;
 import hx.press.ContentItemData;
 import hx.press.data.ContentItemRecord;
+import hx.press.view.ContentAdminRows;
+import hx.press.view.View;
 import haxe.Json;
-import hx.well.facades.Inertia;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
@@ -17,6 +18,9 @@ import hx.press.model.EditorDraft;
 import hx.press.content.ContentTypes;
 import hx.press.content.ContentFields;
 import hx.press.content.ContentTypeDefinition;
+import hx.press.i18n.I18n;
+import hx.press.packages.ThemeData;
+import hx.well.validator.ValidatorRule;
 
 class ContentController {
     public static function base(kind:String):String {
@@ -60,8 +64,11 @@ class ContentController {
             case "deleted": "The content has been permanently deleted.";
             default: "";
         };
+        var listFields = ContentAdminRows.listFields(type);
+        var items = page.items.map(item ->
+            ContentAdminRows.withColumns(ContentItemData.adminSummary(item, type), listFields));
         var props = {
-            items: page.items.map(item -> ContentItemData.adminSummary(item, type)),
+            items: items,
             query: search,
             status: status,
             total: ContentData.count(kind, "", "", author),
@@ -73,9 +80,11 @@ class ContentController {
             notice: notice,
             kind: kind,
             contentType: type,
+            listFields: listFields,
+            showCategory: ContentTypes.supports(type, "categories"),
             workingDrafts: drafts
         };
-        return Inertia.render("Admin/Content", props);
+        return View.render("Admin/Content", props);
     }
 
     public static function newDocument(request:Request, kind:String):AbstractResponse {
@@ -102,6 +111,90 @@ class ContentController {
         return item == null ? SiteController.notFound(request) : renderEditor(request, item, type);
     }
 
+    public static function preview(request:Request, kind:String):AbstractResponse {
+        var type = ContentTypes.find(kind);
+        if (type == null) {
+            return SiteController.notFound(request);
+        }
+        if (!CmsAccess.can(type.capability)) {
+            return CmsController.forbidden(request);
+        }
+        if (!request.validate([
+            "id" => [String, Max(10)],
+            "title" => [String, Max(180)],
+            "slug" => [String, Max(180)],
+            "excerpt" => [String, Max(500)],
+            "content" => [String, Max(100000)],
+            "category" => [String, Max(80)],
+            "image" => [String, Max(2000)],
+            "image_alt" => [String, Max(500)],
+            "status" => [String, Max(30)],
+            "featured" => [String, Max(1)],
+            "published_at" => [String, Max(50)],
+            "tags" => [String, Max(1000)],
+            "seo_title" => [String, Max(200)],
+            "seo_description" => [String, Max(500)],
+            "scheduled_epoch" => [String, Max(32)],
+            "custom_fields" => [String, Max(64000)]
+        ])) {
+            return previewError("The preview exceeds the editor limits.");
+        }
+        var rawId:String = request.input("id", "");
+        var id = Std.parseInt(rawId) ?? 0;
+        if (rawId != "" && (id <= 0 || Std.string(id) != rawId)) {
+            return SiteController.notFound(request);
+        }
+        var existing:Null<ContentItem> = null;
+        if (id > 0) {
+            existing = ContentItem.query.select(["author_id", "version"])
+                .where("id", id)
+                .where("content_type", kind)
+                .first();
+            if (existing == null) {
+                return SiteController.notFound(request);
+            }
+            if (!CmsAccess.canEdit(existing.author_id)) {
+                return CmsController.forbidden(request);
+            }
+        }
+        var tags = ContentTypes.supports(type,
+            "tags") ? TagData.parse(request.input("tags", "")) : [];
+        if (tags == null) {
+            return previewError("Choose up to 10 existing tags.");
+        }
+        var fields:Dynamic;
+        try {
+            fields = ContentFields.validate(type, request.input("custom_fields", null), false);
+        } catch (invalid:Dynamic) {
+            return previewError(Std.string(invalid));
+        }
+        var draft = ContentItemData.fromEditor(request, type, id, existing);
+        draft.reading_minutes = ContentItemData.readingMinutes(draft.content);
+        draft.updated_at = SiteSettingsStore.timestamp();
+        if (ContentItemData.dateValue(draft.published_at) == "") {
+            draft.published_at = SiteSettingsStore.timestamp().substr(0, 10);
+        }
+        var settings = SiteSettingsStore.settings();
+        var home = id > 0 && settings.get("home_mode") == "page"
+            && Std.string(id) == settings.get("home_page");
+        var path = type.publicBase;
+        if (home) {
+            path = "/";
+        } else if (draft.slug != "") {
+            path = '${path}/${StringTools.urlEncode(draft.slug)}';
+        }
+        View.shareAll(SiteController.appearance(ThemeData.active(), path));
+        return SiteController.renderDocument(request, draft.toObject(), type, home, {
+            tags: tags,
+            fields: fields
+        });
+    }
+
+    static function previewError(message:String):AbstractResponse {
+        return ResponseBuilder.asString(I18n.t(message), 422)
+            .header("Content-Type", "text/plain; charset=utf-8");
+    }
+
     public static function editor(request:Request, item:ContentItemRecord, error:String = "",
             status:Int = 200):AbstractResponse {
         var type = ContentTypes.find(item.content_type);
@@ -119,15 +212,19 @@ class ContentController {
             return CmsController.forbidden(request);
         }
         var isNew = item.id == 0;
-        var url = isNew ? '${type.adminBase}/new' : '${type.adminBase}/${item.id}/edit';
+        var admin = CmsAccess.current();
+        var draftPrefix = 'draft-${admin.id}-${kind}-';
+        var submittedDraft = AdminController.input(request, "draft_key", 128);
+        var keepsDraft = isNew && StringTools.startsWith(submittedDraft, draftPrefix);
+        var newUrl = keepsDraft ? '${type.adminBase}/new?draft=${StringTools.urlEncode(submittedDraft)}' : '${type.adminBase}/new';
+        var url = isNew ? newUrl : '${type.adminBase}/${item.id}/edit';
         var redirect = AdminController.validationRedirect(request, "content", error, url);
         if (redirect != null) {
             return redirect;
         }
-        var admin = CmsAccess.current();
         var draftKey = item.id > 0 ? WorkingCopies.key(admin.id, kind,
             item.id) : request.query("draft", "");
-        if (item.id == 0 && !StringTools.startsWith(draftKey, 'draft-${admin.id}-${kind}-')) {
+        if (item.id == 0 && !StringTools.startsWith(draftKey, draftPrefix)) {
             draftKey = WorkingCopies.freshKey(admin.id, kind);
         }
         var working = WorkingCopies.find(admin.id, kind, item.id, draftKey);
@@ -144,6 +241,19 @@ class ContentController {
                     detail.fields);
             } catch (_:Dynamic) {}
         }
+        var canPublish = CmsAccess.can("publish");
+        var notice = request.query("notice", "") == "saved" ? "Your content has been saved." : "";
+        var editor = ContentEditorData.view(request, {
+            detail: detail,
+            type: type,
+            isNew: isNew,
+            hasCategories: hasCategories,
+            categories: options,
+            draftKey: draftKey,
+            workingCopy: working,
+            canPublish: canPublish,
+            notice: notice
+        });
         var props:Map<String, Dynamic> = [
             "item" => detail,
             "kind" => kind,
@@ -153,13 +263,14 @@ class ContentController {
             "categories" => options,
             "draftKey" => draftKey,
             "workingCopy" => working,
-            "canPublish" => CmsAccess.can("publish"),
-            "notice" => request.query("notice", "") == "saved" ? "Your content has been saved." : ""
+            "canPublish" => canPublish,
+            "notice" => notice,
+            "editor" => editor
         ];
         if (error != "") {
             props.set("errors", ["content" => error]);
         }
-        return Inertia.render("Admin/Editor", props).status(status);
+        return View.render("Admin/Editor", props).status(status);
     }
 
     public static function owned(id:Int, kind:String, ?version:Int):Bool {

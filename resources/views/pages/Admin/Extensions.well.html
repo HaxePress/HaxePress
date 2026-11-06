@@ -1,0 +1,284 @@
+<props
+  kind="String"
+  base="String"
+  packages="List<ExtensionPackageView>"
+  query="String"
+  pagination="PageLinksView"
+  notice="String"
+  uploadLimit="Int"
+  uploadMegabytes="Int"
+  uploadDisabled="Bool"
+  kindLabel="String"
+  total="Int"
+  githubAvailable="Bool"
+  inspection="ExtensionInspectionView?"
+  github="ExtensionGitHubView?"
+/>
+<AdminLayout :title="kind == 'theme' ? t('Themes') : t('Plugins')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ kind == 'theme' ? t('Themes') : t('Plugins') }}</h1>
+    </div>
+    <div class="package-actions">
+      <template :if="githubAvailable">
+        <button :if="uploadDisabled" class="button button-outline" type="button" disabled>
+          {{ icon('download') }}{{ t('Install from GitHub') }}
+        </button>
+        <a :else class="button button-outline" href="{{ base }}?github=1"
+          >{{ icon('download') }}{{ t('Install from GitHub') }}</a
+        >
+      </template>
+      <a :if="kind == 'theme'" class="button button-outline" href="/admin/themes/create"
+        >{{ icon('plus') }}{{ t('Create website design') }}</a
+      >
+      <Island
+        name="package-upload"
+        :props="{
+          translations: translations,
+          locale: i18n.locale,
+          direction: i18n.direction,
+          base: base,
+          label: kind == 'theme' ? 'Upload theme' : 'Upload plugin',
+          uploadLimit: uploadLimit,
+          disabled: uploadDisabled,
+          csrfToken: csrfToken
+        }"
+        load="idle"
+      >
+        <label class="button package-upload-button"
+          >{{ icon('upload') }}{{ kind == 'theme' ? t('Upload theme') : t('Upload plugin') }}<input
+            type="file"
+            accept=".zip,application/zip"
+            :disabled="uploadDisabled"
+        /></label>
+      </Island>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <div id="package-upload-error"></div>
+  <Alert error :message="error('package')" />
+  <section
+    :if="github"
+    class="admin-card github-plugin-picker"
+    aria-labelledby="github-plugin-title"
+  >
+    <div class="extension-card-title">
+      <h2 id="github-plugin-title">{{ t('Install from GitHub') }}</h2>
+      <a class="icon-button" href="{{ base }}" aria-label="{{ t('Close') }}">{{ icon('x') }}</a>
+    </div>
+    <Alert error :message="github.error ? github.error : error('github')" />
+    <form class="github-plugin-form" method="get" action="{{ base }}">
+      <input type="hidden" name="github" value="1" />
+      <label
+        >{{ t('GitHub repository URL') }}<input
+          type="url"
+          name="repository"
+          placeholder="https://github.com/owner/plugin"
+          required
+          maxlength="180"
+          value="{{ github.repository }}"
+      /></label>
+      <button
+        type="submit"
+        class="button button-outline"
+        data-well-busy="{{ t('Loading releases…') }}"
+      >
+        {{ t('Load releases') }}
+      </button>
+    </form>
+    <template :if="github.loaded">
+      <form
+        :if="github.releases"
+        class="github-plugin-form"
+        method="post"
+        action="/admin/plugins/github/inspect"
+      >
+        <input type="hidden" name="repository" value="{{ github.repository }}" />
+        <input type="hidden" name="release_page" value="{{ github.page }}" />
+        <label
+          >{{ t('Release ZIP') }}<select name="asset" required>
+            <option value="">{{ t('Choose a GitHub release ZIP.') }}</option>
+            <optgroup :for="release in github.releases" label="{{ release.label }}">
+              <option :for="file in release.assets" value="{{ file.id }}">{{ file.name }}</option>
+            </optgroup>
+          </select></label
+        >
+        <button type="submit" class="button" data-well-busy="{{ t('Inspecting package…') }}">
+          {{ t('Inspect release ZIP') }}
+        </button>
+      </form>
+      <p :else class="field-help">
+        {{ t('No installable ZIP files were found on this release page.') }}
+      </p>
+      <div :if="github.previous or github.next" class="package-actions">
+        <a :if="github.previous" class="button button-outline" href="{{ github.previous }}"
+          >{{ t('Previous releases') }}</a
+        >
+        <a :if="github.next" class="button button-outline" href="{{ github.next }}"
+          >{{ t('More releases') }}</a
+        >
+      </div>
+    </template>
+  </section>
+  <section :if="inspection" class="admin-card package-inspection">
+    <div>
+      <p class="small-label">{{ t('Ready to install') }}</p>
+      <h2>{{ inspection.name }} <span class="package-version">{{ inspection.version }}</span></h2>
+      <p>{{ inspection.description }}</p>
+      <p class="field-help">
+        {{ t('By') }} {{ inspection.author ? inspection.author : t('the package author') }} · {{
+        t(inspection.serverLabel) }}
+      </p>
+      <p :if="inspection.repository" class="field-help">
+        {{ t('GitHub repository') }}
+        <a href="{{ inspection.repository }}">{{ inspection.repository }}</a>
+      </p>
+    </div>
+    <p :if="inspection.installedVersion">
+      <template :if="inspection.builder"
+        >{{ t('This replaces the saved design and its published version. The theme keeps its current
+        active status.') }}</template
+      ><template :else
+        >{{ t('This will replace installed version') }} {{ inspection.installedVersion }}{{ t('.
+        Existing compatible settings are kept.') }}</template
+      >
+    </p>
+    <form class="package-actions" method="post" action="{{ base }}/install">
+      <input type="hidden" name="key" value="{{ inspection.key }}" />
+      <input type="hidden" name="replace" value="{{ inspection.replace }}" />
+      <button class="button" type="submit" data-well-busy="{{ t('Installing…') }}">
+        {{ inspection.installedVersion ? t('Replace package') : t('Install package') }}
+      </button>
+      <button class="button button-outline" type="submit" formaction="{{ base }}/discard">
+        {{ t('Discard upload') }}
+      </button>
+    </form>
+  </section>
+  <form class="category-search-form extension-search" method="get" action="{{ base }}">
+    <label class="sr-only" for="extension-search">{{ t('Find a package') }}</label>
+    <input
+      id="extension-search"
+      name="q"
+      type="search"
+      placeholder="Find a {{ kind }}…"
+      value="{{ query }}"
+      maxlength="80"
+    />
+    <button class="button button-outline">{{ t('Search') }}</button>
+  </form>
+  <div class="extension-grid">
+    <section
+      :for="item in packages"
+      class="admin-card extension-card"
+      :class="item.enabled ? 'extension-active'"
+    >
+      <a
+        :if="kind == 'theme'"
+        class="theme-thumbnail"
+        href="{{ base }}/{{ item.id }}/preview"
+        aria-label="{{ t('Preview {name}', name: item.localizedName) }}"
+        ><Island name="theme-thumbnail" :props="{ source: item.thumbnail }" load="idle"
+          ><div
+            class="theme-thumbnail-viewport"
+            data-theme-preview="{{ item.id }}"
+            data-preview-state="loading"
+          >
+            <span class="theme-thumbnail-status" role="status">{{ t('Loading preview…') }}</span>
+          </div></Island
+        ><span class="theme-thumbnail-open" aria-hidden="true"
+          >{{ icon('eye') }} {{ t('Preview') }}</span
+        ></a
+      >
+      <div class="extension-card-body">
+        <div class="extension-card-title">
+          <h2>{{ item.localizedName }}</h2>
+          <span class="status-badge {{ item.enabled ? 'published' : 'draft' }}"
+            >{{ item.enabled ? t('Active') : t('Inactive') }}</span
+          >
+        </div>
+        <p>
+          {{ item.localizedDescription ? item.localizedDescription : t('An extension for your
+          site.') }}
+        </p>
+        <p class="field-help">
+          {{ t('Version') }} {{ item.version }} · {{ item.author ? item.author : t('Independent
+          author') }}
+        </p>
+        <p :if="item.built_in" class="built-in-theme-note">
+          {{ icon('lock') }} {{ kind == 'theme' ? t('Built-in theme') : t('Bundled plugin') }}
+        </p>
+        <Alert error :message="item.last_error" />
+        <Alert
+          :if="item.restart_required == 1"
+          error
+          message="Plugin creation or destruction failed. The server may not function as expected until it is restarted."
+        />
+        <form class="package-actions" method="post" action="{{ base }}/{{ item.id }}/enable">
+          <template :if="item.designed"
+            ><a class="button button-outline" href="{{ base }}/{{ item.id }}/design"
+              >{{ icon('edit') }}{{ t('Edit design') }}</a
+            ><a
+              class="button button-outline"
+              href="{{ base }}/{{ item.id }}/export"
+              title="{{ t('Export saved design') }}"
+              >{{ icon('download') }}{{ t('Export theme') }}</a
+            ></template
+          >
+          <a
+            :if="kind == 'theme'"
+            class="button button-outline"
+            href="{{ base }}/{{ item.id }}/preview"
+            >{{ t('Preview') }}</a
+          >
+          <button
+            :if="not item.enabled"
+            class="button button-outline"
+            type="submit"
+            formaction="{{ base }}/{{ item.id }}/enable"
+          >
+            {{ kind == 'theme' ? t('Activate theme') : t('Activate') }}
+          </button>
+          <button
+            :if="item.enabled == 1 and kind == 'plugin'"
+            class="button button-outline"
+            type="submit"
+            formaction="{{ base }}/{{ item.id }}/disable"
+          >
+            {{ t('Deactivate') }}
+          </button>
+          <a
+            :if="item.setting_count > 0"
+            class="button button-outline"
+            href="{{ base }}/{{ item.id }}/settings"
+            >{{ t('Settings') }}</a
+          >
+          <button
+            :if="not item.built_in"
+            class="icon-button danger"
+            type="submit"
+            formaction="{{ base }}/{{ item.id }}/uninstall"
+            aria-label="Uninstall {{ item.localizedName }}"
+            :disabled="kind == 'theme' and item.enabled == 1"
+            data-well-confirm="Uninstall “{{ item.localizedName }}”? Its files and settings will be removed."
+          >
+            {{ icon('trash') }}
+          </button>
+        </form>
+      </div>
+    </section>
+  </div>
+  <section :if="not packages" class="admin-card empty-state">
+    {{ icon(kind == 'theme' ? 'layout' : 'grid') }}
+    <h2>{{ query ? t('No packages match this search.') : t('No packages installed') }}</h2>
+    <p>{{ t('Upload a CMS') }} {{ kind }} {{ t('ZIP to inspect it before installation.') }}</p>
+  </section>
+  <Pagination
+    :links="pagination"
+    :count="size(packages)"
+    :noun="kind == 'theme' ? 'themes' : 'plugins'"
+  />
+  <p class="field-help">
+    {{ total }} {{ t('installed') }} {{ kindLabel }}{{ t('. ZIP uploads up to') }} {{
+    uploadMegabytes }} {{ t('MB.') }}
+  </p>
+</AdminLayout>

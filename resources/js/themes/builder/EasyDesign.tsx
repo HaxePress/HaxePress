@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link } from '../../page';
 import { useTranslation } from '../../i18n';
 import { paletteChoices } from './friendly-presets';
 import type { ThemeDocument } from './types';

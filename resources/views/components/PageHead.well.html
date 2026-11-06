@@ -1,0 +1,9 @@
+<props title="String" admin="Bool = false" description="String?" exactTitle="Bool = false" />
+<well:head>
+  <title :if="exactTitle">{{ title }}</title>
+  <title :else>
+    {{ title }} — {{ site.site_name }}<template :if="admin"> {{ t('Administration') }}</template>
+  </title>
+  <meta name="description" content="{{ description ? description : site.description }}" />
+  <meta :if="admin" name="robots" content="noindex,nofollow" />
+</well:head>

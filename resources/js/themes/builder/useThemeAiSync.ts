@@ -158,7 +158,7 @@ export default function useThemeAiSync({
     load,
     connection,
     status: connection?.status || 'connecting',
-    presence: connection?.presence || { browsers: 0, llms: 0 },
+    presence: connection?.presence || { browsers: 0 },
     permissions: connection?.permissions || { read: false, edit: false, media: false },
   };
 }

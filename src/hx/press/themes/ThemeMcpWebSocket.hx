@@ -9,37 +9,31 @@ import hx.well.http.RequestStatic;
 import hx.well.websocket.AbstractWebSocketHandler;
 import hx.well.websocket.WebSocketSession;
 
-/** Both peers use the same SDK tools and theme channel; credentials stay server-side for browsers. */
+/** The signed-in editor keeps its local tools and receives live draft revisions. */
 class ThemeMcpWebSocket extends AbstractWebSocketHandler {
-    final browser:Bool;
-
-    public function new(browser:Bool = false) {
+    public function new() {
         super();
-        this.browser = browser;
     }
 
     public function onOpen(session:WebSocketSession):Void {
         var request = RequestStatic.request();
         var themeId = request.route("id");
         session.setAttribute("theme", themeId);
-        var authorization = request.header("Authorization", "");
         try {
-            if (!ThemeMcpHost.available() || (browser && !CmsAccess.can("extensions"))) {
+            if (!ThemeMcpHost.available() || !CmsAccess.can("extensions")) {
                 Connection.free();
                 session.close();
                 return;
             }
-            if (browser) {
-                authorization = ThemeAiAccess.browserCredential(themeId,
-                    request.session.sessionKey);
-            }
+            var authorization = ThemeAiAccess.browserCredential(themeId,
+                request.session.sessionKey);
             session.setAttribute("authorization", authorization);
             var actor = ThemeAiAccess.authenticateToken(themeId, authorization);
             if (actor == null) {
                 session.close();
             } else {
                 session.setAttribute("permissions", Json.stringify(actor.permissions));
-                ThemeCollaboration.attach(themeId, browser, authorization, actor, session, this);
+                ThemeCollaboration.attach(themeId, authorization, actor, session, this);
             }
         } catch (error:Dynamic) {
             Connection.free();
@@ -65,7 +59,7 @@ class ThemeMcpWebSocket extends AbstractWebSocketHandler {
                 return;
             }
             var permissions = Json.stringify(actor.permissions);
-            if (browser && session.getAttribute("permissions") != permissions) {
+            if (session.getAttribute("permissions") != permissions) {
                 session.setAttribute("permissions", permissions);
                 session.send(Json.stringify({
                     jsonrpc: "2.0",

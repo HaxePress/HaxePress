@@ -1,0 +1,57 @@
+<props email="String = ''" />
+<Document>
+  <Asset css="css/site.css" />
+  <Asset css="css/cms.css" />
+  <Asset css="css/admin.css" />
+  <div class="login-body">
+    <PageHead :title="t('Sign in')" admin />
+    <main class="login-panel">
+      <a class="back-link" href="/">{{ icon('arrow-left') }} {{ t('Back to website') }}</a>
+      <div class="login-form-wrap">
+        <p class="login-context">{{ site.site_name }}</p>
+        <h1>{{ t('Sign in') }}</h1>
+        <Alert error :message="error('credentials')" />
+        <form action="/admin/login" method="post" class="login-form">
+          <label for="email">{{ t('Email address') }}</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="{{ t('you@example.com') }}"
+            autocomplete="username"
+            value="{{ old('email') ?? email }}"
+            required
+            autofocus
+          />
+          <label for="password">{{ t('Password') }}</label>
+          <div class="password-input">
+            <input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="{{ t('Your password') }}"
+              autocomplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              class="icon-button"
+              aria-pressed="false"
+              aria-label="{{ t('Show password') }}"
+              data-well-reveal="password"
+              data-well-show-label="{{ t('Show password') }}"
+              data-well-hide-label="{{ t('Hide password') }}"
+            >
+              <span data-well-pressed="false">{{ icon('eye') }}</span
+              ><span data-well-pressed="true" hidden>{{ icon('eye-off') }}</span>
+            </button>
+          </div>
+          <button type="submit" class="button login-submit" data-well-busy="{{ t('Signing in…') }}">
+            {{ t('Sign in') }}
+          </button>
+        </form>
+      </div>
+      <footer class="login-bottom"><LanguageSwitcher /></footer>
+    </main>
+  </div>
+</Document>

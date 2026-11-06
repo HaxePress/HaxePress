@@ -15,7 +15,7 @@ def request(port, route):
             "GET",
             route,
             headers={
-                "X-Inertia": "true",
+                "X-Well-Data": "true",
                 "Accept": "application/json",
                 "Accept-Encoding": "identity",
             },

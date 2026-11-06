@@ -1,0 +1,100 @@
+<props
+  published="Int"
+  drafts="Int"
+  scheduled="Int"
+  collections="Int"
+  items="List<ContentAdminRowView>"
+  collectionCards="List<ContentAdminCollectionCardView>"
+  activity="List<ContentAdminActivityView>"
+  widgets="List<ExtensionBlockView>"
+/>
+<AdminLayout :title="t('Overview')">
+  <div class="admin-page-heading dashboard-heading">
+    <div>
+      <h1>{{ t('Overview') }}</h1>
+    </div>
+    <div class="package-actions">
+      <a :if="can('extensions')" class="button button-outline" href="/admin/themes/create"
+        >{{ icon('palette') }}{{ t('Build your website') }}</a
+      >
+      <a
+        :if="collectionCards[0]"
+        class="button"
+        href="/admin/{{ collectionCards[0].admin_path }}/new"
+        >{{ icon('plus') }} {{ t('Create {type}', type: t(collectionCards[0].singular)) }}</a
+      >
+    </div>
+  </div>
+  <section class="publication-summary" aria-label="{{ t('Site summary') }}">
+    <div class="site-stat site-stat-published">
+      <span class="publication-stat-label">{{ icon('file') }} {{ t('Published content') }}</span
+      ><strong>{{ published }}</strong>
+    </div>
+    <div class="site-stat site-stat-draft">
+      <span class="publication-stat-label">{{ icon('edit') }} {{ t('Drafts') }}</span
+      ><strong>{{ drafts }}</strong>
+    </div>
+    <div class="site-stat site-stat-pages">
+      <span class="publication-stat-label">{{ icon('layers') }} {{ t('Collections') }}</span
+      ><strong>{{ collections }}</strong>
+    </div>
+    <div class="site-stat site-stat-scheduled">
+      <span class="publication-stat-label">{{ icon('clock') }} {{ t('Scheduled content') }}</span
+      ><strong>{{ scheduled }}</strong>
+    </div>
+  </section>
+  <section :if="collectionCards" class="admin-card dashboard-collections">
+    <div class="admin-card-heading">
+      <div>
+        <h2>{{ t('Your collections') }}</h2>
+        <p>{{ t('Each collection uses its own fields and editor features.') }}</p>
+      </div>
+      <a href="/admin/collections" class="text-link"
+        >{{ t('All collections') }} {{ icon('arrow-right') }}</a
+      >
+    </div>
+    <div class="collection-shortcuts">
+      <a :for="card in collectionCards" href="/admin/{{ card.admin_path }}"
+        >{{ icon(card.icon) }}<span
+          ><strong>{{ t(card.name) }}</strong
+          ><small>{{ t('Content count', count: card.items) }}</small></span
+        >{{ icon('chevron-right') }}</a
+      >
+    </div>
+  </section>
+  <div class="dashboard-grid">
+    <section class="admin-card recent-content-card">
+      <div class="admin-card-heading">
+        <div>
+          <h2>{{ t('Recent content') }}</h2>
+          <p>{{ t('The latest changes across your collections.') }}</p>
+        </div>
+      </div>
+      <ContentTable :if="items" :items="items" compact />
+      <div :else class="empty-state">
+        {{ icon('file') }}
+        <h2>{{ t('No content') }}</h2>
+        <p>{{ t('Choose a collection to create your first content item.') }}</p>
+      </div>
+    </section>
+    <section :if="can('activity')" class="admin-card activity-card">
+      <div class="admin-card-heading">
+        <h2>{{ t('Recent activity') }}</h2>
+        <a href="/admin/activity" class="text-link"
+          >{{ t('View all') }} {{ icon('arrow-right') }}</a
+        >
+      </div>
+      <div class="dashboard-activity">
+        <div :for="entry in activity">
+          <strong>{{ entry.actor }}</strong>
+          <p>{{ t(entry.action) }} · {{ entry.label }}</p>
+          <small>{{ entry.created_at }}</small>
+        </div>
+        <p :empty class="empty-state">{{ t('No activity yet.') }}</p>
+      </div>
+    </section>
+  </div>
+  <div :if="widgets" class="dashboard-widgets">
+    <section :for="widget in widgets" class="admin-card">{{ markdown(widget.content) }}</section>
+  </div>
+</AdminLayout>

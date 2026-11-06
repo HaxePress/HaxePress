@@ -26,9 +26,9 @@
   "uuid": "2.4.1",
   "hxjava": "4.2.0",
   "hxcpp": "4.3.2",
-  "hxwell-inertia": {
-    "version": "0.0.1",
-    "repository": "https://github.com/hxwell/hxwell-inertia",
-    "commit": "243c3b22a13a1c141c5b95fb59fa1031316c782c"
+  "wellout": {
+    "version": "0.1.0",
+    "repository": "https://github.com/hxwell/wellout",
+    "commit": "8566dac6bf34dfbfdd0c0e9c5567c7c684ba4dbe"
   }
 }

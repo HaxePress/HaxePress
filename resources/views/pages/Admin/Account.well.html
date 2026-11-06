@@ -1,0 +1,72 @@
+<props member="AdminAccountMemberView" notice="String" />
+<AdminLayout :title="t('Your account')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Your account') }}</h1>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('account')" />
+  <div class="settings-grid">
+    <section class="admin-card settings-card">
+      <h2>{{ t('Profile') }}</h2>
+      <p>{{ member.email }} · <span class="role-label">{{ t(member.roleLabel) }}</span></p>
+      <form action="/admin/account" method="post">
+        <label for="account-name">{{ t('Display name') }}</label>
+        <input
+          id="account-name"
+          name="name"
+          required
+          maxlength="100"
+          value="{{ old('name') ?? member.name }}"
+        />
+        <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+          {{ t('Save profile') }}
+        </button>
+      </form>
+    </section>
+    <section class="admin-card settings-card">
+      <h2>{{ t('Password') }}</h2>
+      <p>{{ t('Use a different password from your other accounts.') }}</p>
+      <form action="/admin/password" method="post">
+        <Alert error :message="error('password')" />
+        <input type="hidden" name="return_to" value="account" />
+        <label for="current-password">{{ t('Current password') }}</label>
+        <input
+          id="current-password"
+          name="current_password"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
+        <label for="new-password">{{ t('New password') }}</label>
+        <input
+          id="new-password"
+          name="new_password"
+          type="password"
+          autocomplete="new-password"
+          required
+          minlength="12"
+          maxlength="72"
+        />
+        <p class="field-help">
+          {{ t('Use at least 12 characters, up to 72 bytes. Other signed-in sessions will expire.')
+          }}
+        </p>
+        <label for="confirm-password">{{ t('Confirm new password') }}</label>
+        <input
+          id="confirm-password"
+          name="confirm_password"
+          type="password"
+          autocomplete="new-password"
+          required
+          minlength="12"
+          maxlength="72"
+        />
+        <button class="button button-outline" type="submit" data-well-busy="{{ t('Updating…') }}">
+          {{ t('Update password') }}
+        </button>
+      </form>
+    </section>
+  </div>
+</AdminLayout>

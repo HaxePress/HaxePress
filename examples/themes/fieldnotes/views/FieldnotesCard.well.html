@@ -1,0 +1,25 @@
+<props item="ContentItemView" />
+<article class="content-card">
+  <a class="content-image" href="{{ item.url }}" aria-label="{{ item.title }}"
+    ><img :if="item.image" src="{{ item.image }}" alt="{{ item.image_alt }}" loading="lazy" /><span
+      :else
+      class="content-image-placeholder"
+      aria-hidden="true"
+      >✳</span
+    ><span class="image-arrow">{{ icon('arrow-up-right') }}</span></a
+  >
+  <div class="card-topline">
+    <a
+      class="category-pill {{ item.category | lower | replace(' ', '-') }}"
+      href="{{ url(item.archiveUrl, category: item.category) }}"
+      >{{ item.category }}</a
+    ><span>{{ t('{count} min read', count: item.readMinutes) }}</span>
+  </div>
+  <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
+  <p>{{ item.excerpt }}</p>
+  <FieldValues :definitions="item.fieldDefinitions" :values="item.fields" />
+  <div class="card-meta">
+    <span>{{ item.publishedLabel }}</span><span class="meta-dot"></span
+    ><span>{{ site.publisher_name ? site.publisher_name : site.site_name }}</span>
+  </div>
+</article>

@@ -1,0 +1,80 @@
+<props field="ExtensionSettingFieldView" />
+<div class="extension-setting">
+  <label for="setting-{{ field.key }}"
+    >{{ field.label }}<template :if="field.required"> *</template></label
+  >
+  <template :if="field.kind == 'color'">
+    <label :if="not field.required" class="checkbox-label optional-color-toggle">
+      <input type="checkbox" data-color-toggle :checked="field.colorEnabled" />
+      {{ t('Use custom color') }}
+    </label>
+    <div class="setting-color-control" data-color-control>
+      <input
+        id="setting-{{ field.key }}"
+        type="color"
+        :value="field.colorValue"
+        :disabled="not field.colorEnabled"
+        data-color-picker
+      />
+      <input
+        :name="field.key"
+        aria-label="{{ t('{name} hex value', name: field.label) }}"
+        type="text"
+        :value="field.value"
+        :disabled="not field.colorEnabled"
+        pattern="#[0-9a-fA-F]{6}"
+        maxlength="7"
+        placeholder="#2457a6"
+        :required="field.required"
+        data-color-text
+      />
+    </div>
+  </template>
+  <textarea
+    :else-if="field.kind == 'textarea'"
+    id="setting-{{ field.key }}"
+    :name="field.key"
+    rows="5"
+    maxlength="2000"
+    :required="field.required"
+  >
+{{ field.value }}</textarea>
+  <select
+    :else-if="field.kind == 'select'"
+    id="setting-{{ field.key }}"
+    :name="field.key"
+    :required="field.required"
+  >
+    <option :for="option in field.options" :value="option.value" :selected="option.selected">
+      {{ option.label }}
+    </option>
+  </select>
+  <label :else-if="field.kind == 'boolean'" class="checkbox-label"
+    ><input type="hidden" :name="field.key" value="false" /><input
+      id="setting-{{ field.key }}"
+      type="checkbox"
+      :name="field.key"
+      value="true"
+      :checked="field.checked"
+    />{{ t('Enabled') }}</label
+  >
+  <input
+    :else
+    id="setting-{{ field.key }}"
+    :type="field.inputType"
+    :name="field.key"
+    :value="field.kind == 'secret' ? '' : field.value"
+    :required="field.required and not field.secretSaved"
+    :min="field.minimum ? field.minimum : null"
+    :max="field.maximum ? field.maximum : null"
+    :step="field.kind == 'number' ? 'any' : null"
+    :maxlength="field.maxLength"
+    :placeholder="field.secretSaved ? t('Saved value. Enter a replacement.') : null"
+    :autocomplete="field.kind == 'secret' ? 'new-password' : null"
+  />
+  <p :if="field.help" class="field-help">{{ field.help }}</p>
+  <label :if="field.kind == 'secret' and field.secretSaved" class="checkbox-label">
+    <input type="checkbox" name="clear_{{ field.key }}" value="1" />
+    {{ t('Clear saved value') }}
+  </label>
+</div>

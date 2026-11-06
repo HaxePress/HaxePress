@@ -1,6 +1,7 @@
 """Fresh installs require a trusted socket peer and write private, literal configuration."""
 
 import base64
+import html
 import http.client
 import http.cookies
 import json
@@ -12,16 +13,16 @@ import sys
 import socket
 import stat
 import subprocess
+import re
 import tempfile
 import time
 import urllib.parse
 
-from e2e import check, InertiaPageParser
+from e2e import check
 from fixture_store import FixtureStore, TEST_BINARY
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = Path(os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
-SSR = Path(os.environ.get("CMS_TEST_SSR_PATH", ROOT / "bootstrap/ssr/ssr.js"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from setup import prepare_environment
 
@@ -38,16 +39,20 @@ class SetupClient:
         self.cookies = {}
         self.csrf = ""
 
-    def request(self, path, values=None, headers=None, csrf=True, inertia=False):
+    def request(
+        self, path, values=None, headers=None, csrf=True, data=False, raw=None, binary=False
+    ):
         fields = {"Accept": "application/json"}
         if self.cookies:
             fields["Cookie"] = "; ".join(f"{key}={value}" for key, value in self.cookies.items())
-        if inertia:
-            fields["X-Inertia"] = "true"
+        if data:
+            fields["X-Well-Data"] = "true"
         body = None
-        if values is not None:
-            body = json.dumps(values)
-            fields["Content-Type"] = "application/json"
+        if values is not None or raw is not None:
+            body = raw if raw is not None else json.dumps(values)
+            fields["Content-Type"] = (
+                "application/octet-stream" if raw is not None else "application/json"
+            )
             if csrf:
                 fields["X-CSRF-TOKEN"] = self.csrf
         fields.update(headers or {})
@@ -55,9 +60,9 @@ class SetupClient:
             self.address.hostname, self.address.port, timeout=35
         )
         try:
-            connection.request("GET" if values is None else "POST", path, body, fields)
+            connection.request("GET" if body is None else "POST", path, body, fields)
             response = connection.getresponse()
-            payload = response.read().decode()
+            payload = response.read()
             for key, value in response.getheaders():
                 if key.lower() == "set-cookie":
                     parsed = http.cookies.SimpleCookie()
@@ -65,26 +70,27 @@ class SetupClient:
                     for name, item in parsed.items():
                         self.cookies[name] = item.value
             normalized = {key.lower(): value for key, value in response.getheaders()}
+            if binary:
+                return response.status, normalized, payload
+            payload = payload.decode()
             if "application/json" in normalized.get("content-type", ""):
-                data = json.loads(payload) if payload else {}
-                if inertia and data.get("props", {}).get("csrfToken"):
-                    self.csrf = data["props"]["csrfToken"]
+                result = json.loads(payload) if payload else {}
+                if normalized.get("x-well-data") == "true" and result["props"].get("csrfToken"):
+                    self.csrf = result["props"]["csrfToken"]
             else:
-                data = payload
-                parser = InertiaPageParser()
-                parser.feed(payload)
-                if parser.pages:
-                    self.csrf = parser.pages[0]["props"].get("csrfToken") or self.csrf
-            return response.status, normalized, data
+                result = payload
+                token = re.search(r'name="_token" value="([^"]+)"', payload)
+                if token:
+                    self.csrf = html.unescape(token.group(1))
+            return response.status, normalized, result
         finally:
             connection.close()
 
 
 class SetupServer:
-    def __init__(self, work, trusted):
+    def __init__(self, work, trusted, *, app_key=None):
         self.work = work
         self.port = port()
-        self.ssr_port = port()
         self.url = f"http://127.0.0.1:{str(self.port)}"
         work.chmod(0o700)
         (work / "storage").mkdir()
@@ -94,6 +100,8 @@ class SetupServer:
         initial_key_line = next(
             line for line in (work / ".env").read_text().splitlines() if line.startswith("APP_KEY=")
         )
+        if app_key is not None:
+            initial_key_line = f"APP_KEY={app_key}"
         self.application_key_line = initial_key_line
         values = {
             "APP_NAME": "haxepress_test",
@@ -108,11 +116,7 @@ class SetupServer:
             "STORAGE_PATH": str(work / "storage"),
             "CACHE_PATH": str(work / "storage/cache"),
             "SESSION_PATH": str(work / "storage/sessions"),
-            "VITE_USE_BUILD": "true",
-            "VITE_INCLUDE_PAGE_ENTRY": "false",
-            "INERTIA_SSR_ENABLED": "true",
-            "INERTIA_SSR_URL": f"http://127.0.0.1:{str(self.ssr_port)}/render",
-            "INERTIA_SSR_TIMEOUT": "3",
+            "WELL_DATA_RESPONSES": "1",
             "UNRELATED_SETTING": "preserved",
         }
         if trusted is not None:
@@ -120,35 +124,7 @@ class SetupServer:
         (work / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         (work / ".env").chmod(0o600)
         self.log = (work / "runtime.log").open("w+")
-        self.renderer = subprocess.Popen(
-            ["node", str(SSR)],
-            cwd=ROOT,
-            env={
-                **os.environ,
-                "INERTIA_SSR_PORT": str(self.ssr_port),
-                "CMS_STORAGE_PATH": str(work / "storage"),
-            },
-            stdout=self.log,
-            stderr=subprocess.STDOUT,
-        )
         self.process = None
-        deadline = time.monotonic() + 45
-        while time.monotonic() < deadline and self.renderer.poll() is None:
-            try:
-                connection = http.client.HTTPConnection("127.0.0.1", self.ssr_port, timeout=1)
-                connection.request("GET", "/health")
-                response = connection.getresponse()
-                response.read()
-                connection.close()
-                if response.status == 200:
-                    break
-            except OSError:
-                pass
-            time.sleep(0.1)
-        else:
-            self.stop(self.renderer)
-            self.log.close()
-            raise RuntimeError("The installation SSR process did not become ready.")
         self.start()
 
     def start(self):
@@ -164,7 +140,7 @@ class SetupServer:
             if self.process.poll() is not None:
                 break
             try:
-                status, _, data = client.request("/admin/install", inertia=True)
+                status, _, _ = client.request("/admin/install", data=True)
                 if status in (200, 403, 404):
                     return
             except (OSError, http.client.HTTPException):
@@ -187,7 +163,6 @@ class SetupServer:
 
     def close(self):
         self.stop(self.process)
-        self.stop(self.renderer)
         self.log.close()
         if sys.exc_info()[0] is not None:
             failure = ROOT / "outputs/installer/failure" / self.work.name
@@ -206,7 +181,7 @@ def verify_mysql(mysql_port, mysql_work):
             server = SetupServer(Path(directory), "127.0.0.1")
             try:
                 client = SetupClient(server.url)
-                client.request("/admin/install", inertia=True)
+                client.request("/admin/install", data=True)
                 fields = {
                     "driver": "mysql",
                     "host": "127.0.0.1",
@@ -235,7 +210,7 @@ def verify_mysql(mysql_port, mysql_work):
                     f"MySQL schema/bootstrap failed: {str(result)}",
                 )
                 check(
-                    client.request("/admin", inertia=True)[0] == 200,
+                    client.request("/admin", data=True)[0] == 200,
                     "MySQL administrator dashboard failed",
                 )
                 config = (server.work / ".env").read_text()
@@ -354,7 +329,7 @@ def run():
                 for header in ("Forwarded", "X-Forwarded-For", "X-Real-IP"):
                     value = "for=127.0.0.1" if header == "Forwarded" else "127.0.0.1"
                     status, headers, data = client.request(
-                        "/admin/install", headers={header: value}, inertia=True
+                        "/admin/install", headers={header: value}, data=True
                     )
                     check(
                         status == 403 and data["props"]["setup"]["blocked"],
@@ -383,7 +358,7 @@ def run():
                     status == 303 and headers.get("location") == "/admin/install",
                     "Loopback did not automatically redirect to setup",
                 )
-                status, _, data = client.request("/admin/install", inertia=True)
+                status, _, data = client.request("/admin/install", data=True)
                 check(
                     status == 200
                     and not data["props"]["setup"]["blocked"]
@@ -403,18 +378,32 @@ def run():
                 == 403,
                 "Forwarded identity headers were accepted",
             )
-            status, _, data = client.request("/admin/install", inertia=True)
+            status, _, data = client.request("/admin/install", data=True)
             check(
                 status == 200 and not data["props"]["setup"]["blocked"] and client.csrf,
                 "Trusted setup did not open with CSRF",
             )
-            html_status, _, html = client.request("/admin/install")
+            html_status, html_headers, page = client.request("/admin/install")
             check(
                 html_status == 200
-                and "Connect your database" in html
-                and "setup-shell" in html
-                and "noindex,nofollow" in html,
-                "The installation screen did not render through SSR",
+                and "Connect your database" in page
+                and "setup-shell" in page
+                and "noindex,nofollow" in page
+                and "data-page=" not in page
+                and 'name="_token"' in page
+                and html_headers.get("cache-control") == "private, no-store",
+                "The installation screen did not render as server HTML",
+            )
+            fragment_status, fragment_headers, fragment = client.request(
+                "/admin/install", headers={"Well-Fragment": "setup"}
+            )
+            check(
+                fragment_status == 200
+                and fragment_headers.get("well-fragment") == "setup"
+                and fragment.startswith('<section class="setup-content"')
+                and "Connect your database" in fragment
+                and "<html" not in fragment,
+                "The installation fragment request did not return only the setup section",
             )
             check(
                 client.request(
@@ -510,13 +499,22 @@ def run():
                 "An installation configuration temporary was left behind",
             )
             check(
-                client.request("/admin", inertia=True)[0] == 200,
+                client.request("/admin", data=True)[0] == 200,
                 "Setup did not authenticate the new administrator",
             )
-            check(
-                client.request("/admin/install", inertia=True)[0] == 404,
-                "The installer reopened after completion",
-            )
+            for path, values in (
+                ("/admin/install", None),
+                ("/admin/install/database", {}),
+                ("/admin/install/finish", {}),
+            ):
+                status, headers, page = client.request(path, values, csrf=False, data=True)
+                check(
+                    status == 404
+                    and isinstance(page, dict)
+                    and page.get("component") == "NotFound"
+                    and "set-cookie" not in headers,
+                    f"{path} did not reach the site 404 before session and CSRF middleware",
+                )
             with FixtureStore(server.work) as store:
                 admin = store.rows(
                     "admins",
@@ -535,7 +533,7 @@ def run():
             SetupServer.stop(server.process)
             server.start()
             after = SetupClient(server.url)
-            check(after.request("/admin/install", inertia=True)[0] == 404, "Restart reopened setup")
+            check(after.request("/admin/install", data=True)[0] == 404, "Restart reopened setup")
             check(
                 after.request("/admin/login")[0] == 200 and after.csrf,
                 "Login did not open after setup restart",

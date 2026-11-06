@@ -307,7 +307,7 @@ def verify(fixtures):
         )
         check(
             "An unsaved portable design" in public.request("/")[2],
-            "Imported theme did not render through SSR",
+            "Imported theme did not render as server HTML",
         )
         invalid = dict(files)
         invalid.pop(f"media/{package_filename}")

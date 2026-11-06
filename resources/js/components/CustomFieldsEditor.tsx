@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { usePage } from '@inertiajs/react';
 import type { ContentFieldDefinition, CustomFieldValue, CustomFieldValues } from '../content';
-import type { SharedProps } from '../types';
 import { useTranslation } from '../i18n';
-import { uploadManagedImage } from '../media';
+import { uploadManagedImage, type MediaRules } from '../media';
 import MediaPicker from './MediaPicker';
 import Icon from './Icon';
 
@@ -13,15 +11,18 @@ export default function CustomFieldsEditor({
   publishing,
   onChange,
   onBusyChange,
+  csrfToken,
+  mediaRules,
 }: {
   definitions: ContentFieldDefinition[];
   values: CustomFieldValues;
   publishing: boolean;
   onChange: (key: string, value: CustomFieldValue) => void;
   onBusyChange: (busy: boolean) => void;
+  csrfToken: string | null;
+  mediaRules?: MediaRules;
 }) {
   const { t } = useTranslation();
-  const { csrfToken, mediaRules } = usePage<SharedProps>().props;
   const [libraryField, setLibraryField] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState('');

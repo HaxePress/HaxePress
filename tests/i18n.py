@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+from uuid import NAMESPACE_URL, uuid5
 import zipfile
 
 from cms_content import props
@@ -13,7 +14,7 @@ from fixture_store import FixtureStore
 from content_cache import clear_content
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADERS = {"X-Inertia": "true", "Accept": "application/json"}
+HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
 
 
 def run():
@@ -39,8 +40,11 @@ def run():
         initial = props(public, "/")
         check(initial["i18n"]["locale"] == "en", "default language changed")
         status, headers, html = public.request("/?lang=tr")
-        check(status == 200 and '<html lang="tr" dir="ltr">' in html, "SSR document language")
-        check("Son içerikler" in html, "React SSR translation")
+        check(
+            status == 200 and '<html lang="tr" dir="ltr">' in html,
+            "server-rendered document language",
+        )
+        check("Son içerikler" in html, "server-rendered translation")
         check(
             headers.get("content-language") == "tr" and "set-cookie" not in headers,
             "stateless language request",
@@ -109,11 +113,17 @@ def run():
             "language endpoint redirects outside the site",
         )
         preview_page = props(owner, "/admin/themes/theme-notebook/preview?lang=tr")
-        preview = owner.request(preview_page["preview"]["url"])[2]
-        preview_props = props(owner, preview_page["preview"]["url"])
+        preview_html = owner.request("/admin/themes/theme-notebook/preview?lang=tr")[2]
         check(
-            preview_props["i18n"]["catalogues"]["theme-notebook"]["Notebook"] == "Defter",
+            preview_page["preview"]["name"] == "Defter" and "Defter" in preview_html,
             "inactive theme catalogue was not used in preview",
+        )
+        frame_status, _, frame = owner.request(preview_page["preview"]["url"])
+        check(
+            frame_status == 200
+            and '<html lang="tr" dir="ltr">' in frame
+            and props(owner, preview_page["preview"]["url"])["theme"]["id"] == "theme-notebook",
+            "inactive theme preview frame did not render in the selected language",
         )
         check(
             props(Client(), "/")["theme"]["slug"] == "simple",
@@ -139,7 +149,12 @@ def run():
         }
 
         def package(slug, text, version="2.16.0"):
-            manifest = {**base, "slug": slug, "version": version}
+            manifest = {
+                **base,
+                "slug": slug,
+                "version": version,
+                "pluginId": str(uuid5(NAMESPACE_URL, f"haxepress-test:{slug}")),
+            }
             return zip_bytes(
                 manifest,
                 {
@@ -274,7 +289,7 @@ def run():
             "translation changed editorial content",
         )
     print(
-        "PASS Translation system: English/Turkish SSR, request isolation, session-free preferences, native/plugin/theme namespaces, fallbacks/plurals, catalogue validation and replacement",
+        "PASS Translation system: English/Turkish server rendering, request isolation, session-free preferences, native/plugin/theme namespaces, fallbacks/plurals, catalogue validation and replacement",
         flush=True,
     )
 

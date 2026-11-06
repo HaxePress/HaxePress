@@ -9,13 +9,14 @@ class PackageBundles {
     public static function ensure():Void {
         BuiltInTheme.ensure();
         ensureThemes();
-        ensureFeatures();
+        BuiltInPlugins.ensure();
         upgradeCmsRelease();
         ensureTranslations();
     }
 
     static function upgradeCmsRelease():Void {
-        var marker = 'cms_bundles_${CmsVersion.version}_api_${CmsVersion.pluginApiVersion}';
+        // The `views` suffix reinstalls bundled themes once, replacing their browser renderers.
+        var marker = 'cms_bundles_${CmsVersion.version}_api_${CmsVersion.pluginApiVersion}_views';
         if (Setting.query.where("key", marker).exists()) {
             return;
         }
@@ -23,12 +24,6 @@ class PackageBundles {
             {slug: "fieldnotes", kind: "theme", entrypoint: ""},
             {slug: "notebook", kind: "theme", entrypoint: ""},
             {slug: "gallery", kind: "theme", entrypoint: ""},
-            {slug: "rss", kind: "plugin", entrypoint: "extensions.rss.RssPlugin"},
-            {
-                slug: "newsletter",
-                kind: "plugin",
-                entrypoint: "extensions.newsletter.NewsletterPlugin"
-            },
             {slug: "reading-companion", kind: "plugin", entrypoint: "example.reading.ReadingPlugin"}
         ];
         for (bundle in bundles) {
@@ -37,8 +32,9 @@ class PackageBundles {
                 continue;
             }
             var manifest = PackageManifest.parse(installed.manifest);
+            var browserRenderer = manifest.renderer != "" && manifest.views == "";
             if (manifest.cmsVersion == CmsVersion.version
-                && manifest.apiVersion == CmsVersion.pluginApiVersion) {
+                && manifest.apiVersion == CmsVersion.pluginApiVersion && !browserRenderer) {
                 continue;
             }
             if (!["Fieldnotes", "HxWell CMS", "HaxePress"].contains(manifest.author)
@@ -56,42 +52,12 @@ class PackageBundles {
         Setting.query.insert(["key" => marker, "value" => CmsVersion.version]);
     }
 
-    static function ensureFeatures():Void {
-        if (Setting.query.where("key", "cms_feature_plugins_v1").exists()) {
-            return;
-        }
-        for (slug in ["rss", "newsletter"]) {
-            var id = 'plugin-${slug}';
-            if (InstalledPackage.query.where("id", id).exists()) {
-                continue;
-            }
-            var path = 'packages/${slug}-${CmsVersion.version}.zip';
-            if (!Storage.disk("public").fileExists(path)) {
-                return;
-            }
-            var inspection = PackageManager.stage(Storage.disk("public").getBytes(path), "plugin",
-                0);
-            PackageManager.install(inspection.key, "plugin", 0, "System", false);
-            if (slug == "newsletter") {
-                var legacy = Setting.query.select(["value"])
-                    .where("key", "newsletter_title")
-                    .limit(1)
-                    .first();
-                if (legacy != null && legacy.value != "") {
-                    PackageManager.configure(id, ["title" => legacy.value], [], 0, "System");
-                }
-            }
-            PackageManager.enable(id, 0, "System");
-        }
-        Setting.query.insert(["key" => "cms_feature_plugins_v1", "value" => CmsVersion.version]);
-    }
-
     static function ensureTranslations():Void {
         if (Setting.query.where("key", "cms_bundled_translations_v1").exists()) {
             return;
         }
-        for (slug in ["rss", "newsletter", "fieldnotes", "notebook", "gallery"]) {
-            var kind = ["rss", "newsletter"].contains(slug) ? "plugin" : "theme";
+        for (slug in ["fieldnotes", "notebook", "gallery"]) {
+            var kind = "theme";
             var installed = PackageData.one('${kind}-${slug}');
             if (installed == null) {
                 continue;

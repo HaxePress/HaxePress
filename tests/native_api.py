@@ -39,7 +39,7 @@ def run():
             "Invalid definition requests changed stored data",
         )
         status, headers, _ = post_json(owner, "/admin/roles/create", {"name": []}, HEADERS)
-        check(status == 303, "Native validation did not create an Inertia redirect")
+        check(status == 303, "Native validation did not redirect back with flashed errors")
         check(
             props(owner, headers["location"])["errors"].get("role"),
             "Native flash did not reach the role editor",

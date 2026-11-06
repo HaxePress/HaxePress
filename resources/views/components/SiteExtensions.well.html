@@ -1,0 +1,5 @@
+<well:head>
+  <template :for="asset in extensions.assets"
+    ><link :if="asset.stylesheet" rel="stylesheet" href="{{ asset.stylesheet }}"
+  /></template>
+</well:head>

@@ -4,6 +4,7 @@ import type {
   DesignerTool,
   AiPermissions,
 } from './ThemeDesignerConnection';
+import type { AdminMcpBrowserApi } from '../../ai/AdminMcpBrowser';
 
 export interface DesignerContext {
   themeId: string;
@@ -47,7 +48,7 @@ interface BrowserModelContext {
 
 declare global {
   interface Window {
-    haxePress?: { themeDesigner?: ThemeDesignerApi };
+    haxePress?: { themeDesigner?: ThemeDesignerApi; adminMcp?: AdminMcpBrowserApi };
   }
   interface Document {
     modelContext?: BrowserModelContext;

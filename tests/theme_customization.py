@@ -3,6 +3,7 @@
 import json
 import os
 import secrets
+import urllib.parse
 
 from cms_content import HEADERS, props
 from cms_management import login
@@ -26,19 +27,20 @@ def verify(owner, public, fixtures):
         "settings"
     ]
     preview = props(owner, f"{url}/preview")["preview"]
-    controls = preview["customization"]
-    check(controls and len(controls["session"]) == 32, "Theme customization session is missing")
-    fields = {field["key"]: field for field in controls["fields"]}
+    frame_query = urllib.parse.parse_qs(urllib.parse.urlsplit(preview["url"]).query)
+    session = frame_query.get("customizeSession", [""])[0]
+    check(preview["customizable"] and len(session) == 32, "Theme customization session is missing")
+    fields = {field["key"]: field for field in preview["fields"]}
     check(
         fields["button_color"]["kind"] == "color" and not fields["button_color"]["required"],
         "Button color is not developer-defined and optional",
     )
     check(
-        controls["values"]["button_color"] == "", "An unset optional color lost its inherited value"
+        preview["saved"]["button_color"] == "", "An unset optional color lost its inherited value"
     )
     frame = props(owner, preview["url"])
     check(
-        frame["theme"]["customizeSession"] == controls["session"],
+        frame["theme"]["customizeSession"] == session,
         "Customization context did not reach the frame",
     )
     check(
@@ -54,12 +56,12 @@ def verify(owner, public, fixtures):
     )
     check(
         owner.request(
-            f"{url}/settings", "POST", {**controls["values"], "_context": "preview"}, csrf=False
+            f"{url}/settings", "POST", {**preview["saved"], "_context": "preview"}, csrf=False
         )[0]
         == 419,
         "Customization save bypassed CSRF",
     )
-    current = controls["values"]
+    current = preview["saved"]
     try:
         changed = {
             **current,
@@ -167,7 +169,9 @@ def verify(owner, public, fixtures):
         synthetic.append(package_id)
         page = props(owner, f"/admin/themes/{package_id}/preview")["preview"]
         check(
-            page["customization"] is None and "customizeSession" not in page["url"],
+            not page["customizable"]
+            and not page["fields"]
+            and "customizeSession" not in page["url"],
             "A theme without public fields exposed customization controls",
         )
     for package_id in synthetic:

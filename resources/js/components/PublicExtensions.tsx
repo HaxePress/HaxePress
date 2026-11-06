@@ -1,4 +1,4 @@
-import { Head, usePage } from '@inertiajs/react';
+import { Head, usePage } from '../page';
 import { useEffect } from 'react';
 import Markdown from './Markdown';
 import type { SharedProps } from '../types';

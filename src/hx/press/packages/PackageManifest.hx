@@ -25,6 +25,7 @@ typedef ManifestData = {
     var apiVersion:Int;
     var cmsVersion:String;
     var kind:String;
+    var pluginId:Null<String>;
     var slug:String;
     var name:String;
     var version:String;
@@ -34,6 +35,10 @@ typedef ManifestData = {
     var fields:Array<PackageField>;
     var module:String;
     var renderer:String;
+
+    /** The folder of the theme's Wellout templates (`*.well.html`), relative to the package root. **/
+    var views:String;
+
     var stylesheet:String;
     var serverJar:String;
     var serverCppia:String;
@@ -50,6 +55,12 @@ typedef ManifestData = {
 
 class PackageManifest {
     public static inline var FILENAME = "cms-package.json";
+
+    public static function validPluginId(id:Null<String>):Bool {
+        return id != null
+            && ~/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.match(id);
+    }
+
     public static final events = [
         "site.shared",
         "site.assets",
@@ -109,6 +120,10 @@ class PackageManifest {
             throw new Exception("This package requires an unsupported CMS API version.");
         }
         var kind = text(input, "kind", 10, true);
+        var identity = text(input, "pluginId", 36);
+        if (identity != "" && (kind != "plugin" || !validPluginId(identity))) {
+            throw new Exception("Use a stable lowercase UUID as the plugin ID.");
+        }
         var slug = text(input, "slug", 64, true);
         var version = text(input, "version", 40, true);
         if (!["plugin", "theme"].contains(kind) || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(slug)) {
@@ -141,6 +156,10 @@ class PackageManifest {
         if (renderer != ""
             && (kind != "theme" || !safePath(renderer) || !~/\.(mjs|js)$/.match(renderer))) {
             throw new Exception("A theme renderer must reference a JavaScript file in public/.");
+        }
+        var views = text(assets, "views", 240);
+        if (views != "" && (kind != "theme" || !safePath(views) || views.indexOf(".") >= 0)) {
+            throw new Exception("Theme views must reference a folder of Wellout templates.");
         }
         var stylesheet = text(assets, "stylesheet", 240);
         if (module != "" && (!safePath(module) || !~/\.(mjs|js)$/.match(module))) {
@@ -211,6 +230,7 @@ class PackageManifest {
             apiVersion: input.apiVersion,
             cmsVersion: text(input, "cmsVersion", 40),
             kind: kind,
+            pluginId: identity == "" ? null : identity,
             slug: slug,
             name: text(input, "name", 100, true),
             version: version,
@@ -220,6 +240,7 @@ class PackageManifest {
             fields: fields(input.fields),
             module: module,
             renderer: renderer,
+            views: views,
             stylesheet: stylesheet,
             serverJar: serverJar,
             serverCppia: serverCppia,

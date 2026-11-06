@@ -9,10 +9,14 @@ import hx.well.http.ResponseStatic;
 import hx.well.http.CookieData;
 import hx.well.facades.Config;
 import hx.well.facades.Environment;
+import hx.press.ai.AdminMcpAccess;
 
 /** Cookie policy for the /admin group. Public routes never run this middleware. */
 class AdminSessionMiddleware extends AbstractMiddleware {
     public function handle(request:Request, next:Request->Null<Response>):Null<Response> {
+        if (request.getAttribute(AdminMcpAccess.INTERNAL, false)) {
+            return next(request);
+        }
         try {
             var result = next(request);
             apply(request);

@@ -8,6 +8,8 @@ import hx.press.SiteSettingsStore;
 import hx.press.navigation.NavigationRegions;
 import hx.press.Activity;
 import hx.press.packages.PackageData.PackageRecord;
+import hx.press.packages.PackageManifest.ManifestData;
+import hx.press.packages.SafePackageArchive.InspectedPackage;
 import hx.press.plugins.PluginRuntime;
 import haxe.Exception;
 import haxe.Json;
@@ -15,6 +17,7 @@ import haxe.io.Bytes;
 import hx.well.facades.DBStatic;
 import hx.well.internal.SecureToken;
 import hx.press.model.InstalledPackage;
+import hx.press.model.ScheduledJob;
 import hx.press.model.PackageHook;
 import hx.press.model.PackageUpload;
 import hx.well.thread.MutexPool;
@@ -29,7 +32,28 @@ import hx.press.model.ThemeAiConnection;
 class PackageManager {
     public static final writes = new MutexPool();
 
-    public static function stage(bytes:Bytes, kind:String, userId:Int):Dynamic {
+    public static function stage(bytes:Bytes, kind:String, userId:Int,
+            bundled:Bool = false):Dynamic {
+        return stageArchive(kind, userId,
+            destination -> SafePackageArchive.extract(bytes, destination), bundled);
+    }
+
+    public static function stageArchive(kind:String, userId:Int, extract:String->InspectedPackage,
+            bundled:Bool = false):Dynamic {
+        var key = 'package-upload:${userId}';
+        writes.acquire(key);
+        try {
+            var result = stageChecked(kind, userId, extract, bundled);
+            writes.release(key);
+            return result;
+        } catch (error:Dynamic) {
+            writes.release(key);
+            throw error;
+        }
+    }
+
+    static function stageChecked(kind:String, userId:Int, extract:String->InspectedPackage,
+            bundled:Bool):Dynamic {
         if (PackageUpload.query.where("user_id", userId)
             .where("expires_epoch", ">", Date.now().getTime())
             .count() >= 5) {
@@ -37,14 +61,24 @@ class PackageManager {
         }
         var token = SecureToken.generate(32);
         var destination = '${PackageStorage.STAGING}/${token}';
-        var inspected = SafePackageArchive.extract(bytes, destination);
         try {
+            var inspected = extract(destination);
             if (inspected.manifest.kind != kind) {
                 throw new Exception('Upload a ${kind} package in this section.');
             }
-            BuiltInTheme.requireUploadable('${kind}-${inspected.manifest.slug}');
+            var id = '${kind}-${inspected.manifest.slug}';
+            requireUploadable(id, inspected.manifest, bundled);
             var source = Storage.disk("extensions")
                 .get('${inspected.root}/${PackageManifest.FILENAME}');
+            var serverTarget = PackageManifest.serverArtifact(inspected.manifest) == "" ? "" : PackageManifest.serverTarget();
+            var existing = InstalledPackage.query.select(["version", "plugin_id"])
+                .where("id", id)
+                .limit(1)
+                .first();
+            if (existing != null && existing.plugin_id != null
+                && existing.plugin_id != inspected.manifest.pluginId) {
+                throw new Exception("A plugin update must keep its installed plugin ID.");
+            }
             PackageUpload.query.insert([
                 "key" => token,
                 "user_id" => userId,
@@ -53,20 +87,31 @@ class PackageManager {
                 "manifest" => source,
                 "expires_epoch" => Date.now().getTime() + 3600000
             ]);
-            var id = '${kind}-${inspected.manifest.slug}';
-            var existing = InstalledPackage.query.select(["version"])
-                .where("id", id)
-                .limit(1)
-                .first();
             return {
                 key: token,
                 manifest: inspected.manifest,
-                serverTarget: PackageManifest.serverArtifact(inspected.manifest) == "" ? "" : PackageManifest.serverTarget(),
+                serverTarget: serverTarget,
                 installedVersion: existing == null ? null : existing.version
             };
         } catch (error:Dynamic) {
             PackageStorage.remove(destination);
             throw error;
+        }
+    }
+
+    static function requireUploadable(id:String, manifest:ManifestData, bundled:Bool):Void {
+        BuiltInTheme.requireUploadable(id);
+        if (manifest.kind != "plugin") {
+            return;
+        }
+        if (!PackageManifest.validPluginId(manifest.pluginId)) {
+            throw new Exception("Plugin ZIPs must declare a stable pluginId UUID.");
+        }
+        BuiltInPlugins.requireUploadable(id, manifest, bundled);
+        if (InstalledPackage.query.where("plugin_id", manifest.pluginId)
+            .where("id", "!=", id)
+            .exists()) {
+            throw new Exception("This plugin ID already belongs to another installed package.");
         }
     }
 
@@ -84,6 +129,7 @@ class PackageManager {
     static function record(id:String):PackageRecord {
         var row = InstalledPackage.query.select([
             "id",
+            "plugin_id",
             "kind",
             "slug",
             "name",
@@ -105,7 +151,7 @@ class PackageManager {
     }
 
     public static function install(token:String, kind:String, userId:Int, name:String,
-            replace:Bool):String {
+            replace:Bool, bundled:Bool = false):String {
         writes.acquire("packages");
         var moved:String = null;
         var committed = false;
@@ -122,12 +168,17 @@ class PackageManager {
             var manifest = PackageManifest.parse(upload.manifest);
             PackageManifest.requireCompatible(manifest);
             var id = '${kind}-${manifest.slug}';
-            BuiltInTheme.requireUploadable(id);
+            requireUploadable(id, manifest, bundled);
             var previous = InstalledPackage.query.where("id", id).limit(1).first();
             if (previous != null && !replace) {
                 throw new Exception("This package is already installed. Choose Replace package to update it.");
             }
-            if (previous != null && previous.restart_required == 1) {
+            if (previous != null && previous.plugin_id != null
+                && previous.plugin_id != manifest.pluginId) {
+                throw new Exception("A plugin update must keep its installed plugin ID.");
+            }
+            if (previous != null && previous.restart_required == 1
+                && (!bundled || PluginRuntime.ready)) {
                 throw new Exception("Restart the server before replacing this plugin.");
             }
             if (manifest.layout == "builder") {
@@ -180,6 +231,7 @@ class PackageManager {
             var values:Map<String, Dynamic> = [
                 "id" => id,
                 "kind" => kind,
+                "plugin_id" => manifest.pluginId,
                 "slug" => manifest.slug,
                 "name" => manifest.name,
                 "name_key" => CategoryData.key(manifest.name),
@@ -355,6 +407,9 @@ class PackageManager {
                 throw new Exception("The built-in theme is included with HaxePress and cannot be uninstalled.");
             }
             var packageData = record(id);
+            if (BuiltInPlugins.isBuiltIn(id, packageData.plugin_id)) {
+                throw new Exception("Bundled plugins can be deactivated in the Plugins panel.");
+            }
             if (packageData.kind == "theme" && packageData.enabled == 1) {
                 throw new Exception("Activate another theme before removing this theme.");
             }
@@ -368,6 +423,9 @@ class PackageManager {
                     PackageHook.query.where("package_id", id).delete();
                     ThemeDesign.query.where("id", id).delete();
                     ThemeAiConnection.query.where("theme_id", id).delete();
+                    if (packageData.plugin_id != null) {
+                        ScheduledJob.query.where("plugin_id", packageData.plugin_id).delete();
+                    }
                     InstalledPackage.query.where("id", id).delete();
                     Activity.append(userId, name, "uninstalled", packageData.kind, 0,
                         packageData.name);

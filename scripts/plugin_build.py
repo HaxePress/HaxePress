@@ -22,7 +22,7 @@ HOST_API_TYPES = [
     "hx.well.model.BaseModelQuery",
     "hx.well.route.Route",
     "hx.well.tools.RouteElementTools",
-    "hx.well.facades.Inertia",
+    "hx.press.view.Pages",
     "hx.well.facades.Schema",
     "hx.well.facades.Storage",
     "hx.well.http.ResponseBuilder",
@@ -62,8 +62,6 @@ def host_options():
     options = [
         "-cp",
         str(ROOT / ".deps/hxwell/src"),
-        "-cp",
-        str(ROOT / ".deps/hxwell-inertia/src"),
         "-cp",
         str(ROOT / "src"),
         "-D",

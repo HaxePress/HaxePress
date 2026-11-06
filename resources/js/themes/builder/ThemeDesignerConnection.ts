@@ -13,7 +13,6 @@ export interface AiPermissions {
 }
 export interface DesignerPresence {
   browsers: number;
-  llms: number;
 }
 export interface DesignChange {
   themeId: string;
@@ -29,7 +28,7 @@ export type DesignerEvent =
   | { type: 'design_changed'; change: DesignChange }
   | { type: 'permissions' };
 
-class BrowserSocketTransport implements Transport {
+export class BrowserSocketTransport implements Transport {
   onclose?: () => void;
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
@@ -127,7 +126,7 @@ class BrowserSocketTransport implements Transport {
 export class ThemeDesignerConnection {
   status: DesignerStatus = 'disconnected';
   permissions: AiPermissions = { read: false, edit: false, media: false };
-  presence: DesignerPresence = { browsers: 0, llms: 0 };
+  presence: DesignerPresence = { browsers: 0 };
   private client: Client | null = null;
   private pending: Promise<Client> | null = null;
   private stopped = false;
@@ -166,12 +165,8 @@ export class ThemeDesignerConnection {
       this.permissions = { ...permissions };
       if (changed) this.emit({ type: 'permissions' });
     }
-    if (
-      method === 'notifications/haxepress/presence' &&
-      Number.isSafeInteger(data.browsers) &&
-      Number.isSafeInteger(data.llms)
-    ) {
-      this.presence = { browsers: Number(data.browsers), llms: Number(data.llms) };
+    if (method === 'notifications/haxepress/presence' && Number.isSafeInteger(data.browsers)) {
+      this.presence = { browsers: Number(data.browsers) };
       this.emit({ type: 'presence' });
     }
     if (
@@ -205,7 +200,7 @@ export class ThemeDesignerConnection {
       this.client = null;
       this.pending = null;
       this.permissions = { read: false, edit: false, media: false };
-      this.presence = { browsers: 0, llms: 0 };
+      this.presence = { browsers: 0 };
       this.status = 'disconnected';
       if (this.heartbeat) clearInterval(this.heartbeat);
       this.emit({ type: 'permissions' });

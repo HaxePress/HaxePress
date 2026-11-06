@@ -1,7 +1,7 @@
 import { SiteLink as Link } from '../themes/navigation';
 import type { NavigationLink } from '../types';
 import { useTranslation } from '../i18n';
-import { usePage } from '@inertiajs/react';
+import { usePage } from '../page';
 import type { SharedProps } from '../types';
 
 export default function SiteNavigation({ links, path }: { links: NavigationLink[]; path: string }) {

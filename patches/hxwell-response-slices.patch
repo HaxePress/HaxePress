@@ -1,0 +1,91 @@
+diff --git a/src/hx/well/http/JsonResponse.hx b/src/hx/well/http/JsonResponse.hx
+index 665a546..7ac5859 100644
+--- a/src/hx/well/http/JsonResponse.hx
++++ b/src/hx/well/http/JsonResponse.hx
+@@ -22,4 +22,9 @@ class JsonResponse extends Response {
+             return value;
+         });
+     }
++
++    public override function slice():Null<ResponseSlice>
++    {
++        return encodedText(toString());
++    }
+ }
+diff --git a/src/hx/well/http/Response.hx b/src/hx/well/http/Response.hx
+index 3e4d078..615c7ad 100644
+--- a/src/hx/well/http/Response.hx
++++ b/src/hx/well/http/Response.hx
+@@ -98,6 +98,26 @@ class Response {
+         return new BytesInput(toBytes());
+     }
+ 
++    /**
++        Encodes text bodies into reusable buffers when an application installs
++        it. Without one, drivers read `toInput()`, which copies the text.
++    **/
++    public static var textEncoder:Null<String->ResponseSlice> = null;
++
++    /**
++        The body as bytes a driver may write without copying, or null when the
++        driver should read `toInput()`. A driver that takes a slice releases it
++        once the bytes are no longer needed.
++    **/
++    public function slice():Null<ResponseSlice> {
++        return null;
++    }
++
++    function encodedText(text:String):Null<ResponseSlice> {
++        var encode = textEncoder;
++        return encode == null || text == null ? null : encode(text);
++    }
++
+     public function asStatic():Void {
+         ResponseStatic.set(this);
+     }
+diff --git a/src/hx/well/http/ResponseSlice.hx b/src/hx/well/http/ResponseSlice.hx
+new file mode 100644
+index 0000000..2366be3
+--- /dev/null
++++ b/src/hx/well/http/ResponseSlice.hx
+@@ -0,0 +1,26 @@
++package hx.well.http;
++
++import haxe.io.Bytes;
++
++/**
++    A response body that a driver can write without copying: `bytes` from 0
++    to `length`. The driver calls `release` once it no longer reads `bytes`,
++    after which the owner may reuse the buffer. Releasing twice is harmless.
++**/
++class ResponseSlice {
++    public final bytes:Bytes;
++    public final length:Int;
++    var onRelease:Null<Void->Void>;
++
++    public function new(bytes:Bytes, length:Int, ?onRelease:Void->Void) {
++        this.bytes = bytes;
++        this.length = length;
++        this.onRelease = onRelease;
++    }
++
++    public function release():Void {
++        var callback = onRelease;
++        onRelease = null;
++        if(callback != null) callback();
++    }
++}
+diff --git a/src/hx/well/http/StringResponse.hx b/src/hx/well/http/StringResponse.hx
+index a41009c..d72f25a 100644
+--- a/src/hx/well/http/StringResponse.hx
++++ b/src/hx/well/http/StringResponse.hx
+@@ -13,4 +13,9 @@ class StringResponse extends Response {
+     {
+         return body;
+     }
++
++    public override function slice():Null<ResponseSlice>
++    {
++        return encodedText(body);
++    }
+ }

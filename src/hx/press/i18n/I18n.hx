@@ -36,9 +36,13 @@ class I18n {
         for (choice in locales) {
             var source = Resource.getString('lang.${choice.code}');
             var messages = source == null ? new Map() : TranslationCatalogue.parse(source);
-            var editor = Resource.getString('lang.editor.${choice.code}');
-            if (editor != null) {
-                messages = merge(messages, TranslationCatalogue.parse(editor));
+            for (section in ["editor", "packages", "backups"]) {
+                var additional = Resource.getString('lang.${section}.${choice.code}');
+                if (additional != null) {
+                    for (key => value in TranslationCatalogue.parse(additional)) {
+                        messages.set(key, value);
+                    }
+                }
             }
             catalogues.set(choice.code, messages);
         }
@@ -126,6 +130,50 @@ class I18n {
             message = core.get(FALLBACK).get(key);
         }
         return TranslationCatalogue.format(message, key, parameters);
+    }
+
+    static final mergedCore:Map<String, Map<String, Dynamic>> = [
+        for (choice in locales)
+            choice.code => merge(core.get(FALLBACK), core.get(choice.code))
+    ];
+
+    /** The CMS catalogue of a locale over the fallback, built once; callers must not change it. **/
+    public static function coreMessages(selected:String):Map<String, Dynamic> {
+        var messages = mergedCore.get(selected);
+        return messages == null ? mergedCore.get(FALLBACK) : messages;
+    }
+
+    /** The catalogue of a theme or plugin over its fallback, or null when it has none. **/
+    public static function namespaceMessages(namespace:String,
+            selected:String):Null<Map<String, Dynamic>> {
+        var record = TranslationData.one(namespace);
+        return record == null ? null : packageMessages(record, selected);
+    }
+
+    /**
+        The catalogue of an installed theme or plugin whether or not it is
+        enabled, for administration pages such as previews and package
+        settings. Public pages use `namespaceMessages`, which reads only
+        enabled packages.
+    **/
+    public static function installedMessages(namespace:String,
+            selected:String):Null<Map<String, Dynamic>> {
+        var enabled = namespaceMessages(namespace, selected);
+        if (enabled != null) {
+            return enabled;
+        }
+        var records = TranslationData.byIds([namespace]);
+        return records.length == 0 ? null : packageMessages(records[0], selected);
+    }
+
+    /** `t` for administration pages: an installed package's message, else the CMS one. **/
+    public static function installedT(key:String, ?parameters:Map<String, Dynamic>,
+            namespace:String = "cms"):String {
+        var selected = locale();
+        var own = namespace == "cms" ? null : installedMessages(namespace, selected);
+        var message:Dynamic = own == null ? null : own.get(key);
+        return TranslationCatalogue.format(message ?? coreMessages(selected).get(key), key,
+            parameters);
     }
 
     public static function props(?preview:TranslationPackageRecord):TranslationProps {

@@ -1,0 +1,119 @@
+<props
+  isNew="Bool"
+  roleForm="RoleFormView"
+  heading="String"
+  formAction="String"
+  removeAction="String"
+  protectedOwner="Bool"
+  removable="Bool"
+  choices="List<RoleCapabilityView>"
+  selected="List<String>"
+  grantable="List<String>"
+  noticeMessage="String"
+/>
+<AdminLayout :title="isNew ? t('New role') : t('Edit role')">
+  <form action="{{ formAction }}" method="post">
+    <input type="hidden" name="capability_fields" value="1" />
+    <template :if="protectedOwner"
+      ><input type="hidden" name="enabled" value="1" /><input
+        type="hidden"
+        name="grant:*"
+        value="1"
+    /></template>
+    <div class="admin-page-heading">
+      <div>
+        <a class="back-link" href="/admin/roles">{{ icon('arrow-left') }} {{ t('Roles') }}</a>
+        <h1>{{ isNew ? t('New role') : t(heading) }}</h1>
+      </div>
+      <button type="submit" class="button" data-well-busy="{{ t('Saving…') }}">
+        {{ icon('check') }} {{ t('Save role') }}
+      </button>
+    </div>
+    <div id="role-capability-error"></div>
+    <Alert error :message="error('role')" />
+    <Alert :message="noticeMessage" />
+    <div class="settings-grid">
+      <section class="admin-card settings-card">
+        <h2>{{ t('Role details') }}</h2>
+        <label for="role-name">{{ t('Role name') }}</label>
+        <input id="role-name" name="name" value="{{ roleForm.name }}" required maxlength="100" />
+        <label for="role-key">{{ t('Stable key') }}</label>
+        <input
+          id="role-key"
+          name="key"
+          value="{{ roleForm.key }}"
+          required
+          :readonly="not isNew"
+          pattern="[a-z][a-z0-9_]{0,31}"
+          maxlength="32"
+        />
+        <label for="role-description">{{ t('Description') }}</label>
+        <textarea id="role-description" name="description" rows="4" maxlength="500">
+{{ roleForm.description }}</textarea>
+        <label class="checkbox-label"
+          ><input
+            type="checkbox"
+            name="enabled"
+            value="1"
+            :checked="roleForm.enabled"
+            :disabled="protectedOwner"
+          /><span>{{ t('Role enabled') }}</span></label
+        >
+        <p class="field-help">
+          {{ t('Disabled roles cannot sign in or keep using an existing administration session.') }}
+        </p>
+        <button
+          :if="removable"
+          type="submit"
+          class="button button-outline danger"
+          formaction="{{ removeAction }}"
+          formnovalidate
+          data-well-confirm="{{ t('Remove this unused role?') }}"
+        >
+          {{ t('Remove role') }}
+        </button>
+      </section>
+      <section :if="protectedOwner" class="admin-card settings-card">
+        <h2>{{ t('Capabilities') }}</h2>
+        <p>{{ t('The protected owner role always retains every capability.') }}</p>
+      </section>
+      <Island
+        :else
+        name="role-capabilities"
+        :props="{
+          translations: translations,
+          locale: i18n.locale,
+          direction: i18n.direction,
+          choices: choices,
+          selected: selected,
+          grantable: grantable
+        }"
+        load="idle"
+      >
+        <section class="admin-card settings-card">
+          <h2>{{ t('Capabilities') }}</h2>
+          <label for="capability-search">{{ t('Search capabilities') }}</label>
+          <input
+            id="capability-search"
+            type="search"
+            maxlength="100"
+            placeholder="{{ t('Search capabilities') }}"
+          />
+          <p class="field-help">{{ t('Selected capabilities: {count}', count: size(selected)) }}</p>
+          <label :for="choice in choices" class="checkbox-label capability-choice"
+            ><input
+              type="checkbox"
+              name="grant:{{ choice.key }}"
+              value="1"
+              :checked="choice.key in selected"
+              :disabled="not can(choice.key)"
+            /><span
+              ><strong>{{ t(choice.name) }}</strong
+              ><small>{{ t(choice.group_name) }} · {{ choice.key }}</small></span
+            ></label
+          >
+        </section>
+      </Island>
+    </div>
+  </form>
+</AdminLayout>

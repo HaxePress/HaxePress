@@ -13,7 +13,7 @@ import hx.press.i18n.I18n;
 import hx.press.packages.PackageData;
 import hx.press.packages.ThemeData;
 import hx.press.plugins.PluginRuntime;
-import hx.well.facades.Inertia;
+import hx.press.view.View;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.internal.SecureToken;
@@ -25,7 +25,7 @@ class ThemeStudioController {
             return CmsController.forbidden(request);
         }
         var props = {baseDocument: ThemeDesignSchema.starter(true)};
-        return Inertia.render("Admin/ThemeCreate", props);
+        return View.render("Admin/ThemeCreate", props);
     }
 
     public static function editor(request:Request):AbstractResponse {
@@ -61,7 +61,7 @@ class ThemeStudioController {
                 frameUrl: '/admin/themes/${id}/design/frame?studioSession=${session}'
             }
         };
-        return Inertia.render("Admin/ThemeBuilder", props);
+        return View.render("Admin/ThemeBuilder", props);
     }
 
     public static function frame(request:Request):AbstractResponse {
@@ -98,9 +98,8 @@ class ThemeStudioController {
         if (~/^[A-Za-z0-9_-]{32}$/.match(session)) {
             info.studioSession = session;
         }
-        Inertia.share("theme", info);
-        Inertia.share("i18n", I18n.props(theme));
-        Inertia.share("navigation", NavigationData.forRegions(["header", "footer"]));
+        View.share("theme", info);
+        View.share("navigation", NavigationData.forRegions(["header", "footer"]));
         var homeType = SiteSettingsStore.settings().get("home_type") ?? "entry";
         var kind = request.query("collection", fallback == "Page" ? "page" : homeType)
             .substr(0, 32);
@@ -113,11 +112,11 @@ class ThemeStudioController {
             case "About": "/about";
             default: type == null ? "/" : type.publicBase;
         };
-        Inertia.share("extensions", {
+        View.share("extensions", {
             assets: PluginRuntime.assets(),
             blocks: PluginRuntime.blocks("site.shared", {path: path})
         });
-        Inertia.share("pluginNavigation", {
+        View.share("pluginNavigation", {
             header: PluginRuntime.navigation("header", []),
             footer: PluginRuntime.navigation("footer", []),
             admin: []
@@ -146,6 +145,6 @@ class ThemeStudioController {
             collection: type == null ? null : ContentTypes.publicInfo(type),
             templateFallback: fallback
         };
-        return Inertia.render(component ? "Home" : template, props);
+        return View.render(component ? "Home" : template, props);
     }
 }

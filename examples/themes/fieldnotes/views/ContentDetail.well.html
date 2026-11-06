@@ -1,0 +1,62 @@
+<props item="ContentItemView" related="List<ContentItemView>" />
+<FieldnotesLayout>
+  <PageHead
+    :title="item.seo_title ? item.seo_title : item.title"
+    :exactTitle="item.seo_title ? true : false"
+    :description="item.seo_description ? item.seo_description : item.excerpt"
+  />
+  <article class="content-page wrap">
+    <a class="back-link" href="{{ item.archiveUrl }}"
+      >{{ icon('arrow-left') }} {{ t('Back to content') }}</a
+    >
+    <header class="content-header">
+      <a class="category-pill" href="{{ url(item.archiveUrl, category: item.category) }}"
+        >{{ item.category }}</a
+      >
+      <h1>{{ item.title }}</h1>
+      <p class="content-deck">{{ item.excerpt }}</p>
+      <nav :if="item.tags" class="content-tags" aria-label="{{ t('Content tags') }}">
+        <template :for="tag in item.tags"
+          ><a :if="tag.url" href="{{ tag.url }}">#{{ tag.name }}</a
+          ><a :else href="/tags/{{ tag.slug | encode }}">#{{ tag.name }}</a></template
+        >
+      </nav>
+      <div class="content-byline">
+        <FieldnotesAuthor :published="item.publishedLabel" /><span
+          >{{ icon('clock') }} {{ item.readMinutes }} {{ t('min read') }}</span
+        ><Island name="share" :props="{ title: item.title, toast: true }" load="idle"
+          ><button class="icon-button share-button" aria-label="{{ t('Share this content item') }}">
+            {{ icon('share') }}
+          </button></Island
+        >
+      </div>
+    </header>
+    <img :if="item.image" class="content-cover" src="{{ item.image }}" alt="{{ item.image_alt }}" />
+    <div class="content-prose">
+      <ExtensionSlot name="content.before" />
+      {{ markdown(item.content ?? '') }}
+      <FieldValues :definitions="item.fieldDefinitions" :values="item.fields" />
+      <ExtensionSlot name="content.after" />
+      <div class="content-end">
+        <Island name="share" :props="{ title: item.title, toast: true }" load="idle"
+          ><button class="button button-outline">
+            {{ icon('share') }} {{ t('Share this content item') }}
+          </button></Island
+        >
+      </div>
+    </div>
+  </article>
+  <section class="wrap related-content">
+    <div class="section-heading">
+      <div>
+        <h2>{{ t('Related content') }}</h2>
+      </div>
+      <a class="text-link" href="{{ item.archiveUrl }}"
+        >{{ t('All content') }} {{ icon('arrow-right') }}</a
+      >
+    </div>
+    <div class="content-grid">
+      <FieldnotesCard :for="entry in related" :item="entry" />
+    </div>
+  </section>
+</FieldnotesLayout>

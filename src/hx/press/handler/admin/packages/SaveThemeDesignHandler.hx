@@ -6,7 +6,7 @@ import hx.press.themes.ThemeStudio;
 import hx.press.themes.ThemeDesignSchema;
 import hx.press.packages.PackageManager;
 import hx.press.validation.ValidationResponder;
-import hx.well.facades.Inertia;
+import hx.press.view.View;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -45,7 +45,7 @@ class SaveThemeDesignHandler extends AbstractHandler implements ValidationRespon
                 baseDocument: ThemeDesignSchema.starter(true),
                 errors: {name: "Enter a theme name between 2 and 100 characters and choose a starting layout."}
             };
-            return Inertia.render("Admin/ThemeCreate", props).status(422);
+            return View.render("Admin/ThemeCreate", props).status(422);
         }
         return
             ResponseBuilder.asJson({error: "Check the theme name, design and version before saving."},
@@ -94,7 +94,7 @@ class SaveThemeDesignHandler extends AbstractHandler implements ValidationRespon
             });
         } catch (error:Dynamic) {
             if (creating) {
-                return Inertia.render("Admin/ThemeCreate", {
+                return View.render("Admin/ThemeCreate", {
                     baseDocument: ThemeDesignSchema.starter(true),
                     errors: {name: Std.string(error)}
                 }).status(422);

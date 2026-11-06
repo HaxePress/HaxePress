@@ -1,0 +1,146 @@
+diff --git a/src/crossbyte/http/HTTPServerConfig.hx b/src/crossbyte/http/HTTPServerConfig.hx
+--- a/src/crossbyte/http/HTTPServerConfig.hx
++++ b/src/crossbyte/http/HTTPServerConfig.hx
+@@ -49,6 +49,14 @@
+ 		`http2MaxRequestBodyBuffer` is what all of them may hold together.
+ 	**/
+ 	public var maxRequestBodySize:Int = DEFAULT_MAX_REQUEST_BODY_SIZE;
++
++	/** Optional smaller body limit, selected from the settled request target before reading its body. */
++	public var maxRequestBodySizeFor:Null<(method:String, path:String) -> Int> = null;
++
++	@:noCompletion public function requestBodyCeiling(method:String, path:String):Int {
++		var specific = maxRequestBodySizeFor == null ? -1 : maxRequestBodySizeFor(method, path);
++		return specific >= 0 && specific < maxRequestBodySize ? specific : maxRequestBodySize;
++	}
+
+ 	/**
+ 		Bytes of request body one HTTP/2 connection holds at once, across
+diff --git a/src/crossbyte/http/HTTPRequestHandler.hx b/src/crossbyte/http/HTTPRequestHandler.hx
+--- a/src/crossbyte/http/HTTPRequestHandler.hx
++++ b/src/crossbyte/http/HTTPRequestHandler.hx
+@@ -149,6 +149,7 @@
+ 	@:noCompletion private var __awaitingBody:Bool = false;
+ 	@:noCompletion private var __expectBody:Int = 0;
+ 	@:noCompletion private var __bodyBuf:ByteArray = null;
++	@:noCompletion private var __bodyCeiling:Int = 0;
+ 	@:noCompletion private var __bodyComplete:Void->Void = null;
+ 	@:noCompletion private var __bodyIsChunked:Bool = false;
+ 	@:noCompletion private var __chunkBytesRemaining:Int = -1;
+@@ -801,6 +802,7 @@
+ 		}
+ 		__requestPath = settled;
+ 		__filePath = null;
++		__bodyCeiling = __config.requestBodyCeiling(__method, __requestPath);
+
+ 		// Repeats of one name, collected and joined once the block has ended.
+ 		// Appending each to the whole value so far is quadratic in the
+@@ -982,6 +984,7 @@
+ 		}
+ 		__requestPath = settled;
+ 		__filePath = null;
++		__bodyCeiling = __config.requestBodyCeiling(__method, __requestPath);
+
+ 		// What the HTTP/1.1 parser applies as it reads a request, applied here
+ 		// to one that arrived as frames, so the rate limiter and the content
+@@ -997,7 +1000,7 @@
+
+ 		// Too big is said before a byte of it is sent, as over HTTP/1.1. The
+ 		// frame layer read the field already, so it arrives a number.
+-		if (bodyToCome && declaredLength > __config.maxRequestBodySize) {
++		if (bodyToCome && declaredLength > __bodyCeiling) {
+ 			__sendErrorResponse(413, "Payload Too Large");
+ 			return false;
+ 		}
+@@ -4545,7 +4548,7 @@
+ 				}
+ 				// Too big is not malformed: 413, and before a byte of the body
+ 				// is read.
+-				if (contentLength > __config.maxRequestBodySize) {
++				if (contentLength > __bodyCeiling) {
+ 					__sendErrorResponse(413, "Payload Too Large");
+ 					return true;
+ 				}
+@@ -4641,7 +4644,7 @@
+
+ 				// A chunk that would take the body past its limit is refused on
+ 				// its size line, rather than once it has been buffered whole.
+-				if (HttpSyntax.passes(__bodyBuf.length, parsed, __config.maxRequestBodySize)) {
++				if (HttpSyntax.passes(__bodyBuf.length, parsed, __bodyCeiling)) {
+ 					__sendErrorResponse(413, "Payload Too Large");
+ 					return false;
+ 				}
+@@ -4674,7 +4677,7 @@
+ 				return false;
+ 			}
+
+-			if (__bodyBuf.length > __config.maxRequestBodySize) {
++			if (__bodyBuf.length > __bodyCeiling) {
+ 				__sendErrorResponse(413, "Payload Too Large");
+ 				return false;
+ 			}
+@@ -4705,7 +4708,7 @@
+ 		try {
+ 			for (i in 0...__requestContentEncodings.length) {
+ 				var algorithm = __requestContentEncodings[__requestContentEncodings.length - 1 - i];
+-				__requestBody.uncompress(HTTPContentCoding.codecFor(algorithm, __requestBody), __config.maxRequestBodySize);
++				__requestBody.uncompress(HTTPContentCoding.codecFor(algorithm, __requestBody), __bodyCeiling);
+ 			}
+ 		} catch (_:crossbyte.errors.RangeError) {
+ 			// Grew past the ceiling: every codec says so with a RangeError.
+diff --git a/src/crossbyte/_internal/http/H2ConnectionHandler.hx b/src/crossbyte/_internal/http/H2ConnectionHandler.hx
+--- a/src/crossbyte/_internal/http/H2ConnectionHandler.hx
++++ b/src/crossbyte/_internal/http/H2ConnectionHandler.hx
+@@ -566,6 +566,7 @@
+
+ 		if (admitted) {
+ 			request.context = handler;
++			request.bodyCeiling = handler.__bodyCeiling;
+ 		}
+ 		return admitted;
+ 	}
+diff --git a/src/crossbyte/_internal/http/h2/H2ServerRequest.hx b/src/crossbyte/_internal/http/h2/H2ServerRequest.hx
+--- a/src/crossbyte/_internal/http/h2/H2ServerRequest.hx
++++ b/src/crossbyte/_internal/http/h2/H2ServerRequest.hx
+@@ -26,6 +26,9 @@
+
+ 	/** Request body, empty when there was none. */
+ 	public var body:Bytes;
++
++	/** A lower ceiling selected when the headers were admitted, or -1 for the connection default. */
++	public var bodyCeiling:Int = -1;
+
+ 	// The body of a request that has none: shared, since a body is only read.
+ 	private static final NO_BODY:Bytes = Bytes.alloc(0);
+diff --git a/src/crossbyte/_internal/http/h2/H2ServerConnection.hx b/src/crossbyte/_internal/http/h2/H2ServerConnection.hx
+--- a/src/crossbyte/_internal/http/h2/H2ServerConnection.hx
++++ b/src/crossbyte/_internal/http/h2/H2ServerConnection.hx
+@@ -1704,7 +1704,7 @@
+ 		if (target != null && !target.overflowed) {
+ 			// What is left of the limit, not the sum, which wraps where the
+ 			// limit is within a frame of the largest Int.
+-			if (contentLength > __bodyLimit - target.bodyLength) {
++			if (contentLength > __requestBodyCeiling(target) - target.bodyLength) {
+ 				__refuseOversized(target);
+ 			} else {
+ 				target.appendBody(frame.payload, contentStart, contentLength);
+@@ -2175,13 +2175,18 @@
+ 		told.
+ 	**/
+ 	private function __need(target:H2Stream):Int {
+-		var whole:Int = __bodyLimit + 1;
++		var whole:Int = __requestBodyCeiling(target) + 1;
+ 		var declared:Int = target.request != null ? target.request.declaredLength : -1;
+ 		if (declared >= 0 && declared < whole) {
+ 			whole = declared;
+ 		}
+ 		var need:Int = whole - target.bodyLength;
+ 		return need > 0 ? need : 0;
++	}
++
++	private inline function __requestBodyCeiling(target:H2Stream):Int {
++		var specific:Int = target.request == null ? -1 : target.request.bodyCeiling;
++		return specific >= 0 && specific < __bodyLimit ? specific : __bodyLimit;
+ 	}
+
+ 	/** What `target` may need beyond the window it has open. */

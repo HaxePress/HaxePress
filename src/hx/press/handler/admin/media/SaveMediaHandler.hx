@@ -25,8 +25,10 @@ class SaveMediaHandler extends AbstractHandler implements ValidationResponder {
     }
 
     public function validationFailed(request:Request):AbstractResponse {
+        var id = Std.parseInt(request.route("id"));
         return MediaController.index(request,
-            "Use at most 180 characters for the title and 500 for the image description.", 422);
+            "Use at most 180 characters for the title and 500 for the image description.", 422,
+            '/admin/media?edit=${id}');
     }
 
     public function execute(request:Request):AbstractResponse {

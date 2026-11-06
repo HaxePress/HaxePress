@@ -1,5 +1,10 @@
 package hx.press.packages;
 
+import haxe.Json;
+import hx.press.view.PackageFieldViews;
+import hx.press.view.PackageFieldViews;
+import hx.press.view.View;
+import hx.press.view.types.AdminViews.ThemePreviewView;
 import hx.press.AdminController;
 import hx.press.SiteController;
 import hx.press.Pagination;
@@ -10,11 +15,10 @@ import hx.press.CmsController;
 import hx.press.handler.SitePublicHandler;
 import hx.press.TagData;
 import hx.press.SiteSettingsStore;
-import hx.press.NavigationData;
-import hx.press.plugins.PluginRuntime;
 import haxe.Exception;
+import haxe.ds.StringMap;
+import hx.press.packages.PackageManifest.PackageField;
 import hx.well.facades.Config;
-import hx.well.facades.Inertia;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
@@ -59,7 +63,8 @@ class PackageController {
             item.id)) : [];
         var packages = page.items.map(item -> {
             var props:Dynamic = Reflect.copy(item);
-            props.built_in = BuiltInTheme.isBuiltIn(item.id);
+            props.built_in = BuiltInTheme.isBuiltIn(item.id)
+                || BuiltInPlugins.isBuiltIn(item.id, item.plugin_id);
             props.designed = designedThemes.contains(item.id);
             return props;
         });
@@ -78,22 +83,33 @@ class PackageController {
             var revisions = domains.map(domain -> ContentCache.revision(domain));
             themePreviewRevision = Md5.encode(revisions.join(":"));
         }
+        var translations = I18n.includePackages(I18n.props(), page.items.map(item -> item.id));
+        var listed = PackageViews.packages(packages, translations, kind, themePreviewRevision);
+        var inspection = PackageViews.inspection(request, kind);
+        var github = PackageViews.github(request, kind);
+        var uploadMegabytes = Math.floor(uploadLimit / 1024 / 1024);
         var props:Map<String, Dynamic> = [
             "kind" => kind,
-            "i18n" => Inertia.always(I18n.includePackages(I18n.props(),
-                page.items.map(item -> item.id))),
-            "packages" => packages,
+            "i18n" => translations,
+            "packages" => listed,
             "themePreviewRevision" => themePreviewRevision,
             "query" => query,
             "total" => count,
             "pagination" => links,
             "notice" => notice,
-            "uploadLimit" => uploadLimit
+            "uploadLimit" => uploadLimit,
+            "githubAvailable" => #if jvm kind == "plugin" #else false #end,
+            "base" => url,
+            "inspection" => inspection,
+            "github" => github,
+            "uploadMegabytes" => uploadMegabytes,
+            "uploadDisabled" => inspection != null || github != null,
+            "kindLabel" => count == 1 ? kind : '${kind}s'
         ];
         if (error != "") {
             props.set("errors", ["package" => error]);
         }
-        return Inertia.render("Admin/Extensions", props).status(status);
+        return View.render("Admin/Extensions", props).status(status);
     }
 
     public static function upload(request:Request, kind:String):AbstractResponse {
@@ -118,8 +134,8 @@ class PackageController {
             return CmsController.forbidden(request);
         }
         var admin = CmsAccess.current();
+        var key = AdminController.input(request, "key", 64);
         try {
-            var key = AdminController.input(request, "key", 64);
             if (!~/^[A-Za-z0-9_-]{32}$/.match(key)) {
                 throw new Exception("Inspect a package ZIP before installing it.");
             }
@@ -127,6 +143,13 @@ class PackageController {
                 request.input("replace", "0") == "1");
             return ResponseBuilder.asRedirect('${base(kind)}?notice=installed', 303);
         } catch (error:Dynamic) {
+            // A failed installation keeps its inspection open, as the page did before.
+            var inspected = ~/^[A-Za-z0-9_-]{32}$/.match(key) ? '${base(kind)}?inspect=${key}' : base(kind);
+            var redirect = AdminController.validationRedirect(request, "package",
+                Std.string(error), inspected);
+            if (redirect != null) {
+                return redirect;
+            }
             return index(request, kind, Std.string(error), 422);
         }
     }
@@ -137,6 +160,9 @@ class PackageController {
         }
         var admin = CmsAccess.current();
         PackageManager.discard(AdminController.input(request, "key", 64), admin.id);
+        if (View.redirectsValidation(request)) {
+            return ResponseBuilder.asRedirect(base(kind), 303);
+        }
         return ResponseBuilder.asJson({discarded: true});
     }
 
@@ -193,9 +219,11 @@ class PackageController {
                 secrets.set(field.key, stored.get(field.key) != null && stored.get(field.key) != "");
             }
         }
+        var shown = submittedSettings(request, manifest.fields, configured, error);
+        var settingFields = PackageFieldViews.prepare(item.id, manifest.fields, shown, secrets);
         var props:Map<String, Dynamic> = [
             "kind" => kind,
-            "i18n" => Inertia.always(I18n.props(PackageData.one(id))),
+            "i18n" => I18n.props(PackageData.one(id)),
             "packageInfo" => {
                 id: item.id,
                 name: item.name,
@@ -205,12 +233,38 @@ class PackageController {
             "values" => configured,
             "secrets" => secrets,
             "notice" => request.query("notice",
-                "") == "saved" ? "Package settings have been saved." : ""
+                "") == "saved" ? "Package settings have been saved." : "",
+            "packageName" => I18n.t(item.name, null, item.id),
+            "settingFields" => settingFields,
+            "base" => base(kind)
         ];
         if (error != "") {
             props.set("errors", ["package" => error]);
         }
-        return Inertia.render("Admin/ExtensionSettings", props).status(status);
+        return View.render("Admin/ExtensionSettings", props).status(status);
+    }
+
+    /**
+        The values a failed save submitted, from the request when its
+        response renders the form, or flashed by its redirect. Secrets are
+        never shown again.
+    **/
+    static function submittedSettings(request:Request, fields:Array<PackageField>,
+            configured:Map<String, String>, error:String):Map<String, String> {
+        var flashed:Dynamic = View.flashed(request, "old");
+        var source:Null<Map<String, Dynamic>> = error != "" ? request.all() : Std.isOfType(flashed,
+            StringMap) ? cast flashed : null;
+        if (source == null) {
+            return configured;
+        }
+        var shown = configured.copy();
+        for (field in fields) {
+            var value:Dynamic = source.get(field.key);
+            if (field.kind != "secret" && Std.isOfType(value, String)) {
+                shown.set(field.key, value);
+            }
+        }
+        return shown;
     }
 
     public static function preview(request:Request, error:String = "",
@@ -222,37 +276,72 @@ class PackageController {
         if (theme == null || theme.kind != "theme") {
             return SiteController.notFound(request);
         }
-        var previewBase = '/admin/themes/${theme.id}/preview/frame';
-        var previewUrl = '${previewBase}?lang=${StringTools.urlEncode(I18n.locale())}';
-        var manifest = PackageManifest.parse(theme.manifest);
-        var fields = manifest.fields.filter(field -> field.kind != "secret");
-        var customization:Dynamic = null;
-        if (fields.length > 0) {
-            var session = SecureToken.generate(32);
-            var values = PackageSettings.values(manifest, theme.settings, false);
-            customization = {fields: fields, values: values, session: session};
-            previewUrl += '&customizeSession=${session}';
-        }
         var redirect = AdminController.validationRedirect(request, "package", error,
             '/admin/themes/${theme.id}/preview');
         if (redirect != null) {
             return redirect;
         }
-        var props:Map<String, Dynamic> = [
-            "preview" => {
-                id: theme.id,
-                name: theme.name,
-                url: previewUrl,
-                customization: customization
-            },
-            "i18n" => I18n.props(theme),
-            "notice" => request.query("notice",
-                "") == "saved" ? "Theme changes have been saved." : ""
-        ];
-        if (error != "") {
-            props.set("errors", ["package" => error]);
+        var previewBase = '/admin/themes/${theme.id}/preview/frame';
+        var previewUrl = '${previewBase}?lang=${StringTools.urlEncode(I18n.locale())}';
+        var manifest = PackageManifest.parse(theme.manifest);
+        var fields = manifest.fields.filter(field -> field.kind != "secret");
+        var saved:Map<String, String> = [];
+        var editing:Map<String, String> = [];
+        var dirty = false;
+        if (fields.length > 0) {
+            var session = SecureToken.generate(32);
+            previewUrl += '&customizeSession=${session}';
+            var values = PackageSettings.values(manifest, theme.settings, false);
+            for (field in fields) {
+                var stored = values.get(field.key) ?? "";
+                var submitted = View.old(request, field.key);
+                saved.set(field.key, stored);
+                editing.set(field.key, submitted ?? stored);
+                dirty = dirty || (submitted != null && submitted != stored);
+            }
         }
-        return Inertia.render("Admin/ThemePreview", props).status(status);
+        var notice = request.query("notice", "") == "saved" ? "Theme changes have been saved." : "";
+        var errorMessage = View.errorText(View.errors(request, null).get("package"));
+        var preview:ThemePreviewView = {
+            id: theme.id,
+            name: I18n.installedT(theme.name, null, theme.id),
+            url: previewUrl,
+            customizable: fields.length > 0,
+            dirty: dirty,
+            fields: PackageFieldViews.prepare(theme.id, fields, editing),
+            saved: saved
+        };
+        var props:Map<String, Dynamic> = [
+            "preview" => preview,
+            "customizerOpen" => preview.customizable && (notice != "" || errorMessage != ""),
+            "notice" => notice,
+            "error" => errorMessage
+        ];
+        return View.render("Admin/ThemePreview", props).status(status);
+    }
+
+    /**
+        Unsaved customizer values for a preview frame, sent as JSON in the
+        `preview_settings` query: only the theme's own setting keys, as text.
+    **/
+    static function draftSettings(request:Request, saved:Map<String, String>):Map<String, String> {
+        var raw = request.query("preview_settings", "");
+        if (raw == "" || raw.length > 20000) {
+            return saved;
+        }
+        var settings = saved.copy();
+        try {
+            var values:Dynamic = Json.parse(raw);
+            for (key in saved.keys()) {
+                var value:Dynamic = Reflect.field(values, key);
+                if (Std.isOfType(value, String) && (value : String).length <= 2000) {
+                    settings.set(key, value);
+                }
+            }
+        } catch (error:Dynamic) {
+            return saved;
+        }
+        return settings;
     }
 
     public static function previewContent(request:Request, path:String = "/"):AbstractResponse {
@@ -272,19 +361,10 @@ class PackageController {
         if (~/^[A-Za-z0-9_-]{32}$/.match(session)) {
             themeInfo.customizeSession = session;
         }
-        Inertia.share("theme", themeInfo);
-        Inertia.share("i18n", I18n.props(theme));
-        Inertia.share("categories", CategoryData.names());
-        Inertia.share("navigation", NavigationData.forRegions(themeInfo.navigation));
-        Inertia.share("extensions", {
-            assets: PluginRuntime.assets(),
-            blocks: PluginRuntime.blocks("site.shared", {path: path})
-        });
-        Inertia.share("pluginNavigation", {
-            header: PluginRuntime.navigation("header", []),
-            footer: PluginRuntime.navigation("footer", []),
-            admin: []
-        });
+        if (themeInfo.customizeSession != null) {
+            themeInfo.settings = draftSettings(request, themeInfo.settings);
+        }
+        View.shareAll(SiteController.appearance(themeInfo, path));
         if (path == "/") {
             return SiteController.home(request);
         }

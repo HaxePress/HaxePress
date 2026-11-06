@@ -1,0 +1,9 @@
+<SiteLayout>
+  <PageHead :title="t('About this site')" />
+  <article class="simple-about">
+    <h1>{{ site.site_name }}</h1>
+    <p :if="site.description">{{ site.description }}</p>
+    <p :if="site.about_site">{{ site.about_site }}</p>
+    <a href="{{ primaryArchive }}">{{ t('Explore content') }}</a>
+  </article>
+</SiteLayout>

@@ -1,0 +1,147 @@
+<props
+  members="List<AdminTeamMemberView>"
+  roleChoices="List<AdminRoleChoiceView>"
+  query="String"
+  total="Int"
+  pagination="PageLinksView"
+  notice="String"
+  memberForm="AdminTeamMemberFormView"
+/>
+<AdminLayout :title="t('Team')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Your team') }}</h1>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('team')" />
+  <div class="categories-grid">
+    <section class="admin-card category-collection">
+      <div class="admin-card-heading">
+        <h2>{{ t('Team members') }} <span class="count-badge">{{ total }}</span></h2>
+      </div>
+      <form class="category-search-form" action="/admin/team" method="get">
+        <label class="sr-only" for="team-query">{{ t('Find a team member') }}</label>
+        <input
+          id="team-query"
+          name="q"
+          type="search"
+          placeholder="{{ t('Search names or email addresses…') }}"
+          maxlength="100"
+          value="{{ query }}"
+        />
+        <button class="button button-outline" type="submit">{{ t('Search') }}</button>
+      </form>
+      <ul class="category-list team-list">
+        <li :for="member in members" :class="memberForm.id == (member.id | string) ? 'editing'">
+          <div class="category-details">
+            <strong
+              >{{ member.name }}
+              <small :if="auth and member.id == auth.admin.id">{{ t('(you)') }}</small></strong
+            >
+            <span>{{ member.email }}</span>
+            <span
+              ><b class="role-label">{{ t(member.roleLabel) }}</b> · {{ member.active ? t('Active')
+              : t('Deactivated') }}</span
+            >
+          </div>
+          <a
+            class="icon-button"
+            aria-label="Edit {{ member.name }}"
+            href="{{ url('/admin/team', q: query, cursor: query('cursor'), edit: member.id) }}#member-name"
+            >{{ icon('edit') }}</a
+          >
+        </li>
+      </ul>
+      <Pagination :links="pagination" :count="size(members)" :noun="t('members')" />
+    </section>
+    <section class="admin-card settings-card category-form">
+      <h2>{{ memberForm.id ? t('Edit member') : t('Invite a member') }}</h2>
+      <p :if="memberForm.id">{{ t('Permissions take effect on the next request.') }}</p>
+      <p :else>
+        {{ t('Create an account and share the initial password directly with your teammate.') }}
+      </p>
+      <Island name="admin-form" :props="{ translations: translations }" load="idle">
+        <form action="/admin/team/save" method="post">
+          <input type="hidden" name="id" value="{{ memberForm.id }}" />
+          <label for="member-name">{{ t('Display name') }}</label>
+          <input
+            id="member-name"
+            name="name"
+            required
+            maxlength="100"
+            value="{{ memberForm.name }}"
+            :autofocus="memberForm.id ? true : false"
+          />
+          <label for="member-email">{{ t('Email address') }}</label>
+          <input
+            id="member-email"
+            name="email"
+            type="email"
+            required
+            maxlength="254"
+            value="{{ memberForm.email }}"
+          />
+          <label for="member-role">{{ t('Role') }}</label>
+          <select id="member-role" name="role">
+            <option value="writer" :selected="memberForm.role == 'writer'">
+              {{ t('Writer') }}
+            </option>
+            <option value="editor" :selected="memberForm.role == 'editor'">
+              {{ t('Editor') }}
+            </option>
+            <option value="" :selected="memberForm.role == ''">{{ t('Choose a role') }}</option>
+            <option
+              :for="role in roleChoices"
+              value="{{ role.key }}"
+              :disabled="not role.enabled"
+              :selected="memberForm.role == role.key and not (role.key in ['writer', 'editor'])"
+            >
+              {{ t(role.name) }}
+            </option>
+          </select>
+          <!-- prettier-ignore -->
+          <p
+            class="field-help"
+            data-describes="member-role"
+            data-text-owner="{{ t('Full access, including packages, settings and team management.') }}"
+            data-text-editor="{{ t('Manage and publish all content, organize tags and categories, and edit navigation.') }}"
+            data-text="{{ t('Write and manage personal drafts and use the media library. Publishing requires an editor.') }}"
+          >{{ memberForm.role == 'owner' ? t('Full access, including packages, settings and team management.') : memberForm.role == 'editor' ? t('Manage and publish all content, organize tags and categories, and edit navigation.') : t('Write and manage personal drafts and use the media library. Publishing requires an editor.') }}</p>
+          <template :if="not memberForm.own">
+            <label :if="memberForm.id" for="member-password"
+              >{{ t('Reset password (optional)') }}</label
+            >
+            <label :else for="member-password">{{ t('Initial password') }}</label>
+            <input
+              id="member-password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+              :required="not memberForm.id"
+              minlength="12"
+              maxlength="72"
+            />
+            <!-- prettier-ignore -->
+            <p :if="memberForm.id" class="field-help">{{ t('Leave blank to keep the current password. Resetting it expires existing sessions.') }}</p>
+          </template>
+          <label class="checkbox-field"
+            ><input type="checkbox" name="active" value="1" :checked="memberForm.active" /> {{
+            t('Active account') }}</label
+          >
+          <div class="category-form-actions">
+            <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+              {{ memberForm.id ? t('Save member') : t('Create account') }}
+            </button>
+            <a
+              :if="memberForm.id"
+              class="button button-outline"
+              href="{{ url('/admin/team', q: query, cursor: query('cursor')) }}"
+              >{{ t('Cancel') }}</a
+            >
+          </div>
+        </form>
+      </Island>
+    </section>
+  </div>
+</AdminLayout>

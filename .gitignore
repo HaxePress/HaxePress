@@ -37,7 +37,6 @@ __pycache__/
 java-lib/*.jar
 public/build/
 public/packages/
-bootstrap/ssr/
 bootstrap/mcp/
 public/mcp/
 /export_classes.info

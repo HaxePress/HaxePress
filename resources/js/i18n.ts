@@ -1,5 +1,4 @@
-import { usePage } from '@inertiajs/react';
-import type { SharedProps } from './types';
+import { createContext, createElement, useContext, type ReactNode } from 'react';
 
 export type TranslationMessage = string | { one: string; other: string };
 export type TranslationParameters = Record<string, string | number>;
@@ -30,10 +29,43 @@ export function createTranslator(data: TranslationProps, namespace = 'cms'): Tra
   };
 }
 
+/** Translations for a client island, provided when it mounts. */
+const IslandTranslations = createContext<TranslationProps | null>(null);
+
+export function TranslationProvider({
+  value,
+  children,
+}: {
+  value: TranslationProps;
+  children: ReactNode;
+}) {
+  return createElement(IslandTranslations.Provider, { value }, children);
+}
+
+const catalogues = new Map<string, Promise<Record<string, TranslationMessage>>>();
+
+/** Loads the CMS catalogue an island needs from its cached, versioned URL. */
+export function loadCatalogue(url: string): Promise<Record<string, TranslationMessage>> {
+  let pending = catalogues.get(url);
+  if (!pending) {
+    pending = fetch(url, { credentials: 'same-origin' }).then((response) =>
+      response.ok ? response.json() : {},
+    );
+    catalogues.set(url, pending);
+  }
+  return pending;
+}
+
+/** Used outside a translation provider, where keys show as written. */
+const untranslated: TranslationProps = {
+  locale: 'en',
+  direction: 'ltr',
+  fallbackLocale: 'en',
+  locales: [],
+  catalogues: {},
+};
+
 export function useTranslation(namespace?: string) {
-  const page = usePage<SharedProps>();
-  const data = page.props.i18n;
-  const selectedNamespace =
-    namespace ?? (page.component.startsWith('Admin/') ? 'cms' : page.props.theme?.id || 'cms');
-  return { ...data, t: createTranslator(data, selectedNamespace) };
+  const data = useContext(IslandTranslations) ?? untranslated;
+  return { ...data, t: createTranslator(data, namespace ?? 'cms') };
 }

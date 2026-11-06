@@ -1,4 +1,4 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '../../page';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHead from '../../components/PageHead';
 import Icon from '../../components/Icon';
@@ -16,6 +16,7 @@ import EasyInspector from '../../themes/builder/EasyInspector';
 import EasyDesign from '../../themes/builder/EasyDesign';
 import useDesignSaving from '../../themes/builder/useDesignSaving';
 import ThemeAiPanel from '../../themes/builder/ThemeAiPanel';
+import AdminAiControl from '../../components/AdminAiControl';
 import useThemeAiSync from '../../themes/builder/useThemeAiSync';
 import {
   friendlySection,
@@ -81,7 +82,7 @@ type Snapshot = { name: string; document: ThemeDocument };
 
 export default function ThemeBuilder({ studio }: { studio: Studio }) {
   const { t } = useTranslation();
-  const { csrfToken } = usePage<SharedProps>().props;
+  const { csrfToken, auth } = usePage<SharedProps>().props;
   const mediaRules = studio.imageRules;
   const [history, setHistory] = useState<{
     past: Snapshot[];
@@ -966,7 +967,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
       onClick={() => setAiPanel(true)}
     >
       <Icon name="sparkles" />
-      {t('Connect AI')}
+      {t('Theme AI permissions')}
     </button>
   );
   const easyClass = mode === 'easy' ? ' theme-studio-easy' : '';
@@ -1074,6 +1075,7 @@ export default function ThemeBuilder({ studio }: { studio: Studio }) {
             </button>
           ))}
         </div>
+        {auth && <AdminAiControl adminId={auth.admin.id} csrfToken={csrfToken} />}
         {mode === 'easy' ? (
           <div className="studio-save-actions">
             {exportAction}

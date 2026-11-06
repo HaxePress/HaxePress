@@ -1,9 +1,10 @@
 diff --git a/src/hx/well/database/Connection.hx b/src/hx/well/database/Connection.hx
 --- a/src/hx/well/database/Connection.hx
 +++ b/src/hx/well/database/Connection.hx
-@@ -1,16 +1,22 @@
+@@ -1,16 +1,25 @@
  package hx.well.database;
 +
++import haxe.Exception;
  import haxe.ThreadLocal;
  import hx.well.pool.DatabasePool;
  import sys.db.Connection as HaxeConnection;
@@ -19,6 +20,8 @@ diff --git a/src/hx/well/database/Connection.hx b/src/hx/well/database/Connectio
 +        String> = SynchronizedMap.newStringMap();
 +    private static var nativeUpserts:SynchronizedMap<String,
 +        Bool> = SynchronizedMap.newStringMap();
++    private static var scoped = new ThreadLocal<Map<String,
++        {driver:String, connection:HaxeConnection}>>(() -> []);
 +    private static var threadLocal:ThreadLocal<Map<String,
 +        HaxeConnection>> = new ThreadLocal<Map<String, HaxeConnection>>(() -> {
          return new Map<String, HaxeConnection>();
@@ -30,7 +33,7 @@ diff --git a/src/hx/well/database/Connection.hx b/src/hx/well/database/Connectio
              var connection = connections.get(key);
              connectionPool.get(key).free(connection);
          }
-@@ -19,11 +25,12 @@
+@@ -19,11 +28,12 @@
          #end
      });
  
@@ -46,13 +49,16 @@ diff --git a/src/hx/well/database/Connection.hx b/src/hx/well/database/Connectio
          #if debug
          trace('${key} => ${databasePool} ${connectionPool.get(key)}');
          #end
-@@ -33,26 +40,40 @@
+@@ -33,26 +43,71 @@
          return connectionPool.get(key).get();
      }
  
 -    public static function get(key:String = "default"):HaxeConnection
 -    {
 +    public static function get(key:String = "default"):HaxeConnection {
++        var temporary = scoped.get().get(key);
++        if (temporary != null)
++            return temporary.connection;
          var connections = threadLocal.get();
  
 -        if(!connections.exists(key))
@@ -68,11 +74,40 @@ diff --git a/src/hx/well/database/Connection.hx b/src/hx/well/database/Connectio
      }
  
      public static function driver(key:String = "default"):Null<String> {
-         return connectionDrivers.get(key);
+-        return connectionDrivers.get(key);
++        var temporary = scoped.get().get(key);
++        return temporary == null ? connectionDrivers.get(key) : temporary.driver;
      }
  
 -    public static function free():Void
 -    {
++    /** Expose an isolated file to Schema and model queries for the current thread only. */
++    public static function withSqlite<T>(key:String, path:String, work:Void->T):T {
++        return withConfiguration(key, {path: path}, work);
++    }
++
++    public static function withConfiguration<T>(key:String, config:Dynamic, work:Void->T):T {
++        if (driver(key) != null)
++            throw new Exception("Choose an unused scoped connection name.");
++        var connections = scoped.get();
++        var connection = new DatabasePool(key, config).create();
++        connections.set(key, {
++            driver: config.path == null ? "mysql" : "sqlite",
++            connection: connection
++        });
++        var result:T;
++        try {
++            result = work();
++        } catch (error:Dynamic) {
++            connections.remove(key);
++            connection.close();
++            throw error;
++        }
++        connections.remove(key);
++        connection.close();
++        return result;
++    }
++
 +    public static function supportsNativeUpsert(key:String = "default"):Bool {
 +        if (driver(key) != "sqlite") {
 +            return true;
@@ -190,7 +225,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
      private var conditions:Array<QueryCondition> = [];
      private var joins:Array<String> = [];
      private var values:Array<Dynamic> = [];
-@@ -37,24 +42,48 @@
+@@ -37,24 +42,76 @@
      }
  
      public function select(columns:Array<String>):QueryBuilder<T> {
@@ -204,6 +239,34 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          return this;
      }
  
++    /** Preserve database numeric precision and temporal values in logical exports. */
++    public function selectWithText(columns:Array<String>, textColumns:Array<String>):QueryBuilder<T> {
++        select(columns);
++        var textType = Connection.driver(model.__connection) == "sqlite" ? "TEXT" : "CHAR";
++        for (i in 0...columns.length) {
++            var column = columns[i];
++            if (textColumns.contains(column)) {
++                var name = QueryIdentifier.quote(column);
++                this.columns[i] = 'CAST(${name} AS ${textType}) AS ${name}';
++            }
++        }
++        return this;
++    }
++
++    public function whereAfterKey(columns:Array<String>, cursor:Array<Dynamic>):QueryBuilder<T> {
++        if (columns.length == 0 || columns.length != cursor.length)
++            throw new Exception("A query cursor must match its key columns.");
++        return addGroup(group -> {
++            for (position in 0...columns.length) {
++                group.addGroup(branch -> {
++                    for (prefix in 0...position)
++                        branch._where(columns[prefix], "=", cursor[prefix]);
++                    branch._where(columns[position], ">", cursor[position]);
++                }, "OR");
++            }
++        }, "AND");
++    }
++
 +    public function distinct():QueryBuilder<T> {
 +        this.distinctValue = true;
 +        return this;
@@ -248,7 +311,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          return _where(column, op, value);
      }
  
-@@ -63,10 +92,14 @@
+@@ -63,10 +120,14 @@
      }
  
      public overload extern inline function where(data:StringMap<Dynamic>):QueryBuilder<T> {
@@ -264,7 +327,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
      }
  
      private function _where(column:String, op:String, value:Dynamic):QueryBuilder<T> {
-@@ -77,7 +110,15 @@
+@@ -77,7 +138,15 @@
          return this;
      }
  
@@ -281,7 +344,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          return _orWhere(column, op, value);
      }
  
-@@ -86,9 +127,60 @@
+@@ -86,9 +155,60 @@
      }
  
      public overload extern inline function orWhere(data:StringMap<Dynamic>):QueryBuilder<T> {
@@ -343,7 +406,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          return this;
      }
  
-@@ -102,8 +194,36 @@
+@@ -102,8 +222,36 @@
  
      public function whereRaw(query:String, ...queryValues):QueryBuilder<T> {
          conditions.push({condition: query, type: "RAW"});
@@ -381,7 +444,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          return this;
      }
  
-@@ -165,22 +285,35 @@
+@@ -165,22 +313,35 @@
          return this;
      }
  
@@ -423,7 +486,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          table = QueryIdentifier.reference(table);
          column1 = QueryIdentifier.reference(column1);
          column2 = QueryIdentifier.reference(column2);
-@@ -192,9 +325,14 @@
+@@ -192,9 +353,14 @@
      public function orderBy(column:String, direction:String = "ASC"):QueryBuilder<T> {
          column = QueryIdentifier.reference(column);
          direction = QueryIdentifier.keyword(direction);
@@ -434,14 +497,14 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
 +            throw new Exception('Invalid sort direction: ${direction}');
 +        var ordering = '$column $direction';
 +        if (this.orderByClause == "") {
-+            this.orderByClause = 'ORDER BY ${ordering}';
++            this.orderByClause = "ORDER BY " + ordering;
 +        } else {
-+            this.orderByClause += ', ${ordering}';
++            this.orderByClause += ", " + ordering;
 +        }
          return this;
      }
  
-@@ -216,7 +354,17 @@
+@@ -216,7 +382,17 @@
      }
  
      public function first():Null<T> {
@@ -460,7 +523,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
      }
  
      public function exists():Bool {
-@@ -237,29 +385,73 @@
+@@ -237,29 +413,73 @@
      public function count():Int {
          var tempColumns = this.columns.copy();
          var tempLimit = this.limitValue;
@@ -505,7 +568,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
 +        var previousLimit = limitValue;
 +        var previousOrdering = orderByClause;
 +        var previousDistinct = distinctValue;
-+        var distinctColumn = previousDistinct ? 'DISTINCT ${reference}' : reference;
++        var distinctColumn = previousDistinct ? "DISTINCT " + reference : reference;
 +        columns = ['COALESCE(SUM($distinctColumn), 0) AS aggregate_value'];
 +        selectValues = [];
 +        limitValue = -1;
@@ -547,7 +610,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          var values:Array<Dynamic> = dataValues.concat(this.values);
          db.update(toUpdateSql(keys.iterator()), ...values);
      }
-@@ -273,9 +465,37 @@
+@@ -273,9 +493,37 @@
      }
  
      public function insert(data:StringMap<Dynamic>):Int {
@@ -587,7 +650,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
      }
  
      public function unsafe(value:Bool):QueryBuilder<T> {
-@@ -283,21 +503,38 @@
+@@ -283,21 +531,38 @@
          return this;
      }
  
@@ -796,7 +859,7 @@ diff --git a/src/hx/well/database/schema/ForeignKeyInfo.hx b/src/hx/well/databas
 new file mode 100644
 --- /dev/null
 +++ b/src/hx/well/database/schema/ForeignKeyInfo.hx
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,10 @@
 +package hx.well.database.schema;
 +
 +typedef ForeignKeyInfo = {
@@ -804,10 +867,21 @@ new file mode 100644
 +    var columns:Array<String>;
 +    var foreignTable:String;
 +    var foreignColumns:Array<String>;
++    var ?onDelete:String;
++    var ?onUpdate:String;
 +}
 diff --git a/src/hx/well/database/schema/MysqlSchemaGrammar.hx b/src/hx/well/database/schema/MysqlSchemaGrammar.hx
 --- a/src/hx/well/database/schema/MysqlSchemaGrammar.hx
 +++ b/src/hx/well/database/schema/MysqlSchemaGrammar.hx
+@@ -27,7 +27,7 @@
+             case TTimestamp: "TIMESTAMP";
+             case TYear: "YEAR";
+             case TJson: "JSON";
+-            case TBinary: "BLOB";
++            case TBinary: column.length != null && column.length > 65535 ? "LONGBLOB" : "BLOB";
+             case TUuid: "CHAR(36)";
+             case TEnum: 'ENUM(${quotedValueList(column.allowed)})';
+             case TSet: 'SET(${quotedValueList(column.allowed)})';
 @@ -57,6 +57,17 @@
          return "";
      }
@@ -876,7 +950,7 @@ diff --git a/src/hx/well/database/schema/MysqlSchemaGrammar.hx b/src/hx/well/dat
          return 'ALTER TABLE ${quote(table)} ADD PRIMARY KEY (${quoteList(columns)})';
      }
  
-@@ -153,19 +171,31 @@
+@@ -153,19 +171,44 @@
      }
  
      public override function compileTableExists(table:String):String {
@@ -889,6 +963,18 @@ diff --git a/src/hx/well/database/schema/MysqlSchemaGrammar.hx b/src/hx/well/dat
 -        return 'SELECT COLUMN_NAME AS name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
 +        return
 +            'SELECT COLUMN_NAME AS name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\'';
++    }
++
++    public override function compileColumnDetails(table:String):String {
++        return 'SELECT COLUMN_NAME AS name, DATA_TYPE AS type, COLUMN_TYPE AS declared_type, CHARACTER_MAXIMUM_LENGTH AS max_length, NUMERIC_PRECISION AS numeric_precision, NUMERIC_SCALE AS numeric_scale, IS_NULLABLE AS nullable, COLUMN_DEFAULT AS default_value, EXTRA AS extra FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\' ORDER BY ORDINAL_POSITION';
++    }
++
++    public override function compileIndexDetails(table:String):String {
++        return 'SELECT INDEX_NAME AS name, COLUMN_NAME AS column_name, (INDEX_NAME = \'PRIMARY\') AS primary_key, (NON_UNIQUE = 0) AS unique_key, (SUB_PART IS NOT NULL OR INDEX_TYPE <> \'BTREE\' OR COLLATION = \'D\' OR COLUMN_NAME IS NULL) AS unsupported FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = \'${escapeString(table)}\' ORDER BY INDEX_NAME, SEQ_IN_INDEX';
++    }
++
++    public override function compileNonPortableObjects():String {
++        return "SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema = DATABASE() AND (TABLE_TYPE <> 'BASE TABLE' OR ENGINE <> 'InnoDB') UNION ALL SELECT TRIGGER_NAME FROM information_schema.triggers WHERE TRIGGER_SCHEMA = DATABASE() UNION ALL SELECT CONSTRAINT_NAME FROM information_schema.table_constraints WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_TYPE = 'CHECK' UNION ALL SELECT CONSTRAINT_NAME FROM information_schema.key_column_usage WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_SCHEMA <> DATABASE() LIMIT 1";
      }
  
      public override function compileTableListing():String {
@@ -905,10 +991,11 @@ diff --git a/src/hx/well/database/schema/MysqlSchemaGrammar.hx b/src/hx/well/dat
 +
 +    public override function compileForeignKeyListing(table:String):String {
 +        quote(table);
-+        var columns = "CONSTRAINT_NAME AS name, COLUMN_NAME AS column_name, REFERENCED_TABLE_NAME AS foreign_table, REFERENCED_COLUMN_NAME AS foreign_column, ORDINAL_POSITION AS position";
-+        var source = "information_schema.KEY_COLUMN_USAGE";
-+        var condition = 'TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'${escapeString(table)}\' AND REFERENCED_TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL';
-+        return 'SELECT ${columns} FROM ${source} WHERE ${condition} ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION';
++        return 'SELECT keys_info.CONSTRAINT_NAME AS name, keys_info.COLUMN_NAME AS column_name, keys_info.REFERENCED_TABLE_NAME AS foreign_table, keys_info.REFERENCED_COLUMN_NAME AS foreign_column, keys_info.ORDINAL_POSITION AS position, rules.DELETE_RULE AS on_delete, rules.UPDATE_RULE AS on_update FROM information_schema.KEY_COLUMN_USAGE AS keys_info JOIN information_schema.REFERENTIAL_CONSTRAINTS AS rules ON rules.CONSTRAINT_SCHEMA = keys_info.CONSTRAINT_SCHEMA AND rules.CONSTRAINT_NAME = keys_info.CONSTRAINT_NAME AND rules.TABLE_NAME = keys_info.TABLE_NAME WHERE keys_info.TABLE_SCHEMA = DATABASE() AND keys_info.TABLE_NAME = \'${escapeString(table)}\' AND keys_info.REFERENCED_TABLE_SCHEMA = DATABASE() AND keys_info.REFERENCED_TABLE_NAME IS NOT NULL ORDER BY keys_info.CONSTRAINT_NAME, keys_info.ORDINAL_POSITION';
++    }
++
++    private override function escapeString(value:String):String {
++        return super.escapeString(value).replace("\\", "\\\\");
      }
  
      public override function compileEnableForeignKeyConstraints():String {
@@ -936,7 +1023,26 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          return Connection.get(connectionKey).request(statement);
      }
  
-@@ -100,11 +103,12 @@
+@@ -37,9 +40,17 @@
+     }
+
+     public function create(table:String, callback:Blueprint->Void):Void {
++        createTracked(table, callback);
++    }
++
++    public function createTracked(table:String, callback:Blueprint->Void, ?created:Void->Void):Void {
+         var blueprint = new Blueprint(table);
+         callback(blueprint);
+-        execute(grammar().compileCreate(blueprint));
++        var statements = grammar().compileCreate(blueprint);
++        request(statements.shift());
++        if (created != null)
++            created();
++        execute(statements);
+     }
+
+     public function table(table:String, callback:Blueprint->Void):Void {
+@@ -100,11 +111,12 @@
      }
  
      public function hasTable(table:String):Bool {
@@ -951,7 +1057,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      }
  
      public function hasColumns(table:String, columns:Array<String>):Bool {
-@@ -117,11 +121,21 @@
+@@ -117,11 +129,58 @@
      }
  
      public function hasIndex(table:String, index:String):Bool {
@@ -965,6 +1071,43 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
 +        return [for (row in columnRows(table)) Std.string(Reflect.field(row, "name"))];
 +    }
 +
++    public function getWritableColumnListing(table:String):Array<String> {
++        return [for (row in columnRows(table)) if (row.hidden == null
++            || intValue(row.hidden) == 0) Std.string(Reflect.field(row, "name"))];
++    }
++
++    /** Column metadata for logical schema readers. */
++    public function getColumnDetails(table:String):Array<Dynamic> {
++        if (isSqlite()) {
++            var definition = SqliteTableDefinition.parse(sqliteTableSql(table));
++            if (definition.suffix != "" || definition.hasKeyword(["CHECK", "COLLATE", "DEFERRABLE"]))
++                throw new Exception('Table ${table} has constraints outside the portable format.');
++            return columnRows(table);
++        }
++        return [for (row in request(grammar().compileColumnDetails(table)).results()) row];
++    }
++
++    public function getIndexDetails(table:String):Array<Dynamic> {
++        if (!isSqlite())
++            return [for (row in request(grammar().compileIndexDetails(table)).results()) row];
++        var details:Array<Dynamic> = [];
++        for (index in request(grammar().compileIndexListing(table)).results()) {
++            for (column in request('PRAGMA index_xinfo(${quote(index.name)})').results()) {
++                if (intValue(column.key) == 1) {
++                    details.push({
++                        name: index.name,
++                        column_name: column.name,
++                        primary_key: index.origin == "pk" ? 1 : 0,
++                        unique_key: Reflect.field(index, "unique"),
++                        unsupported: intValue(index.partial) != 0 || intValue(column.desc) != 0
++                            || column.name == null || column.coll != "BINARY" ? 1 : 0
++                    });
++                }
++            }
++        }
++        return details;
++    }
++
 +    private function columnRows(table:String):Array<Dynamic> {
 +        var rows = request(grammar().compileColumnListing(table)).results();
 +        if (isSqlite() && rows.length == 0) {
@@ -975,7 +1118,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      }
  
      public function getIndexListing(table:String):Array<String> {
-@@ -130,6 +144,35 @@
+@@ -130,6 +189,37 @@
  
      public function getTableListing():Array<String> {
          return readNames(grammar().compileTableListing());
@@ -993,7 +1136,9 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
 +                    columns: [],
 +                    foreignTable: Std.string(Reflect.field(row,
 +                        isSqlite() ? "table" : "foreign_table")),
-+                    foreignColumns: []
++                    foreignColumns: [],
++                    onDelete: Std.string(row.on_delete),
++                    onUpdate: Std.string(row.on_update)
 +                };
 +                grouped.set(name, current);
 +            }
@@ -1011,7 +1156,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      }
  
      public function whenTableHasColumn(table:String, column:String, callback:Blueprint->Void):Void {
-@@ -137,7 +180,8 @@
+@@ -137,7 +227,8 @@
              this.table(table, callback);
      }
  
@@ -1021,7 +1166,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          if (!hasColumn(table, column))
              this.table(table, callback);
      }
-@@ -170,7 +214,7 @@
+@@ -170,7 +261,7 @@
          execute([grammar().compileDisableForeignKeyConstraints()]);
      }
  
@@ -1030,7 +1175,98 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          disableForeignKeyConstraints();
          try {
              callback();
-@@ -191,7 +235,7 @@
+@@ -181,6 +272,90 @@
+         enableForeignKeyConstraints();
+     }
+
++    public function startReadSnapshot():Void {
++        if (!isSqlite())
++            request("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
++        Connection.get(connectionKey).startTransaction();
++    }
++
++    public function prepareLogicalRestore():Void {
++        if (!isSqlite())
++            request("SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'STRICT_ALL_TABLES', 'NO_AUTO_VALUE_ON_ZERO')");
++    }
++
++    /** Validate every incoming reference before a bulk load can commit. */
++    public function validateForeignKeys(tables:Array<String>):Void {
++        if (isSqlite()) {
++            if (!request("SELECT 1 FROM pragma_foreign_key_check LIMIT 1").results().isEmpty())
++                throw new Exception("The restored database has invalid foreign keys.");
++            return;
++        }
++        for (table in tables) {
++            for (foreign in getForeignKeys(table)) {
++                var on:Array<String> = [];
++                var nonNull:Array<String> = [];
++                for (i in 0...foreign.columns.length) {
++                    var column = 'child.${quote(foreign.columns[i])}';
++                    on.push('${column} = parent.${quote(foreign.foreignColumns[i])}');
++                    nonNull.push('${column} IS NOT NULL');
++                }
++                var missing = 'parent.${quote(foreign.foreignColumns[0])} IS NULL';
++                if (!request('SELECT 1 FROM ${quote(table)} AS child LEFT JOIN ${quote(foreign.foreignTable)} AS parent ON ${on.join(" AND ")} WHERE ${nonNull.join(" AND ")} AND ${missing} LIMIT 1').results().isEmpty())
++                    throw new Exception('Table ${table} contains an invalid foreign key.');
++            }
++        }
++    }
++
++    /** A logical backup cannot replay executable database objects. */
++    public function requirePortableTables():Void {
++        if (!request(grammar().compileNonPortableObjects()).results().isEmpty())
++            throw new Exception("The database contains schema objects outside the portable format.");
++    }
++
++    /** Replay a SQLite snapshot into a private copy with its original schema. */
++    public function replaySqliteSnapshot(source:String, verify:Void->Void, rollback:Bool):Void {
++        if (!isSqlite())
++            throw new Exception("Replaying this snapshot requires SQLite.");
++        request("PRAGMA trusted_schema = OFF");
++        if (!request("SELECT name FROM sqlite_schema WHERE type IN ('trigger', 'view') OR sql LIKE 'CREATE VIRTUAL TABLE %' LIMIT 1").results().isEmpty())
++            throw new Exception("The backup contains unsupported SQLite schema objects.");
++        var connection = Connection.get(connectionKey);
++        var tables = getTableListing();
++        request('ATTACH DATABASE ${connection.quote(source)} AS backup_source');
++        try {
++            withoutForeignKeyConstraints(() -> {
++                connection.startTransaction();
++                try {
++                    for (table in tables)
++                        request('DELETE FROM main.${quote(table)}');
++                    for (table in tables) {
++                        var columns = getWritableColumnListing(table).map(quote).join(", ");
++                        var identifier = quote(table);
++                        request('INSERT INTO main.${identifier} (${columns}) SELECT ${columns} FROM backup_source.${identifier}');
++                    }
++                    verify();
++                    var integrity = request("PRAGMA main.quick_check(1)").results().first();
++                    if (integrity == null || Reflect.field(integrity, "quick_check") != "ok"
++                        || !request("SELECT 1 FROM pragma_foreign_key_check LIMIT 1").results().isEmpty())
++                        throw new Exception("The backup database failed its integrity checks.");
++                    if (rollback)
++                        connection.rollback();
++                    else
++                        connection.commit();
++                } catch (error:Dynamic) {
++                    connection.rollback();
++                    throw error;
++                }
++            });
++        } catch (error:Dynamic) {
++            // A failed verifier may still own an open cursor. Closing the
++            // scoped connection releases it without masking the original error.
++            try request("DETACH DATABASE backup_source") catch (_:Dynamic) {}
++            throw error;
++        }
++        request("DETACH DATABASE backup_source");
++    }
++
+     private function readNames(statement:String):Array<String> {
+         var resultSet = request(statement);
+         return [for (row in resultSet.results()) Std.string(Reflect.field(row, "name"))];
+@@ -191,7 +366,7 @@
      }
  
      private function quote(identifier:String):String {
@@ -1039,7 +1275,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
      }
  
      private function sqliteRenameIndex(table:String, from:String, to:String):Void {
-@@ -205,7 +249,8 @@
+@@ -205,7 +380,8 @@
              throw new Exception('Index ${from} does not exist on table ${table}.');
  
          var createSql:Null<String> = null;
@@ -1049,7 +1285,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
              if (Reflect.field(row, "sql") != null)
                  createSql = Std.string(Reflect.field(row, "sql"));
          }
-@@ -219,14 +264,20 @@
+@@ -219,14 +395,20 @@
          });
      }
  
@@ -1076,7 +1312,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          for (column in changedColumns) {
              if (!existingColumns.contains(SchemaGrammar.asciiLower(column.name)))
                  throw new Exception('Column ${column.name} does not exist on table ${table}.');
-@@ -258,20 +309,24 @@
+@@ -258,20 +440,24 @@
              }
              if (!isGeneratedColumn(changed))
                  copyColumns.push(name);
@@ -1104,7 +1340,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
  
          var temporaryTable = '__tmp_${table}';
          var quotedColumns = copyColumns.map(quote).join(", ");
-@@ -282,7 +337,9 @@
+@@ -282,7 +468,9 @@
              if (copyColumns.length > 0)
                  request('INSERT INTO ${quote(temporaryTable)} (${quotedColumns}) SELECT ${quotedColumns} FROM ${quote(table)}');
              // Keep AUTOINCREMENT's high-water mark even when the highest rows were deleted.
@@ -1115,7 +1351,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
                  request('UPDATE sqlite_sequence SET seq = MAX(seq, COALESCE((SELECT seq FROM sqlite_sequence WHERE name = \'${table.replace("'", "''")}\'), 0)) WHERE name = \'${temporaryTable.replace("'", "''")}\'');
              request('DROP TABLE ${quote(table)}');
              request('ALTER TABLE ${quote(temporaryTable)} RENAME TO ${quote(table)}');
-@@ -298,12 +355,13 @@
+@@ -298,12 +486,13 @@
      }
  
      private function sqliteTableSql(table:String):String {
@@ -1131,7 +1367,7 @@ diff --git a/src/hx/well/database/schema/SchemaBuilder.hx b/src/hx/well/database
          request("SAVEPOINT hxwell_schema");
          try {
              callback();
-@@ -315,7 +373,7 @@
+@@ -315,7 +504,7 @@
          request("RELEASE SAVEPOINT hxwell_schema");
      }
  
@@ -1194,18 +1430,36 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
                      statements.push(compileDropIndex(blueprint.table, name));
                  case DropPrimary:
                      statements.push(compileDropPrimary(blueprint.table));
-@@ -102,6 +108,10 @@
+@@ -94,12 +100,28 @@
          throw new Exception("Not implemented");
      }
  
-+    public function compileForeignKeyListing(table:String):String {
-+        throw new Exception("Foreign key introspection is not implemented by this driver.");
++    public function compileColumnDetails(table:String):String {
++        return compileColumnListing(table);
 +    }
 +
-     public function compileCreateDatabase(name:String):String {
++    public function compileIndexDetails(table:String):String {
++        throw new Exception("Not implemented");
++    }
++
++    public function compileNonPortableObjects():String {
++        throw new Exception("Not implemented");
++    }
++
+     public function compileTableListing():String {
          throw new Exception("Not implemented");
      }
-@@ -125,13 +135,17 @@
+
+     public function compileIndexListing(table:String):String {
+         throw new Exception("Not implemented");
++    }
++
++    public function compileForeignKeyListing(table:String):String {
++        throw new Exception("Foreign key introspection is not implemented by this driver.");
+     }
+
+     public function compileCreateDatabase(name:String):String {
+@@ -125,13 +147,17 @@
      public function compileColumnIndexes(table:String, column:ColumnDefinition):Array<String> {
          var statements:Array<String> = [];
          if (column.isUnique)
@@ -1227,7 +1481,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
          return statements;
      }
  
-@@ -144,13 +158,17 @@
+@@ -144,13 +170,17 @@
          for (command in blueprint.commands) {
              switch (command) {
                  case AddUnique(columns, name):
@@ -1249,7 +1503,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
                  default:
              }
          }
-@@ -172,10 +190,7 @@
+@@ -172,10 +202,7 @@
          sql += collateModifier(column);
          sql += generatedModifier(column);
          sql += nullableModifier(column);
@@ -1261,7 +1515,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
          sql += onUpdateModifier(column);
          sql += incrementModifier(column, blueprint);
          sql += commentModifier(column);
-@@ -183,6 +198,14 @@
+@@ -183,6 +210,14 @@
          return sql;
      }
  
@@ -1276,7 +1530,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
      private function charsetModifier(column:ColumnDefinition):String {
          return "";
      }
-@@ -249,7 +272,8 @@
+@@ -249,7 +284,8 @@
          throw new Exception("Not implemented");
      }
  
@@ -1286,7 +1540,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
          throw new Exception("Not implemented");
      }
  
-@@ -283,7 +307,8 @@
+@@ -283,7 +319,8 @@
      }
  
      public function isIncrementsColumn(column:ColumnDefinition):Bool {
@@ -1296,7 +1550,7 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
      }
  
      private function hasPrimaryCommand(blueprint:Null<Blueprint>):Bool {
-@@ -291,7 +316,8 @@
+@@ -291,7 +328,8 @@
              return false;
          for (command in blueprint.commands) {
              switch (command) {
@@ -1306,6 +1560,15 @@ diff --git a/src/hx/well/database/schema/SchemaGrammar.hx b/src/hx/well/database
                  default:
              }
          }
+@@ -309,7 +347,7 @@
+             return (value : Bool) ? "1" : "0";
+         if (value is Int || value is Float)
+             return Std.string(value);
+-        return "'" + Std.string(value).replace("'", "''") + "'";
++        return "'" + escapeString(Std.string(value)) + "'";
+     }
+
+     public static function asciiUpper(value:String):String {
 diff --git a/src/hx/well/database/schema/SqliteSchemaGrammar.hx b/src/hx/well/database/schema/SqliteSchemaGrammar.hx
 --- a/src/hx/well/database/schema/SqliteSchemaGrammar.hx
 +++ b/src/hx/well/database/schema/SqliteSchemaGrammar.hx
@@ -1357,17 +1620,23 @@ diff --git a/src/hx/well/database/schema/SqliteSchemaGrammar.hx b/src/hx/well/da
      }
  
      public override function compileColumnListing(table:String):String {
-@@ -94,6 +100,10 @@
-         return 'PRAGMA index_list(${quote(table)})';
+@@ -90,8 +96,16 @@
+         return "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'";
      }
  
-+    public override function compileForeignKeyListing(table:String):String {
-+        return 'PRAGMA foreign_key_list(${quote(table)})';
++    public override function compileNonPortableObjects():String {
++        return "SELECT name FROM sqlite_schema WHERE type IN ('trigger', 'view') OR sql LIKE 'CREATE VIRTUAL TABLE %' LIMIT 1";
 +    }
 +
-     public override function compileEnableForeignKeyConstraints():String {
-         return "PRAGMA foreign_keys = ON";
+     public override function compileIndexListing(table:String):String {
+         return 'PRAGMA index_list(${quote(table)})';
++    }
++
++    public override function compileForeignKeyListing(table:String):String {
++        return 'PRAGMA foreign_key_list(${quote(table)})';
      }
+
+     public override function compileEnableForeignKeyConstraints():String {
 diff --git a/src/hx/well/database/schema/SqliteTableDefinition.hx b/src/hx/well/database/schema/SqliteTableDefinition.hx
 --- a/src/hx/well/database/schema/SqliteTableDefinition.hx
 +++ b/src/hx/well/database/schema/SqliteTableDefinition.hx
@@ -1380,7 +1649,7 @@ diff --git a/src/hx/well/database/schema/SqliteTableDefinition.hx b/src/hx/well/
  using StringTools;
  
  class SqliteTableDefinition {
-@@ -55,14 +57,16 @@
+@@ -55,16 +57,35 @@
              throw new Exception('Unable to parse table definition: ${sql}');
  
          items.push(sql.substring(itemStart, close));
@@ -1398,17 +1667,39 @@ diff --git a/src/hx/well/database/schema/SqliteTableDefinition.hx b/src/hx/well/
 +            && constraintKeywords.contains(SchemaGrammar.asciiUpper(identifier.name)))
              return null;
          return identifier.name;
++    }
++
++    public function hasKeyword(keywords:Array<String>):Bool {
++        for (item in items) {
++            var position = 0;
++            while (position < item.length) {
++                var token = readIdentifier(item, position);
++                if (token == null) {
++                    position++;
++                } else {
++                    if (!token.quoted && keywords.contains(SchemaGrammar.asciiUpper(token.name)))
++                        return true;
++                    position = token.end;
++                }
++            }
++        }
++        return false;
      }
-@@ -104,10 +108,16 @@
+
+     public static function isPrimaryKeyConstraint(item:String):Bool {
+@@ -104,10 +125,17 @@
          }
          if (token == null)
              throw new Exception("Unable to parse index definition.");
 -        return sql.substring(0, token.start) + hx.well.database.query.QueryIdentifier.quote(name) + sql.substring(token.end);
-+        var quoted = QueryIdentifier.quote(name);
-+        return '${sql.substring(0, token.start)}${quoted}${sql.substring(token.end)}';
-     }
- 
+-    }
+-
 -    private static function readIdentifier(text:String, position:Int):Null<{name:String, quoted:Bool, start:Int, end:Int}> {
++        return sql.substring(0, token.start)
++            + QueryIdentifier.quote(name)
++            + sql.substring(token.end);
++    }
++
 +    private static function readIdentifier(text:String, position:Int):Null<{
 +        name:String,
 +        quoted:Bool,
@@ -1418,13 +1709,13 @@ diff --git a/src/hx/well/database/schema/SqliteTableDefinition.hx b/src/hx/well/
          var i = position;
          while (i < text.length) {
              if (text.isSpace(i))
-@@ -126,22 +136,36 @@
+@@ -126,22 +154,36 @@
          if (code == "'".code || code == '"'.code || code == "`".code) {
              var quote = text.charAt(i);
              var end = skipQuoted(text, i, code);
 -            return {name: text.substring(i + 1, end - 1).replace(quote + quote, quote), quoted: true, start: i, end: end};
 +            return {
-+                name: text.substring(i + 1, end - 1).replace('${quote}${quote}', quote),
++                name: text.substring(i + 1, end - 1).replace(quote + quote, quote),
 +                quoted: true,
 +                start: i,
 +                end: end
