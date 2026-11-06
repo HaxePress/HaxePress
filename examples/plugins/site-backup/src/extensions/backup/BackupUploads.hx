@@ -1,4 +1,4 @@
-package hx.press.backup;
+package extensions.backup;
 
 #if jvm
 import haxe.Exception;
@@ -8,7 +8,8 @@ import haxe.io.Bytes;
 import haxe.io.Eof;
 import haxe.io.Input;
 import hx.press.CmsAccess;
-import hx.press.install.InstallationState;
+import hx.press.http.BodyLimits;
+import hx.press.install.Installation;
 import hx.well.facades.Storage;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -36,32 +37,22 @@ private typedef BackupUploadState = {
 class BackupUploads {
     static inline var ROOT = "backup-uploads";
     static inline var CHUNK_BYTES = 1024 * 1024;
-    static inline var CONTROL_BYTES = 4096;
     static inline var LIFETIME = 15 * 60 * 1000;
-    static final actions = ["/admin/backups/verify", "/admin/install/restore"];
-    static final locks = new MutexPool();
 
-    public static function bodyLimit(_method:String, path:String):Int {
-        for (action in actions) {
-            if (!StringTools.startsWith(path, action)) {
-                continue;
-            }
-            var suffix = path.substr(action.length);
-            if (suffix == "" || suffix == "/" || suffix == "/uploads" || suffix == "/uploads/") {
-                return CONTROL_BYTES;
-            }
-            if (StringTools.startsWith(suffix, "/uploads/")) {
-                return CHUNK_BYTES;
-            }
-        }
-        return -1;
-    }
+    /** The body of a request that starts, finishes or cancels an upload. **/
+    public static inline var CONTROL_BYTES = 4096;
+
+    static final locks = new MutexPool();
 
     public static function register(path:String, purpose:BackupUploadPurpose):Void {
         Route.path(path).group(() -> {
-            Route.post("", request -> begin(request, purpose));
-            Route.post("/{upload}/{index}", request -> chunk(request, purpose)).setStream(true);
-            Route.delete("/{upload}", request -> cancel(request, purpose));
+            Route.post("", request -> begin(request, purpose))
+                .attribute(BodyLimits.ATTRIBUTE, CONTROL_BYTES);
+            Route.post("/{upload}/{index}", request -> chunk(request, purpose))
+                .setStream(true)
+                .attribute(BodyLimits.ATTRIBUTE, CHUNK_BYTES);
+            Route.delete("/{upload}", request -> cancel(request, purpose))
+                .attribute(BodyLimits.ATTRIBUTE, CONTROL_BYTES);
         });
     }
 
@@ -69,7 +60,7 @@ class BackupUploads {
         if (purpose == BackupUploadPurpose.Verify && !CmsAccess.can(SiteBackup.CAPABILITY)) {
             abort(403);
         }
-        if (purpose == BackupUploadPurpose.Restore && !InstallationState.pending) {
+        if (purpose == BackupUploadPurpose.Restore && !Installation.pending()) {
             abort(404);
         }
         var session = request.session.sessionKey;

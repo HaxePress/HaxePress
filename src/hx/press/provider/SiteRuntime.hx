@@ -13,7 +13,6 @@ import hx.well.facades.Cache;
 import hx.well.facades.Schedule;
 import hx.well.facades.Storage;
 #if jvm
-import hx.press.backup.SiteBackup;
 import hx.press.plugins.JvmPluginShutdown;
 import java.lang.Runtime as JavaRuntime;
 import java.lang.Thread as JavaThread;
@@ -34,9 +33,6 @@ class SiteRuntime {
             PackageManager.cleanupUploads();
             WorkingCopies.expire();
             AdminMcpAccess.cleanup();
-            #if jvm
-            SiteBackup.cleanup();
-            #end
         });
         Schedule.get().fixedDelay(_ -> {
             try {

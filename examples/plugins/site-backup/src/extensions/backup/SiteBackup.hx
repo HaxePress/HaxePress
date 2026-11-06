@@ -1,29 +1,20 @@
-package hx.press.backup;
+package extensions.backup;
 
 #if jvm
 import haxe.Exception;
 import haxe.io.Bytes;
-import hx.press.AdminController;
 import hx.press.CmsAccess;
-import hx.press.CmsController;
 import hx.press.access.Roles;
-import hx.press.backup.BackupUploads.BackupUploadPurpose;
-import hx.press.backup.SiteBackupArchive.BackupSelection;
-import hx.press.backup.SiteBackupArchive.ExtractedBackup;
-import hx.press.config.DatabaseConfig;
-import hx.press.install.InstallationDatabase;
-import hx.press.install.InstallationDatabase.SetupDatabase;
-import hx.press.install.InstallationEnv;
-import hx.press.install.InstallationState;
-import hx.press.media.MediaLocks;
+import extensions.backup.BackupUploads.BackupUploadPurpose;
+import extensions.backup.SiteBackupArchive.BackupSelection;
+import extensions.backup.SiteBackupArchive.ExtractedBackup;
+import hx.press.install.Installation;
+import hx.press.install.Installation.InstallationIncomplete;
 import hx.press.model.Admin;
-import hx.press.packages.PackageManager;
-import hx.press.packages.PackageBundles;
-import hx.press.provider.SiteRuntime;
 import hx.press.storage.TemporaryDownloadInput;
-import hx.press.view.View;
+import hx.press.view.Flash;
+import hx.press.view.Pages;
 import hx.well.database.Connection;
-import hx.well.facades.Config;
 import hx.well.facades.Environment;
 import hx.well.facades.Storage;
 import hx.well.http.AbstractResponse;
@@ -57,7 +48,8 @@ class SiteBackup {
 
     public static function page(request:Request):AbstractResponse {
         if (!CmsAccess.can(CAPABILITY)) {
-            return CmsController.forbidden(request);
+            var denied = {message: "Your account does not have access to this area."};
+            return Pages.render("Admin/Forbidden", denied).status(403);
         }
         var available = supported();
         var schedules = available ? BackupViews.schedules(BackupSchedules.list()) : [];
@@ -71,7 +63,7 @@ class SiteBackup {
             savedFiles: available ? BackupViews.savedFiles(request, schedules) : null,
             editing: scheduleForm != null
         };
-        return View.render("Admin/Backups", props).header("Cache-Control", "private, no-store");
+        return Pages.view("Backups", props).header("Cache-Control", "private, no-store");
     }
 
     public static function export(request:Request):AbstractResponse {
@@ -92,10 +84,10 @@ class SiteBackup {
         try {
             var verified = prepare(admin.id, sections, encrypted);
             locks.release(EXPORTS);
-            if (View.redirectsValidation(request)) {
+            if (Pages.redirectsValidation(request)) {
                 // The backups page offers the verified download once.
-                View.flash("backup", verified);
-                View.flash("old", AdminController.submittedInput(request));
+                Flash.put("backup", verified);
+                Flash.put("old", submittedInput(request));
                 return ResponseBuilder.asRedirect(PATH, 303);
             }
             return ResponseBuilder.asJson(verified).header("Cache-Control", "private, no-store");
@@ -115,8 +107,19 @@ class SiteBackup {
     }
 
     static function exportFailed(request:Request, message:String):AbstractResponse {
-        var redirect = AdminController.validationRedirect(request, "backup", message, PATH);
+        var redirect = Pages.validationRedirect(request, "backup", message, PATH);
         return redirect ?? error(message);
+    }
+
+    /** The submitted form values without the CSRF token, shown again with the result. **/
+    static function submittedInput(request:Request):Map<String, String> {
+        var values:Map<String, String> = [];
+        for (key => value in request.all()) {
+            if (key != "_token" && Std.isOfType(value, String) && (value : String).length <= 200) {
+                values.set(key, value);
+            }
+        }
+        return values;
     }
 
     static function prepare(adminId:Int, sections:BackupSelection, encrypted:Bool):Dynamic {
@@ -153,20 +156,10 @@ class SiteBackup {
         var zip = "archive.zip";
         var appKey = Environment.env("APP_KEY", "");
         try {
-            PackageManager.writes.acquire("packages");
-            try {
-                MediaLocks.run(() -> {
-                    var manifest = SiteBackupArchive.manifest(sections, appKey);
-                    var files = [manifest].concat(SiteBackupDatabase.exportData(snapshot, local,
-                        sections));
-                    SiteBackupArchive.write(snapshot, zip, files);
-                    return true;
-                });
-                PackageManager.writes.release("packages");
-            } catch (failure:Dynamic) {
-                PackageManager.writes.release("packages");
-                throw failure;
-            }
+            // The host holds the package and media locks this plugin declares while it runs.
+            var manifest = SiteBackupArchive.manifest(sections, appKey);
+            var files = [manifest].concat(SiteBackupDatabase.exportData(snapshot, local, sections));
+            SiteBackupArchive.write(snapshot, zip, files);
             BackupFormat.seal(snapshot, zip, target, destination, encrypted, appKey);
             var checksum = rehearse(target, destination, scoped('${workspace}/review'));
             local.deleteDirectory(workspace);
@@ -258,116 +251,72 @@ class SiteBackup {
         return backup;
     }
 
+    /**
+        Installs a new site from an uploaded backup, from the installation
+        page: the backup's data, files and APP_KEY become the site.
+    **/
     public static function restore(request:Request):AbstractResponse {
+        if (!Installation.pending()) {
+            abort(404);
+        }
         var token = SecureToken.generate(32);
         var workspace = '${WORK}/${token}';
         var local = Storage.disk("local");
-        InstallationState.locks.acquire("installation");
-        if (!InstallationState.pending) {
-            InstallationState.locks.release("installation");
-            abort(404);
-        }
         var moved:Array<String> = [];
-        var prepared:Null<String> = null;
-        var ownedDatabase:Null<String> = null;
-        var committed = false;
+        var published = false;
         try {
-            var selected:Null<SetupDatabase> = null;
-            if (request.query("use_verified_database") == "1") {
-                selected = request.session.get(InstallationDatabase.SESSION_KEY);
-                if (selected == null
-                    || Date.now()
-                        .getTime() - selected.checkedAt >= InstallationDatabase.VERIFICATION_LIFETIME) {
-                    throw new Exception("Verify the target database again before restoring.");
-                }
-            }
+            var useVerified = request.query("use_verified_database") == "1";
+            // Checks the verified database before reading the upload.
+            Installation.target(request, useVerified);
             var archive = '${workspace}/upload.hxpress';
             BackupUploads.assemble(request, BackupUploadPurpose.Restore, local, archive);
             var stage = scoped('${workspace}/restore');
             var skipDamaged = request.query("skip_damaged_content") == "1";
             var backup = extract(local, archive, stage, skipDamaged);
-            var generated = selected == null;
-            var database:SetupDatabase = generated ? {
-                driver: "sqlite",
-                file: 'restored-${token}.sqlite',
-                host: "",
-                port: 3306,
-                database: "",
-                username: "",
-                password: "",
-                checkedAt: 0
-            } : selected;
-            var native = InstallationDatabase.configuration(database);
-            var values:Map<String, String> = [
-                "APP_INSTALLED" => "true",
-                "DB_DRIVER" => database.driver,
-                "DB_PATH" => database.driver == "sqlite" ? native.path : "",
-                "DB_HOST" => database.host,
-                "DB_PORT" => Std.string(database.port),
-                "DB_DATABASE" => database.database,
-                "DB_USERNAME" => database.username,
-                "DB_PASSWORD" => database.password,
-                "ADMIN_NAME" => "",
-                "ADMIN_EMAIL" => "",
-                "ADMIN_PASSWORD" => "",
-                "CMS_SEED_DEMO" => "false"
-            ];
-            prepared = InstallationEnv.prepareRestore(values, backup.manifest.appKey);
             for (path in backup.files) {
                 if (local.exists(path)) {
                     throw new Exception("Restore requires an empty site storage directory.");
                 }
             }
-            var publish = () -> {
-                for (path in backup.files) {
-                    local.move('${workspace}/restore/${path}', path);
-                    moved.push(path);
-                }
-                InstallationEnv.commit(prepared);
-                committed = true;
-            };
-            if (generated) {
-                local.put(database.file, Bytes.alloc(0), "private");
-                ownedDatabase = database.file;
-            }
-            var skipped = SiteBackupDatabase.replay(stage, backup, native, false, skipDamaged,
-                publish);
-            for (key => value in values) {
-                Environment.set(key, value);
-            }
-            Environment.set("APP_KEY", backup.manifest.appKey);
-            Config.set("database.connections", DatabaseConfig.definitions());
-            Connection.free();
-            Connection.create("default", native);
-            PackageBundles.ensure();
-            InstallationState.complete();
-            request.session.forget(InstallationDatabase.SESSION_KEY);
-            SiteRuntime.start();
+            var skipped = Installation.install(request, useVerified, backup.manifest.appKey,
+                (database,
+                        commit) -> SiteBackupDatabase.replay(stage, backup, database, false,
+                        skipDamaged, () -> {
+                            for (path in backup.files) {
+                                local.move('${workspace}/restore/${path}', path);
+                                moved.push(path);
+                            }
+                            commit();
+                            published = true;
+                        }));
             local.deleteDirectory(workspace);
-            InstallationState.locks.release("installation");
             return ResponseBuilder.asJson({
                 restored: true,
                 redirect: "/admin/login",
                 skippedContent: skipped
             }).header("Cache-Control", "private, no-store");
+        } catch (incomplete:InstallationIncomplete) {
+            cleanWorkspace(local, workspace);
+            return error("The backup was restored. Restart HaxePress and sign in.", 503);
         } catch (failure:Dynamic) {
-            try {
-                if (!committed) {
-                    InstallationEnv.discard(prepared);
-                    for (path in moved) {
+            if (!published) {
+                for (path in moved) {
+                    try {
                         local.delete(path);
-                    }
-                    if (ownedDatabase != null) {
-                        local.delete(ownedDatabase);
-                    }
+                    } catch (_:Dynamic) {}
                 }
-                local.deleteDirectory(workspace);
-            } catch (_:Dynamic) {
-                trace("Could not clean up the backup workspace.");
             }
-            InstallationState.locks.release("installation");
-            return committed ? error("The backup was restored. Restart HaxePress and sign in.",
+            cleanWorkspace(local, workspace);
+            return published ? error("The backup was restored. Restart HaxePress and sign in.",
                 503) : error(Std.string(failure));
+        }
+    }
+
+    static function cleanWorkspace(local:StorageDisk, workspace:String):Void {
+        try {
+            local.deleteDirectory(workspace);
+        } catch (_:Dynamic) {
+            trace("Could not clean up the backup workspace.");
         }
     }
 

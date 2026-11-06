@@ -222,6 +222,15 @@ class PhpTestPluginHost implements PluginHost {
         throw new Exception("Scheduling requires the application host.");
     }
 
+    public function saveSchedule(pluginId:String, key:String, intervalSeconds:Int, payload:String,
+            enabled:Bool, ?nextRun:Float):Void {
+        throw new Exception("Scheduling requires the application host.");
+    }
+
+    public function schedules(pluginId:String, limit:Int):String {
+        throw new Exception("Scheduling requires the application host.");
+    }
+
     public function unschedule(pluginId:String, key:String):Bool {
         throw new Exception("Scheduling requires the application host.");
     }

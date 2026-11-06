@@ -9,10 +9,14 @@ import hx.press.packages.PackageManifest.ManifestData;
 import hx.well.facades.Storage;
 
 /** Installed with the site and upgraded from the archives shipped with the application. */
+typedef BundledPlugin = {
+    var slug:String;
+    var identity:String;
+    var entrypoint:String;
+}
+
 class BuiltInPlugins {
-    public static inline var BACKUP = "plugin-site-backup";
-    public static inline var BACKUP_IDENTITY = "4731896a-89e5-4321-bdb1-565f752d3fb5";
-    static final defaults = [
+    static final defaults:Array<BundledPlugin> = [
         {
             slug: "rss",
             identity: "3e7d160d-52ba-47ab-860b-e91c1a33b826",
@@ -26,11 +30,21 @@ class BuiltInPlugins {
         #if jvm
         {
             slug: "site-backup",
-            identity: BACKUP_IDENTITY,
+            identity: "4731896a-89e5-4321-bdb1-565f752d3fb5",
             entrypoint: "extensions.backup.BackupPlugin"
         }
         #end
     ];
+
+    /** The plugins shipped with the application. **/
+    public static function bundles():Array<BundledPlugin> {
+        return defaults.copy();
+    }
+
+    /** The archive of a bundled plugin on the public disk, built with this version. **/
+    public static function archive(bundle:BundledPlugin):String {
+        return 'packages/${bundle.slug}-${CmsVersion.version}.zip';
+    }
 
     public static function isBuiltIn(id:String, pluginId:Null<String>):Bool {
         return Lambda.exists(defaults,
@@ -57,7 +71,7 @@ class BuiltInPlugins {
         var disk = Storage.disk("public");
         for (bundle in defaults) {
             var id = 'plugin-${bundle.slug}';
-            var path = 'packages/${bundle.slug}-${CmsVersion.version}.zip';
+            var path = archive(bundle);
             if (!disk.fileExists(path)) {
                 continue;
             }

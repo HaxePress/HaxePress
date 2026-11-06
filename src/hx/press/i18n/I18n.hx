@@ -36,7 +36,7 @@ class I18n {
         for (choice in locales) {
             var source = Resource.getString('lang.${choice.code}');
             var messages = source == null ? new Map() : TranslationCatalogue.parse(source);
-            for (section in ["editor", "packages", "backups"]) {
+            for (section in ["editor", "packages"]) {
                 var additional = Resource.getString('lang.${section}.${choice.code}');
                 if (additional != null) {
                     for (key => value in TranslationCatalogue.parse(additional)) {

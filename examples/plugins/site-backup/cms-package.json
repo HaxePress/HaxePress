@@ -6,12 +6,21 @@
   "slug": "site-backup",
   "name": "Backups",
   "version": "2.16.0",
-  "description": "Prepare, verify and schedule private site backups.",
+  "description": "Prepare, verify and schedule private site backups, and restore one while installing a new site.",
   "author": "HaxePress",
   "server": {
     "jar": "server.jar",
     "cppia": "server.cppia",
     "php": "php/module.json",
     "entrypoint": "extensions.backup.BackupPlugin"
+  },
+  "hooks": ["installation"],
+  "locks": ["packages", "media"],
+  "assets": {
+    "views": "views"
+  },
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
   }
 }

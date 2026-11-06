@@ -57,6 +57,38 @@ class CheckViews {
                 }
             }
         }
+        // Plugin views folders, each checked against its own contract.json.
+        var plugins = Sys.getEnv("CHECK_PLUGINS");
+        var pluginFolders = plugins == null || plugins == "" ? [] : plugins.split(":");
+        var pluginTemplates = 0;
+        for (folder in pluginFolders) {
+            var pluginContract = ViewContract.build();
+            var contractPath = '${folder}/${PluginContract.FILENAME}';
+            if (FileSystem.exists(contractPath)) {
+                PluginContract.declare(pluginContract,
+                    PluginContract.parse(File.getContent(contractPath)), "");
+            }
+            var plugin = new ComponentLibrary(pluginContract, library);
+            var sources:Map<String, String> = [];
+            for (file in FileSystem.readDirectory(folder)) {
+                if (StringTools.endsWith(file, ".well.html")) {
+                    var name = file.substr(0, file.length - ".well.html".length);
+                    sources.set(name, File.getContent('${folder}/${file}'));
+                    pluginTemplates++;
+                    plugin.add(name, sources.get(name));
+                }
+            }
+            for (name => source in sources) {
+                for (diagnostic in plugin.check(name).diagnostics) {
+                    if (diagnostic.isError()) {
+                        errors++;
+                    } else {
+                        warnings++;
+                    }
+                    Sys.println(diagnostic.format(source, '${folder}/${name}.well.html'));
+                }
+            }
+        }
         var designPath = Sys.getEnv("CHECK_DESIGN");
         if (designPath != null && designPath != "") {
             var document:Dynamic = Json.parse(File.getContent(designPath));
@@ -78,7 +110,7 @@ class CheckViews {
                 Sys.println(generated.get(Sys.getEnv("PRINT_DESIGN")));
             }
         }
-        Sys.println('${ViewSources.names().length} application and ${themeTemplates} theme templates, ${errors} errors, ${warnings} warnings');
+        Sys.println('${ViewSources.names().length} application, ${themeTemplates} theme and ${pluginTemplates} plugin templates, ${errors} errors, ${warnings} warnings');
         Sys.exit(errors == 0 ? 0 : 1);
     }
 }

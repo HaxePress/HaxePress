@@ -36,8 +36,15 @@ typedef ManifestData = {
     var module:String;
     var renderer:String;
 
-    /** The folder of the theme's Wellout templates (`*.well.html`), relative to the package root. **/
+    /** The folder of the package's Wellout templates (`*.well.html`), relative to the package root. **/
     var views:String;
+
+    /**
+        Host locks a plugin needs while its routes and scheduled tasks run:
+        `packages` keeps installed packages unchanged, `media` keeps media
+        files unchanged.
+    **/
+    var locks:Array<String>;
 
     var stylesheet:String;
     var serverJar:String;
@@ -69,8 +76,12 @@ class PackageManifest {
         "content.saved",
         "dashboard.widgets",
         "ui.navigation",
-        "i18n.catalogues"
+        "i18n.catalogues",
+        "installation"
     ];
+
+    /** The host locks a plugin can hold while it runs, in the order they are acquired. **/
+    public static final lockNames = ["packages", "media"];
 
     public static function text(object:Dynamic, field:String, maximum:Int,
             required:Bool = false):String {
@@ -158,8 +169,12 @@ class PackageManifest {
             throw new Exception("A theme renderer must reference a JavaScript file in public/.");
         }
         var views = text(assets, "views", 240);
-        if (views != "" && (kind != "theme" || !safePath(views) || views.indexOf(".") >= 0)) {
-            throw new Exception("Theme views must reference a folder of Wellout templates.");
+        if (views != "" && (!safePath(views) || views.indexOf(".") >= 0)) {
+            throw new Exception("Package views must reference a folder of Wellout templates.");
+        }
+        var locks = lockList(input.locks);
+        if (locks.length > 0 && kind != "plugin") {
+            throw new Exception("Only plugins can hold host locks.");
         }
         var stylesheet = text(assets, "stylesheet", 240);
         if (module != "" && (!safePath(module) || !~/\.(mjs|js)$/.match(module))) {
@@ -241,6 +256,7 @@ class PackageManifest {
             module: module,
             renderer: renderer,
             views: views,
+            locks: locks,
             stylesheet: stylesheet,
             serverJar: serverJar,
             serverCppia: serverCppia,
@@ -255,6 +271,22 @@ class PackageManifest {
             navigation: navigationDefinitions(input.navigation)
         };
         return manifest;
+    }
+
+    static function lockList(input:Dynamic):Array<String> {
+        if (input == null) {
+            return [];
+        }
+        if (!Std.isOfType(input, Array)) {
+            throw new Exception("Package locks must be a list.");
+        }
+        var requested:Array<Dynamic> = input;
+        for (name in requested) {
+            if (!Std.isOfType(name, String) || !lockNames.contains(name)) {
+                throw new Exception("The package requests an unsupported host lock.");
+            }
+        }
+        return lockNames.filter(name -> requested.contains(name));
     }
 
     static function templateDefinitions(input:Dynamic):Array<{name:String, label:String, scope:String}> {

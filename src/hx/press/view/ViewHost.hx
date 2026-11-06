@@ -17,13 +17,14 @@ class ViewHost implements RenderHost {
     public final request:Null<Request>;
     public final props:Dynamic;
 
-    /** The translation namespace: `cms`, or the theme id for theme templates. **/
+    /** The translation namespace: `cms`, or the package id for theme and plugin templates. **/
     public final namespace:String;
 
-    /** The public base of a theme's packaged assets, or null for application templates. **/
-    public final themeAssetBase:Null<String>;
+    /** The public base of a package's assets, or null for application templates. **/
+    public final packageAssetBase:Null<String>;
 
     final mapper:Null<String->String>;
+    final islands:Null<Map<String, String>>;
     final values:Map<String, Dynamic> = [];
     var nonceValue:Null<String> = null;
     var coreMessages:Null<Map<String, Dynamic>> = null;
@@ -31,12 +32,13 @@ class ViewHost implements RenderHost {
     var locale:Null<String> = null;
 
     public function new(request:Null<Request>, props:Dynamic, namespace:String,
-            ?themeAssetBase:String, ?mapper:String->String) {
+            ?packageAssetBase:String, ?mapper:String->String, ?islands:Map<String, String>) {
         this.request = request;
         this.props = props;
         this.namespace = namespace;
-        this.themeAssetBase = themeAssetBase;
+        this.packageAssetBase = packageAssetBase;
         this.mapper = mapper;
+        this.islands = islands;
     }
 
     public function root(name:String):Dynamic {
@@ -76,8 +78,15 @@ class ViewHost implements RenderHost {
         return ViewAssets.url('resources/${path}');
     }
 
-    /** Islands are built from `resources/js/islands/<name>.tsx`, or `.ts` when they use no JSX. **/
+    /**
+        A plugin's islands load from its package; the application's are built
+        from `resources/js/islands/<name>.tsx`, or `.ts` when they use no JSX.
+    **/
     public function islandModule(name:String):String {
+        var packaged = islands == null ? null : islands.get(name);
+        if (packaged != null) {
+            return packaged;
+        }
         var react = ViewAssets.url('resources/js/islands/${name}.tsx');
         return react != "" ? react : ViewAssets.url('resources/js/islands/${name}.ts');
     }

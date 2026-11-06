@@ -16,8 +16,9 @@ import hx.press.CmsVersion;
 import hx.press.SiteSettingsStore;
 import hx.press.i18n.I18n;
 import hx.press.MediaStorage;
+import hx.press.http.BodyLimits;
+import hx.press.media.MediaLocks;
 import hx.press.packages.PackageData;
-import hx.press.packages.BuiltInPlugins;
 import hx.press.packages.PackageManager;
 import hx.press.packages.PackageData.PackageRecord;
 import hx.press.packages.PackageManifest;
@@ -54,6 +55,11 @@ private class LivePlugin {
 class PluginRuntime {
     static final locks = new MutexPool();
     static final modules:SynchronizedMap<String, LivePlugin> = SynchronizedMap.newStringMap();
+    static final hostLocks:SynchronizedMap<String, Array<String>> = SynchronizedMap.newStringMap();
+
+    /** The plugin whose route is handling the request: `{id, directory}`. **/
+    public static inline final CURRENT = "hx.press.plugin.current";
+
     public static var ready(default, null):Bool = false;
 
     static function key(record:PackageRecord):String {
@@ -137,9 +143,11 @@ class PluginRuntime {
                 if (handler != null) {
                     route.handler(new PluginRouteHandler(record.id, record.directory, handler));
                 }
+                BodyLimits.register(route);
             });
             var live = new LivePlugin(record, module);
             live.routes = routes;
+            hostLocks.set(moduleKey, manifest.locks);
             modules.set(moduleKey, live);
             locks.release(moduleKey);
         } catch (error:Dynamic) {
@@ -173,9 +181,11 @@ class PluginRuntime {
         }
         Route.batch(() -> {
             for (route in live.routes) {
+                BodyLimits.unregister(route);
                 Route.unregister(route);
             }
         });
+        hostLocks.remove(moduleKey);
         try {
             live.module.close();
         } catch (error:Dynamic) {
@@ -206,27 +216,47 @@ class PluginRuntime {
 
     static function withRoute<T>(id:String, directory:String, callback:Void->T, missing:Void->T):T {
         var moduleKey = '${id}:${directory}';
-        // The backup module snapshots installed packages. Follow the lifecycle lock order.
-        var packageSnapshot = id == BuiltInPlugins.BACKUP;
-        if (packageSnapshot) {
-            PackageManager.writes.acquire("packages");
-        }
+        // Host locks the plugin declares are taken before its module lock, in the lifecycle order.
+        var held = hostLocks.get(moduleKey) ?? [];
+        acquireHostLocks(held);
         locks.acquire(moduleKey);
         try {
             var active = directory != null && modules.exists(moduleKey)
                 && PackageData.activeDirectory(id) == directory;
             var result = active ? callback() : missing();
             locks.release(moduleKey);
-            if (packageSnapshot) {
-                PackageManager.writes.release("packages");
-            }
+            releaseHostLocks(held);
             return result;
         } catch (error:Dynamic) {
             locks.release(moduleKey);
-            if (packageSnapshot) {
-                PackageManager.writes.release("packages");
-            }
+            releaseHostLocks(held);
             throw error;
+        }
+    }
+
+    static function acquireHostLocks(names:Array<String>):Void {
+        for (name in names) {
+            switch (name) {
+                case "packages":
+                    PackageManager.writes.acquire("packages");
+                case "media":
+                    MediaLocks.acquire();
+                case _:
+            }
+        }
+    }
+
+    static function releaseHostLocks(names:Array<String>):Void {
+        var index = names.length;
+        while (index > 0) {
+            index--;
+            switch (names[index]) {
+                case "packages":
+                    PackageManager.writes.release("packages");
+                case "media":
+                    MediaLocks.release();
+                case _:
+            }
         }
     }
 
@@ -245,8 +275,10 @@ class PluginRuntime {
 
     public static function route(id:String, directory:String, request:Request,
             handler:AbstractHandler):AbstractResponse {
-        return withRoute(id, directory, () -> handler.execute(request),
-            () -> ResponseBuilder.asString("Not found.", 404));
+        return withRoute(id, directory, () -> {
+            request.setAttribute(CURRENT, {id: id, directory: directory});
+            return handler.execute(request);
+        }, () -> ResponseBuilder.asString("Not found.", 404));
     }
 
     public static function validateRoute(id:String, directory:String,

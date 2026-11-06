@@ -76,6 +76,39 @@ class ScheduledJobs {
         ], ["id"], ["payload", "interval_seconds", "enabled", "next_epoch"]);
     }
 
+    /**
+        One owner's tasks, soonest first: key, JSON payload, interval,
+        whether it runs, its next and last run (epoch milliseconds), the
+        last error and whether a run holds its lease now.
+    **/
+    public static function list(pluginId:Null<String>, limit:Int):Array<Dynamic> {
+        var bounded = limit < 1 ? 1 : limit > 100 ? 100 : limit;
+        var jobs = ScheduledJob.query.select([
+            "job_key",
+            "payload",
+            "interval_seconds",
+            "enabled",
+            "next_epoch",
+            "last_epoch",
+            "last_error",
+            "lease_until"
+        ]).where("plugin_id", pluginId).orderBy("next_epoch").orderBy("id").limit(bounded).get();
+        var now = Date.now().getTime();
+        return [
+            for (job in jobs)
+                {
+                    key: job.job_key,
+                    payload: job.payload,
+                    intervalSeconds: job.interval_seconds,
+                    enabled: job.enabled == 1,
+                    nextRun: job.next_epoch,
+                    lastRun: job.last_epoch,
+                    lastError: job.last_error,
+                    running: job.lease_until > now
+                }
+        ];
+    }
+
     public static function remove(pluginId:Null<String>, key:String):Bool {
         if (!validKey(key)) {
             return false;

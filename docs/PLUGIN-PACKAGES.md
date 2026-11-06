@@ -42,7 +42,7 @@ Simple is embedded in the application and is not distributed as a replaceable ZI
 }
 ```
 
-Place `cms-package.json` at the archive root or inside one enclosing folder. Frontend files live in `public/`; optional `assets.module` and `assets.stylesheet` refer to `.js`/`.mjs` and `.css` files there. The normal builder emits all three server targets. JAR and CPPIA remain required; PHP hosts also require `server.php` and its declared classes. `cmsVersion` is an exact release, rather than a version range. API 1/2/3 metadata can be read during upgrades; it does not authorize executing incompatible server modules or renderer themes.
+Place `cms-package.json` at the archive root or inside one enclosing folder. Frontend files live in `public/`; optional `assets.module` and `assets.stylesheet` refer to `.js`/`.mjs` and `.css` files there, and `assets.views` names a folder of Wellout templates for the plugin's pages (see [Plugin pages](#plugin-pages)). Optional `locks` lists the host locks the plugin holds while it runs (see [Upload limits and host locks](#upload-limits-and-host-locks)). The normal builder emits all three server targets. JAR and CPPIA remain required; PHP hosts also require `server.php` and its declared classes. `cmsVersion` is an exact release, rather than a version range. API 1/2/3 metadata can be read during upgrades; it does not authorize executing incompatible server modules or renderer themes.
 
 Generate one lowercase UUID for the plugin project and declare it in `pluginId`. Keep it across releases. Installation rejects a UUID owned by another package and updates must retain the installed UUID. An existing package that predates this field adopts the UUID from its first updated ZIP. Themes use their usual theme IDs.
 
@@ -99,15 +99,17 @@ Contexts/results are JSON objects. An empty result is treated as an empty object
 
 In `onCreate`, register an optional persistent job with `host.schedule(pluginId, key, intervalSeconds, payload)`. Read `packageInfo.pluginId` from the creation context. The host checks it against the plugin's installed UUID. Use a stable lowercase key and optional JSON object payload. Registering the same definition again keeps its next due time.
 
-The runtime calls `dispatch("schedule.run", context)` on the active plugin. The event's `data` includes `id`, `key` and the parsed `payload`. Return an empty object on success or an object with an `error` message to record a failed run. Keep effects idempotent across an interrupted run. Use `host.unschedule(pluginId, key)` to remove a rule. Deactivation pauses the plugin's jobs and uninstall removes them. Core jobs have a null plugin ID. Each plugin can provide management controls on its own admin page through `host.admin` and native `cms.navigation` route metadata.
+Tasks a user manages, such as backup schedules, use `host.saveSchedule(pluginId, key, intervalSeconds, payload, enabled, nextRun)`, which creates or replaces a task with its first run in epoch milliseconds (one interval from now when omitted). `host.schedules(pluginId, limit)` returns the plugin's tasks as a JSON array of `key`, `payload`, `intervalSeconds`, `enabled`, `nextRun`, `lastRun`, `lastError` and `running`, soonest first.
+
+The runtime calls `dispatch("schedule.run", context)` on the active plugin. The event's `data` includes `id`, `key` and the parsed `payload`. Return an empty object on success or an object with an `error` message to record a failed run. Keep effects idempotent across an interrupted run. Use `host.unschedule(pluginId, key)` to remove a rule; it returns false while a run holds the task. Deactivation pauses the plugin's jobs and uninstall removes them. Core jobs have a null plugin ID. Each plugin can provide management controls on its own admin page through `host.admin` and native `cms.navigation` route metadata.
 
 ### Server modules
 
-| Target | Module | Loading |
-| --- | --- | --- |
-| JVM | `server.jar` | A generation-specific class loader sharing the host API |
-| C++ | `server.cppia` | Native CPPIA module boot/class resolution with `-D scriptable` |
-| PHP | `server.php` | Validated JSON class map and a scoped SPL autoloader |
+| Target | Module         | Loading                                                        |
+| ------ | -------------- | -------------------------------------------------------------- |
+| JVM    | `server.jar`   | A generation-specific class loader sharing the host API        |
+| C++    | `server.cppia` | Native CPPIA module boot/class resolution with `-D scriptable` |
+| PHP    | `server.php`   | Validated JSON class map and a scoped SPL autoloader           |
 
 `server.entrypoint` is the same Haxe name across targets. PHP class maps reference package-owned `.php` files relative to the descriptor and use a `CmsPlugin_<build-id>` namespace. Native `@:native` compiler metadata creates those isolated names; the host runtime/framework is shared. Closing drops the instance and removes the PHP autoloader or closes the JVM loader. Previously declared PHP classes remain until request/process end; separate build namespaces allow changed generations to coexist. PHP hosts retain the exported API graph, including `Xml` for RSS. Keep PHP's native-serialization cache path separate from JVM/C++ caches.
 
@@ -133,6 +135,44 @@ public function onDestroy():Void {
 The host batches route registration and tracks ownership. Stopping a module removes remaining managed routes even when destruction throws. Creation/destruction failures disable the affected plugin, retain its error and show a process-wide restart warning. Installing an inactive package does not execute it. Disable, replacement, uninstall and graceful JVM shutdown destroy running instances; settings changes dispatch `settings.saved` to an active instance.
 
 A plugin's administration page renders the standard `Admin/PluginPage` view: `Pages.render("Admin/PluginPage", {pluginPage: page})`, with `import hx.press.view.Pages;` (the SDK exports it for every target; the JVM host renders the page). `page` holds a `title`, `description`, `total`, `columns` (`key`, `label`), `rows`, `actions` (`label`, `href`, optional `download`), an optional `rowAction` (`label`, `path` with `{id}`, `confirm`), `pagination` from `Pagination.links` and a `noun`. Texts are keys in the plugin's `namespace`. The page is rendered on the server inside the administration layout; the newsletter example's subscriber list shows the whole shape.
+
+### Plugin pages
+
+A plugin can also ship its own pages as Wellout templates. Name the folder in the manifest as `"assets": {"views": "views"}` and render a template from one of the plugin's routes with `Pages.view("Reports", props)`, which renders `views/Reports.well.html`. Plugin templates are looked up first, then the application's components, so a page can use `AdminLayout`, `Alert` or `Pagination`. `t()` reads the plugin's catalogue first, `packageAsset("reports.css")` links a file from the package's `public/` folder, and a page adds its stylesheet in `<well:head>`.
+
+`views/contract.json` declares the view types the templates read and the islands they mount:
+
+```json
+{
+  "views": {
+    "ReportView": { "title": "String", "rows": "List<ReportRowView>", "next": "Url?" },
+    "ReportRowView": { "label": "String", "total": "Int" }
+  },
+  "islands": {
+    "report-chart": { "module": "chart.js", "props": { "rows": "Int" }, "messages": ["Loading"] }
+  }
+}
+```
+
+Types use the template type syntax and may refer to each other and to the application's view types. An island module is an ES module in `public/` that exports `mount(element, props, messages)`; it receives only its declared props and the translated `messages`. Installation checks the contract and compiles every template, and rejects a package whose pages do not compile, with the first problem's position. `haxe tools/check_views.hxml` checks plugin views listed in `CHECK_PLUGINS` the same way.
+
+For forms, `Pages.redirectsValidation(request)` says whether a failed submission should redirect back to its page, as browsers expect, and `Pages.validationRedirect(request, scope, message, url)` keeps the error and the submitted values for the next page and returns that redirect, or null for a JSON request. `Flash.put` and `Flash.get` keep other values for the next page.
+
+### Upload limits and host locks
+
+A route may lower the request body limit with the `cms.bodyLimit` attribute in bytes, such as `Route.post("/upload/{part}", handler).attribute(BodyLimits.ATTRIBUTE, 1048576)`. The server reads it before it reads the body; the limit applies while the plugin is active.
+
+A plugin that reads installed packages or media files as one consistent snapshot declares `"locks": ["packages", "media"]` in its manifest. The host then holds those locks, in its own order and before the plugin's module lock, while the plugin's routes and scheduled tasks run, so packages cannot be installed and media cannot change meanwhile. Hooks do not take them.
+
+### Installation
+
+A plugin shipped with the application can take part in installation by subscribing to the `installation` hook. While HaxePress is not installed, such plugins are unpacked from their bundled archives and created with `phase: "installation"` in the context; there is no database, administration or scheduler yet. They register routes under `/admin/install` with `Installation.routes(callback)`, behind the installer's access, session and CSRF checks, and serve their `public/` files under `/admin/install/assets/<id>/`. The installation page sends `dispatch("installation.panel", context)` with `data` describing the step (`step`, `driver`, `verified`, `target`); a plugin answers `{"view": "InstallRestore", "props": {...}}` to show one of its templates there, or an empty object.
+
+`Installation.install(request, useVerified, appKey, populate)` installs a site from a source instead of the setup form. Installation is locked while it runs. `populate(database, commit)` fills the empty target database, either the database the visitor verified or a new SQLite file, using the connection configuration it receives, and calls `commit()` once the site's data and files are complete; the configuration is written then, with the source's `APP_KEY`. HaxePress then starts as an installed site. A failure before `commit` leaves nothing behind; after it, `InstallationIncomplete` reports that HaxePress must restart. Once installation completes, the installation instances stop and the installed site starts its plugins as usual. The bundled Backups plugin restores backups this way.
+
+### Host classes
+
+Plugins of every target use the exported API above. A JVM plugin is compiled against the application's sources and may also call its public classes, such as `PackageManifest`, `MediaReferences` or `CmsAccess`, to read site data; it should not depend on internal state such as the package or media locks, the scheduler's tables or the installer's configuration, which the APIs above cover. The Backups plugin (`examples/plugins/site-backup`) is built only on these and has no code in the application. A JVM plugin loads the Haxe standard library from the application, which compiles without dead-code elimination so every member of the classes it includes stays available to plugins.
 
 Put request field rules in the handler's `override validate():Bool`, using `request().validate(...)`. Register the handler instance directly with `Route.post`; calling `execute` from a route callback bypasses the framework's validation lifecycle. The managed plugin route forwards validation while holding the module's lifecycle lock and checks that the installed generation is still active before calling plugin code.
 
@@ -168,16 +208,17 @@ Handlers without this interface retain HxWell's standard 422 response. Permissio
 
 ## Hooks
 
-| Event | Data | Result |
-| --- | --- | --- |
-| `site.shared` | `{ path }` | Markdown `blocks` with `slot` / `content` |
-| `content.render` | `{ document, content }` | Transformed `content`; stored content is unchanged |
-| `content.saving` | `{ document }` | An `error` to reject a manual save |
-| `content.saved` | `{ document }` | Notification after saving or scheduled publication |
-| `dashboard.widgets` | `{ summary }` | Markdown blocks with slot `dashboard` |
-| `ui.navigation` | `{ location, capabilities }` | Safe internal `items` with label/href/icon |
-| `site.assets` | Automatically registered for module/styles | Public frontend assets |
-| `i18n.catalogues` | Automatically registered for translations | Package-owned catalogues |
+| Event               | Data                                                                                     | Result                                             |
+| ------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `site.shared`       | `{ path }`                                                                               | Markdown `blocks` with `slot` / `content`          |
+| `content.render`    | `{ document, content }`                                                                  | Transformed `content`; stored content is unchanged |
+| `content.saving`    | `{ document }`                                                                           | An `error` to reject a manual save                 |
+| `content.saved`     | `{ document }`                                                                           | Notification after saving or scheduled publication |
+| `dashboard.widgets` | `{ summary }`                                                                            | Markdown blocks with slot `dashboard`              |
+| `ui.navigation`     | `{ location, capabilities }`                                                             | Safe internal `items` with label/href/icon         |
+| `site.assets`       | Automatically registered for module/styles                                               | Public frontend assets                             |
+| `i18n.catalogues`   | Automatically registered for translations                                                | Package-owned catalogues                           |
+| `installation`      | Bundled plugins only; `installation.panel` receives `{ step, driver, verified, target }` | A `view` and its `props` for the installation page |
 
 Public slots are `site.top`, `site.before-footer`, `site.footer`, `content.before` and `content.after`. Content uses escaped Markdown/GFM. Transformed content retains the uploaded-image policy. Non-strict public hook failures disable the plugin; validation failures reject the save.
 
@@ -302,7 +343,7 @@ Disabling/uninstalling retains plugin tables, values and history for later reins
 Themes declare a stylesheet, a stable lowercase layout identifier and `assets.views`, a folder of Wellout templates (`*.well.html`). Simple is the minimal default. A theme provides any of the standard pages, and the application's own view renders the pages it leaves out:
 
 ```ts
-['Home', 'ContentIndex', 'ContentDetail', 'Page', 'About', 'NotFound']
+['Home', 'ContentIndex', 'ContentDetail', 'Page', 'About', 'NotFound'];
 ```
 
 Templates are checked when the package is installed, against the same view contract the application uses: the props of each page, the shared values (`site`, `theme`, `navigation`, `i18n`, …), the helpers (`t`, `url`, `themeAsset`, `markdown`, …) and the application's components (`SiteLayout`, `ContentCard`, `Pagination`, `FieldValues`, `ContentFilters`, …). A package whose templates do not check is rejected with the first diagnostic. Theme templates are untrusted: they cannot use islands or raw HTML, and rendering is bounded in output size and component depth. `themeAsset(path)` links the package's `public/` files. Inside the owner-only preview frame, links to public pages keep the preview base, language and customization session. Packages that only declare a JavaScript `assets.renderer` are rejected.
@@ -337,12 +378,8 @@ A theme manifest may declare:
 
 ```json
 {
-  "templates": [
-    { "name": "ProductDetail", "label": "Product details", "scope": "detail" }
-  ],
-  "navigation": [
-    { "key": "catalog_links", "name": "Catalog links", "maxLinks": 10 }
-  ]
+  "templates": [{ "name": "ProductDetail", "label": "Product details", "scope": "detail" }],
+  "navigation": [{ "key": "catalog_links", "name": "Catalog links", "maxLinks": 10 }]
 }
 ```
 

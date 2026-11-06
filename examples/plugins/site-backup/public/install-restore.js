@@ -1,43 +1,37 @@
-// Restores a HaxePress backup from the installer. The upload goes in chunks;
-// the server-rendered form shows the backup header and errors.
-import { readBackupHeader, uploadBackup } from '../backup';
+// Restores a HaxePress backup from the installation page. The upload goes in
+// chunks; the server-rendered form shows the backup header and errors.
+import { readBackupHeader, uploadBackup } from './backup.js';
 
-interface Props {
-  restoreLimit: number;
-  csrfToken: string;
-  useVerifiedDatabase: boolean;
-}
-
-export function mount(element: HTMLElement, props: Props) {
+export function mount(element, props) {
   const form = element.querySelector('form');
-  const input = form?.querySelector<HTMLInputElement>('input[type="file"]');
-  const submit = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
-  const section = element.closest<HTMLElement>('.setup-content');
+  const input = form?.querySelector('input[type="file"]');
+  const submit = form?.querySelector('button[type="submit"]');
+  const section = element.closest('.setup-content');
   if (!form || !input || !submit || !section) return;
-  const version = form.querySelector<HTMLElement>('[data-backup-version]');
-  const encrypted = form.querySelector<HTMLElement>('[data-backup-encrypted]');
-  const appKey = form.querySelector<HTMLElement>('[data-backup-key]');
-  const skip = form.querySelector<HTMLInputElement>('[data-skip-damaged]');
-  const error = section.querySelector<HTMLElement>('[data-setup-error]');
+  const version = form.querySelector('[data-backup-version]');
+  const encrypted = form.querySelector('[data-backup-encrypted]');
+  const appKey = form.querySelector('[data-backup-key]');
+  const skip = form.querySelector('[data-skip-damaged]');
+  const error = section.querySelector('[data-setup-error]');
   const label = submit.textContent || '';
   let busy = false;
 
-  function showError(message: string) {
+  function showError(message) {
     const text = error?.querySelector('span');
     if (!error || !text) return;
     text.textContent = message;
     error.hidden = message === '';
   }
 
-  function setBusy(value: boolean) {
+  function setBusy(value) {
     busy = value;
-    section!.setAttribute('aria-busy', String(value));
-    for (const fieldset of section!.querySelectorAll('fieldset')) fieldset.disabled = value;
-    for (const button of section!.querySelectorAll<HTMLButtonElement>('form button')) {
+    section.setAttribute('aria-busy', String(value));
+    for (const fieldset of section.querySelectorAll('fieldset')) fieldset.disabled = value;
+    for (const button of section.querySelectorAll('form button')) {
       if (!button.closest('fieldset')) button.disabled = value;
     }
-    submit!.textContent = value ? 'Verifying and restoring…' : label;
-    submit!.disabled = value || !input!.files?.length;
+    submit.textContent = value ? 'Verifying and restoring…' : label;
+    submit.disabled = value || !input.files?.length;
   }
 
   input.addEventListener('change', async () => {
@@ -69,12 +63,7 @@ export function mount(element: HTMLElement, props: Props) {
       const options = new URLSearchParams();
       if (skip?.checked) options.set('skip_damaged_content', '1');
       if (props.useVerifiedDatabase) options.set('use_verified_database', '1');
-      const result = await uploadBackup<{ restored: boolean; skippedContent: number[] }>(
-        '/admin/install/restore',
-        backup,
-        props.csrfToken,
-        options,
-      );
+      const result = await uploadBackup('/admin/install/restore', backup, props.csrfToken, options);
       if (!result.restored) throw new Error('The backup could not be restored.');
       if (result.skippedContent?.length) {
         showSkipped(section, result.skippedContent);
@@ -89,7 +78,7 @@ export function mount(element: HTMLElement, props: Props) {
 }
 
 /** The restored site skipped damaged content items: list them before signing in. */
-function showSkipped(section: HTMLElement, skipped: number[]) {
+function showSkipped(section, skipped) {
   const heading = document.createElement('div');
   heading.className = 'setup-page-heading';
   heading.setAttribute('role', 'status');

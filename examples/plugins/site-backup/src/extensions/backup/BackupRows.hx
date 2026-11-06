@@ -1,4 +1,4 @@
-package hx.press.backup;
+package extensions.backup;
 
 #if jvm
 import haxe.Exception;
@@ -9,7 +9,7 @@ import haxe.io.Bytes;
 import haxe.io.BytesOutput;
 import haxe.io.Eof;
 import haxe.io.Input;
-import hx.press.backup.BackupTable.BackupTableDefinition;
+import extensions.backup.BackupTable.BackupTableDefinition;
 import hx.well.database.query.QueryBuilder;
 import hx.well.storage.StorageDisk;
 import java.math.BigDecimal;

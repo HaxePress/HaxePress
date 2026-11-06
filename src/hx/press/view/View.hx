@@ -3,7 +3,10 @@ package hx.press.view;
 import wellout.render.Values;
 import haxe.ds.StringMap;
 import haxe.Json;
+import haxe.Exception;
 import hx.press.ai.AdminMcpAccess;
+import hx.press.plugins.PluginRuntime;
+import hx.press.view.ViewEngine.ViewTarget;
 import hx.press.i18n.I18n;
 import hx.press.install.InstallationState;
 import hx.press.media.MediaReferences;
@@ -39,7 +42,29 @@ class View {
         if (isDataRequest(request)) {
             return data(name, props, request);
         }
-        var target = ViewEngine.target(name, request);
+        return renderTarget(ViewEngine.target(name, request), props, request);
+    }
+
+    /**
+        Renders a page of the plugin whose route handles this request, from
+        the templates in its package (`Pages.view`).
+    **/
+    public static function renderPlugin(name:String, ?props:Dynamic):Response {
+        var request = RequestStatic.request();
+        var current:Dynamic = request == null ? null : request.getAttribute(PluginRuntime.CURRENT,
+            null);
+        if (current == null) {
+            throw new Exception("A plugin renders its own pages from its routes.");
+        }
+        Flash.consume(request);
+        if (isDataRequest(request)) {
+            return data('${current.id}/${name}', props, request);
+        }
+        return renderTarget(PluginViews.target(current.id, current.directory, name), props,
+            request);
+    }
+
+    static function renderTarget(target:ViewTarget, props:Dynamic, request:Null<Request>):Response {
         var compiled = target.set.template(target.template);
         if (compiled.value == null) {
             return failure(target.template, compiled.diagnostics, target.set);
@@ -47,7 +72,8 @@ class View {
         var fragment = requestedFragment(request);
         var writer = ViewResponse.acquire();
         writer.reset();
-        var host = new ViewHost(request, props, target.namespace, target.assetBase, target.mapper);
+        var host = new ViewHost(request, props, target.namespace, target.assetBase, target.mapper,
+            target.islands);
         var maxOutput = target.untrusted ? 2097152 : 0;
         var maxDepth = target.untrusted ? 16 : 32;
         try {
@@ -81,6 +107,25 @@ class View {
             response.header(FRAGMENT_HEADER, fragment);
         }
         return response;
+    }
+
+    /**
+        Renders a template to text for a part of another page, such as an
+        installation step a plugin offers. Its islands and links work as on
+        a page; head content is not collected.
+    **/
+    public static function fragmentText(target:ViewTarget, props:Dynamic):String {
+        var request = RequestStatic.request();
+        var compiled = target.set.template(target.template);
+        if (compiled.value == null) {
+            failure(target.template, compiled.diagnostics, target.set);
+            throw new Exception('${target.template} has template errors.');
+        }
+        var writer = new ByteWriter();
+        var host = new ViewHost(request, props, target.namespace, target.assetBase, target.mapper,
+            target.islands);
+        Renderer.render(compiled.value, props, host, writer, {maxComponentDepth: 32});
+        return writer.toString();
     }
 
     static function requestedFragment(request:Null<Request>):Null<String> {

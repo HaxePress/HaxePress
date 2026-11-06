@@ -1730,93 +1730,8 @@
     align-items: start;
   }
 
-  .settings-card,
-  .backup-schedules {
+  .settings-card {
     padding: 26px;
-  }
-
-  .backup-schedules {
-    margin-block-start: 24px;
-  }
-
-  .backup-schedules > .extension-card-title {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .backup-schedule-form {
-    padding: 16px;
-    margin-block: 16px;
-    border: 1px solid var(--admin-line);
-    border-radius: 8px;
-  }
-
-  .backup-schedule-form fieldset {
-    min-inline-size: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-
-  .backup-schedule-form label {
-    min-inline-size: 0;
-    margin: 0;
-  }
-
-  .backup-schedule-form input:not([type='checkbox']),
-  .backup-schedule-form select {
-    min-inline-size: 0;
-    margin-block-start: 6px;
-  }
-
-  .backup-schedule-fields {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin-block: 12px;
-  }
-
-  .backup-schedule-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 18px;
-    margin-block: 12px;
-  }
-
-  .backup-schedule-options .checkbox-label {
-    align-items: center;
-    padding: 0;
-    border: 0;
-  }
-
-  .backup-schedule-options .checkbox-label input {
-    margin: 0;
-  }
-
-  .backup-schedule-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px 16px;
-    padding-block: 16px;
-    border-top: 1px solid var(--admin-line);
-  }
-
-  .backup-schedule-row > :first-child {
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .backup-schedule-row .package-actions {
-    margin: 0;
-  }
-
-  .backup-saved-files {
-    border: 1px solid var(--admin-line);
-    border-radius: 8px;
-    margin-block-start: 16px;
-    padding: 16px;
   }
 
   .settings-card h2 {
@@ -2567,13 +2482,8 @@
 
     .editor-writing,
     .settings-card,
-    .backup-schedules,
     .category-form {
       padding: 21px;
-    }
-
-    .backup-schedule-fields {
-      grid-template-columns: minmax(0, 1fr);
     }
 
     .editor-writing .title-input {

@@ -1,4 +1,4 @@
-package hx.press.backup;
+package extensions.backup;
 
 #if jvm
 import haxe.Exception;

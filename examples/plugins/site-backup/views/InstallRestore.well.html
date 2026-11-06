@@ -1,0 +1,35 @@
+<props restore="InstallRestoreView" />
+<Island
+  name="install-restore"
+  :props="{
+    restoreLimit: restore.limit,
+    csrfToken: csrfToken,
+    useVerifiedDatabase: restore.useVerifiedDatabase
+  }"
+  load="eager"
+>
+  <form class="setup-form">
+    <fieldset>
+      <div class="setup-field">
+        <label for="setup-backup">Restore a HaxePress backup</label>
+        <input id="setup-backup" type="file" accept=".hxpress" required />
+        <p>{{ restore.target }}</p>
+        <p>Choose a backup you trust. Sign in with the restored account afterward.</p>
+      </div>
+      <p class="field-help" hidden data-backup-version></p>
+      <div class="alert error" role="alert" hidden data-backup-encrypted>
+        {{ icon('alert') }}This file is unusable on projects with a different APP_KEY. If the
+        original APP_KEY is lost, the backup is permanently unrecoverable.
+      </div>
+      <p class="field-help" hidden data-backup-key>
+        Set the original APP_KEY in the target .env before starting HaxePress.
+      </p>
+      <label class="setup-samples"
+        ><input type="checkbox" data-skip-damaged /><span>Skip damaged content items</span></label
+      >
+      <div class="setup-form-actions">
+        <button class="button button-outline" type="submit" disabled>Restore backup</button>
+      </div>
+    </fieldset>
+  </form>
+</Island>

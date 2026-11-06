@@ -17,14 +17,18 @@ class ViewTarget {
     /** Theme templates installed at runtime render within output and depth budgets. **/
     public final untrusted:Bool;
 
+    /** Module URLs of a plugin's own islands, by island name. **/
+    public final islands:Null<Map<String, String>>;
+
     public function new(set:TemplateSet, template:String, namespace:String, ?assetBase:String,
-            ?mapper:String->String, untrusted:Bool = false) {
+            ?mapper:String->String, untrusted:Bool = false, ?islands:Map<String, String>) {
         this.set = set;
         this.template = template;
         this.namespace = namespace;
         this.assetBase = assetBase;
         this.mapper = mapper;
         this.untrusted = untrusted;
+        this.islands = islands;
     }
 }
 

@@ -110,8 +110,8 @@ class ThemeViews {
         return set;
     }
 
-    /** Reads every template of a views folder, keyed by file name without `.well.html`. **/
-    static function load(disk:StorageDisk, folder:String):Map<String, String> {
+    /** Reads every template of a package's views folder, keyed by file name without `.well.html`. **/
+    public static function load(disk:StorageDisk, folder:String):Map<String, String> {
         var sources:Map<String, String> = [];
         if (!disk.directoryExists(folder)) {
             return sources;
@@ -123,15 +123,15 @@ class ThemeViews {
             }
             count++;
             if (count > MAX_TEMPLATES) {
-                throw new Exception('A theme may contain at most ${MAX_TEMPLATES} templates.');
+                throw new Exception('A package may contain at most ${MAX_TEMPLATES} templates.');
             }
             if (disk.size(file) > MAX_TEMPLATE_BYTES) {
-                throw new Exception('The theme template ${file} is larger than 256 KB.');
+                throw new Exception('The template ${file} is larger than 256 KB.');
             }
             var base = Path.withoutDirectory(file);
             var name = base.substr(0, base.length - ".well.html".length);
             if (!~/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.match(name)) {
-                throw new Exception('The theme template name ${name} is not allowed.');
+                throw new Exception('The template name ${name} is not allowed.');
             }
             sources.set(name, disk.get(file));
         }

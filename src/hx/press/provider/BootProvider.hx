@@ -1,5 +1,6 @@
 package hx.press.provider;
 
+import hx.press.AdminController;
 import hx.well.provider.AbstractProvider;
 import hx.well.route.Route;
 import hx.press.SiteController;
@@ -23,6 +24,9 @@ import hx.press.view.Pages;
 import hx.press.view.View;
 import hx.press.view.WelloutClient;
 import hx.press.view.Translations;
+#if jvm
+import hx.press.install.InstallationPlugins;
+#end
 import hx.press.view.DesignViews;
 
 using hx.well.tools.RouteElementTools;
@@ -32,6 +36,10 @@ class BootProvider extends AbstractProvider {
         CmsValidators.register();
         // Plugins render pages through Pages, which has no dependency on the renderer.
         Pages.renderer = (name, props) -> View.render(name, props);
+        Pages.viewRenderer = (name, props) -> View.renderPlugin(name, props);
+        Pages.validationRedirects = request -> View.redirectsValidation(request);
+        Pages.validationRedirector = (request, scope, message,
+            url) -> AdminController.validationRedirect(request, scope, message, url);
         InstallationRoutes.register();
         Route.get("/", SiteController.home);
         Route.publicHandler = new SitePublicHandler();
@@ -54,6 +62,10 @@ class BootProvider extends AbstractProvider {
         Route.status(422).handler(new ValidationErrorHandler());
         if (!InstallationState.pending) {
             SiteRuntime.start();
+        } else {
+            #if jvm
+            InstallationPlugins.start();
+            #end
         }
     }
 }

@@ -1,9 +1,9 @@
-package hx.press.backup;
+package extensions.backup;
 
 #if jvm
 import haxe.ds.StringMap;
 import hx.press.i18n.I18n;
-import hx.press.view.View;
+import hx.press.view.Flash;
 import hx.well.http.Request;
 
 private typedef BackupPeriod = {
@@ -13,7 +13,7 @@ private typedef BackupPeriod = {
 }
 
 /**
-    Presentation data of `Admin/Backups`: schedule summaries, the schedule
+    Presentation data of the `Backups` page: schedule summaries, the schedule
     form opened with `?schedule=new|<id>`, the saved files listed with
     `?files=<id>` and the manual backup form with its verified result.
 **/
@@ -28,6 +28,11 @@ class BackupViews {
     static final sectionKeys = ["content", "themes", "plugins"];
 
     static inline var YEAR_SECONDS = 31536000;
+
+    /** A text of the plugin's catalogue, or of the application's. **/
+    static function label(key:String, ?parameters:Map<String, Dynamic>):String {
+        return I18n.installedT(key, parameters, BackupPlugin.NAMESPACE);
+    }
 
     /** `YYYY-MM-DD HH:MM UTC`, as the schedule list showed before. **/
     public static function dateLabel(epoch:Float):String {
@@ -50,30 +55,30 @@ class BackupViews {
 
     /** The schedules with their summary and status lines in the current locale. **/
     public static function schedules(list:Array<Dynamic>):Array<Dynamic> {
-        var encrypted = I18n.t("Encrypted");
+        var encrypted = label("Encrypted");
         for (schedule in list) {
             var interval:Int = schedule.intervalSeconds;
             var period = periodFor(interval);
             var count = Std.int(interval / period.seconds);
-            var unit = I18n.t(count == 1 ? period.singular : period.label).toLowerCase();
-            var every = I18n.t("Every {count} {period}", ["count" => count, "period" => unit]);
+            var unit = label(count == 1 ? period.singular : period.label).toLowerCase();
+            var every = label("Every {count} {period}", ["count" => count, "period" => unit]);
             var sections:Dynamic = schedule.sections;
             var names = [
                 for (key in sectionKeys)
-                    if (Reflect.field(sections, key) == true) I18n.t(sectionLabels.get(key))
+                    if (Reflect.field(sections, key) == true) label(sectionLabels.get(key))
             ];
-            var keep = I18n.t("Keep {count}", ["count" => schedule.retain]);
+            var keep = label("Keep {count}", ["count" => schedule.retain]);
             var lock = schedule.encrypted == true ? ' · ${encrypted}' : "";
             schedule.summaryLabel = '${every} · ${names.join(", ")} · ${keep}${lock}';
-            var status = I18n.t("Paused");
+            var status = label("Paused");
             if (schedule.running == true) {
-                status = I18n.t("Backup in progress");
+                status = label("Backup in progress");
             } else if (schedule.enabled == true) {
-                status = I18n.t("Next run {time}", ["time" => dateLabel(schedule.nextRun)]);
+                status = label("Next run {time}", ["time" => dateLabel(schedule.nextRun)]);
             }
             var lastRun:Float = schedule.lastRun;
             if (lastRun > 0) {
-                var last = I18n.t("Last run {time}", ["time" => dateLabel(lastRun)]);
+                var last = label("Last run {time}", ["time" => dateLabel(lastRun)]);
                 status = '${status} · ${last}';
             }
             schedule.statusLabel = status;
@@ -152,7 +157,7 @@ class BackupViews {
         if (schedule == null) {
             return null;
         }
-        var encrypted = I18n.t("Encrypted");
+        var encrypted = label("Encrypted");
         var archives = BackupSchedules.archives(key).map(archive -> {
             var kilobytes = Std.int(Math.max(1, Math.round(archive.size / 1024)));
             var lock = archive.encrypted ? ' · ${encrypted}' : "";
@@ -184,7 +189,7 @@ class BackupViews {
             form.plugins = submitted.get("plugins") == "1";
             form.encrypted = submitted.get("encrypted") == "1";
         }
-        var verified:Dynamic = View.flashed(request, "backup");
+        var verified:Dynamic = Flash.get(request, "backup");
         if (verified != null) {
             form.download = verified.download;
             form.md5 = verified.md5;
@@ -193,7 +198,7 @@ class BackupViews {
     }
 
     static function old(request:Request):Null<Map<String, Dynamic>> {
-        var flashed:Dynamic = View.flashed(request, "old");
+        var flashed:Dynamic = Flash.get(request, "old");
         return Std.isOfType(flashed, StringMap) ? cast flashed : null;
     }
 

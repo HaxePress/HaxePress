@@ -155,6 +155,11 @@ def build_plugin(plugin, output, api_info, application=None):
         for asset in sorted((plugin / "public").rglob("*")):
             if asset.is_file():
                 archive.write(asset, asset.relative_to(plugin))
+        views = manifest.get("assets", {}).get("views", "")
+        if views:
+            for template in sorted((plugin / views).rglob("*")):
+                if template.is_file():
+                    archive.write(template, template.relative_to(plugin))
     return package
 
 

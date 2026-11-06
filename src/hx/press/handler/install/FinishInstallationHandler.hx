@@ -8,6 +8,9 @@ import hx.press.install.InstallationController;
 import hx.press.install.InstallationController.SetupAdministrator;
 import hx.press.install.InstallationDatabase;
 import hx.press.install.InstallationDatabase.SetupDatabase;
+#if jvm
+import hx.press.install.InstallationPlugins;
+#end
 import hx.press.install.InstallationEnv;
 import hx.press.install.InstallationState;
 import hx.press.model.Admin;
@@ -154,6 +157,9 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
             request.session.forget(InstallationDatabase.SESSION_KEY);
             request.session.forget(InstallationController.ADMINISTRATOR_KEY);
             phase = "runtime startup";
+            #if jvm
+            InstallationPlugins.retire();
+            #end
             SiteRuntime.start();
             phase = "administrator sign-in";
             var admin = Admin.query.where("email", values.get("ADMIN_EMAIL")).limit(1).first();

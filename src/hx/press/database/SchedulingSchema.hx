@@ -21,17 +21,5 @@ class SchedulingSchema {
                 table.index(["plugin_id", "id"]);
             });
         }
-        if (!Schema.hasTable("scheduled_backup_files")) {
-            Schema.create("scheduled_backup_files", table -> {
-                table.string("id", 32).primary();
-                table.string("schedule_id", 104);
-                table.double("created_epoch");
-                table.string("cms_version", 64);
-                table.integer("encrypted");
-                table.integer("size");
-                table.string("md5", 32);
-                table.index(["schedule_id", "created_epoch", "id"]);
-            });
-        }
     }
 }

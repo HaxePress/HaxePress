@@ -1,6 +1,7 @@
 package hx.press.view.types.admin;
 
 import hx.press.view.types.ContentViews.PageLinksView;
+import wellout.SafeHtml;
 import wellout.Url;
 
 /** An installed plugin or theme on `Admin/Extensions`, with its localized name and summary. */
@@ -122,77 +123,6 @@ typedef RoleFormView = {
     var enabled:Bool;
 }
 
-@:well.view
-typedef BackupSectionsView = {
-    var content:Bool;
-    var themes:Bool;
-    var plugins:Bool;
-}
-
-/** The manual backup form and, after a successful run, the verified download. */
-@:well.view
-typedef BackupFormView = {
-    var content:Bool;
-    var themes:Bool;
-    var plugins:Bool;
-    var encrypted:Bool;
-    var download:String;
-    var md5:String;
-}
-
-@:well.view
-typedef BackupScheduleView = {
-    var id:String;
-    var name:String;
-    var sections:BackupSectionsView;
-    var encrypted:Bool;
-    var retain:Int;
-    var enabled:Bool;
-    var running:Bool;
-    var lastError:String;
-    var summaryLabel:String;
-    var statusLabel:String;
-}
-
-@:well.view
-typedef BackupPeriodView = {
-    var seconds:Int;
-    var label:String;
-    var selected:Bool;
-}
-
-/** The schedule form for a new or an existing schedule. */
-@:well.view
-typedef BackupScheduleFormView = {
-    var id:String;
-    var action:String;
-    var name:String;
-    var every:Int;
-    var everyMaximum:Int;
-    var periods:Array<BackupPeriodView>;
-    var retain:Int;
-    var content:Bool;
-    var themes:Bool;
-    var plugins:Bool;
-    var encrypted:Bool;
-    var enabled:Bool;
-}
-
-@:well.view
-typedef BackupArchiveView = {
-    var id:String;
-    var createdLabel:String;
-    var detailsLabel:String;
-    var md5:String;
-    var download:Url;
-}
-
-@:well.view
-typedef BackupSavedFilesView = {
-    var name:String;
-    var archives:Array<BackupArchiveView>;
-}
-
 /** The installer's state; `step` is 0 (database), 1 (administrator) or 2 (review). */
 @:well.view
 typedef InstallSetupView = {
@@ -210,10 +140,9 @@ typedef InstallSetupView = {
     var siteName:String;
     var adminName:String;
     var adminEmail:String;
-    var showRestore:Bool;
-    var restoreTarget:String;
-    var useVerifiedDatabase:Bool;
-    var restoreLimit:Int;
+
+    /** Steps installation plugins offer here, such as restoring a backup. **/
+    var panels:Array<SafeHtml>;
 }
 
 @:well.view

@@ -8,6 +8,9 @@
   editing="Bool"
 />
 <AdminLayout :title="t('Backup / Restore')">
+  <well:head>
+    <link rel="stylesheet" href="{{ packageAsset('backups.css') }}" />
+  </well:head>
   <div class="admin-page-heading">
     <h1>{{ t('Backup / Restore') }}</h1>
   </div>
@@ -72,28 +75,34 @@
     </section>
     <Island
       name="backup-restore-check"
-      :props="{
-        translations: translations,
-        locale: i18n.locale,
-        direction: i18n.direction,
-        uploadLimit: uploadLimit,
-        csrfToken: csrfToken
-      }"
+      :props="{ uploadLimit: uploadLimit, csrfToken: csrfToken }"
       load="idle"
     >
-      <section class="admin-card settings-card">
+      <section class="admin-card settings-card" data-restore-check>
         <h2>{{ t('Restore a backup') }}</h2>
         <p>
           {{ t('Verify a backup here, then restore it in the installer of a fresh HaxePress site.')
           }}
         </p>
+        <div class="alert error" role="alert" hidden data-restore-error>
+          {{ icon('alert') }}<span></span>
+        </div>
         <form>
           <label for="backup-to-restore">{{ t('Backup file') }}</label>
           <input id="backup-to-restore" type="file" accept=".hxpress" required />
+          <p class="field-help" hidden data-backup-version></p>
+          <div class="alert error" role="alert" hidden data-backup-encrypted>
+            {{ icon('alert') }}{{ t('This file is unusable on projects with a different APP_KEY. If
+            the original APP_KEY is lost, the backup is permanently unrecoverable.') }}
+          </div>
           <button class="button button-outline" type="submit" disabled>
             {{ t('Verify backup') }}
           </button>
         </form>
+        <div class="alert success" role="status" hidden data-restore-passed>
+          {{ icon('check') }}{{ t('Restore rehearsal passed.') }}
+        </div>
+        <p class="field-help" hidden data-restore-checksum><code></code></p>
       </section>
     </Island>
   </div>

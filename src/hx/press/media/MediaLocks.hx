@@ -6,6 +6,15 @@ import hx.well.thread.MutexPool;
 class MediaLocks {
     static final locks = new MutexPool();
 
+    /** Held for a plugin that declares the `media` lock while its routes and tasks run. **/
+    public static function acquire():Void {
+        locks.acquire("media");
+    }
+
+    public static function release():Void {
+        locks.release("media");
+    }
+
     public static function run<T>(action:Void->T):T {
         locks.acquire("media");
         try {

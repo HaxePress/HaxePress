@@ -28,7 +28,8 @@ class PluginModule {
             "deactivate",
             "uninstall",
             "settings.saved",
-            "schedule.run"
+            "schedule.run",
+            "installation.panel"
         ];
         if (!PackageManifest.events.contains(event) && !lifecycle.contains(event)) {
             throw new Exception("The requested plugin hook is not supported.");

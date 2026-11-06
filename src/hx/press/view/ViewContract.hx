@@ -70,6 +70,7 @@ class ViewContract {
         contract.addFilter(new FilterSignature("variables", TMap(TString), [], TString));
         contract.addCssFilter("variables");
         contract.addHelper(new HelperSignature("themeAsset", [text("path")], TUrl));
+        contract.addHelper(new HelperSignature("packageAsset", [text("path")], TUrl));
         contract.addFilter(new FilterSignature("slice", TString,
             [new Parameter("start", TInt), new Parameter("end", TInt, true)], TString));
         contract.addFilter(new FilterSignature("pixels", TNullable(TString), [

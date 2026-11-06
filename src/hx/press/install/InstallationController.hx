@@ -7,9 +7,6 @@ import hx.press.view.View;
 import hx.well.http.Request;
 import hx.well.http.Response;
 import hx.well.middleware.CsrfMiddleware;
-#if jvm
-import hx.press.backup.BackupFormat;
-#end
 
 /** The administrator entered on the second step, kept in the session for the review. */
 typedef SetupAdministrator = {
@@ -30,7 +27,7 @@ class InstallationController {
     static final drivers = ["sqlite", "mysql"];
 
     public static function locked(request:Request):Response {
-        var install = view(0, "sqlite", null, null, null, 0);
+        var install = view(0, "sqlite", null, null, null);
         install.blocked = true;
         install.message = InstallationState.blockedReason();
         var props = {
@@ -58,14 +55,21 @@ class InstallationController {
         var submitted = submittedInput(request);
         var selected = request.query("driver", submitted == null ? "" : text(submitted, "driver"));
         var driver = drivers.contains(selected) ? selected : database == null ? "sqlite" : database.driver;
-        var restoreLimit = #if jvm BackupFormat.maxBytes() #else 0 #end;
-        var install = view(step, driver, database, administrator, submitted, restoreLimit);
+        var install = view(step, driver, database, administrator, submitted);
+        #if jvm
+        // Installation plugins, such as backups, may offer another way to install here.
+        install.panels = InstallationPlugins.panels({
+            step: step,
+            driver: driver,
+            verified: step == 1 && database != null,
+            target: install.verifiedLabel
+        });
+        #end
         var props = {
             setup: {
                 blocked: false,
                 message: "",
-                database: database == null ? null : InstallationDatabase.summary(database),
-                restoreLimit: restoreLimit
+                database: database == null ? null : InstallationDatabase.summary(database)
             },
             csrfToken: request.session.get(CsrfMiddleware.TOKEN_KEY),
             install: install
@@ -102,13 +106,10 @@ class InstallationController {
     }
 
     static function view(step:Int, driver:String, database:Null<SetupDatabase>,
-            administrator:Null<SetupAdministrator>, submitted:Null<Map<String, Dynamic>>,
-            restoreLimit:Int):Dynamic {
+            administrator:Null<SetupAdministrator>, submitted:Null<Map<String, Dynamic>>):Dynamic {
         var sqlite = database == null || database.driver == "sqlite";
         var verifiedLabel = database == null ? "" : sqlite ? database.file : database.database;
         var reviewDatabase = database == null ? "" : sqlite ? 'SQLite · ${database.file}' : 'MySQL · ${database.host}:${database.port} / ${database.database}';
-        var restoreTarget = step == 1
-            && database != null ? 'Restore into ${verifiedLabel}.' : "Restore into a new SQLite database.";
         var port = database == null
             || database.driver != "mysql" ? "3306" : Std.string(database.port);
         return {
@@ -131,10 +132,7 @@ class InstallationController {
                 administrator == null ? "" : administrator.admin_name),
             adminEmail: text(submitted, "admin_email",
                 administrator == null ? "" : administrator.admin_email),
-            showRestore: restoreLimit > 0 && ((step == 0 && driver == "sqlite") || step == 1),
-            restoreTarget: restoreTarget,
-            useVerifiedDatabase: step == 1 && database != null,
-            restoreLimit: restoreLimit
+            panels: []
         };
     }
 }

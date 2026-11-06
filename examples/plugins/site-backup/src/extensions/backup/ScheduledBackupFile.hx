@@ -1,12 +1,13 @@
-package hx.press.model;
+package extensions.backup;
 
 import hx.well.model.BaseModel;
 import hx.well.model.BaseModelQuery;
 
+/** A saved backup of a schedule. The table keeps its name so existing files stay listed. **/
 @:connection("default")
 @:table("scheduled_backup_files")
-class ScheduledBackup extends BaseModel<ScheduledBackup> {
-    public static var query:BaseModelQuery<ScheduledBackup>;
+class ScheduledBackupFile extends BaseModel<ScheduledBackupFile> {
+    public static var query:BaseModelQuery<ScheduledBackupFile>;
 
     @:primary @:visible @:field public var id:String = "";
     @:visible @:field public var schedule_id:String = "";

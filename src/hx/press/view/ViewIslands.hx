@@ -103,17 +103,8 @@ class ViewIslands {
             // Captures a theme preview frame into the thumbnail of a theme card.
             new IslandSignature("theme-thumbnail", TRecord([new FieldInfo("source", TString)]),
                 ["Preview unavailable"]),
-            // Uploads a backup in chunks and rehearses its restore.
-            react("backup-restore-check",
-                [new FieldInfo("uploadLimit", TInt), new FieldInfo("csrfToken", TString)]),
             // Sends a datetime-local field of its form as epoch milliseconds in the browser's zone.
-            new IslandSignature("local-datetime", TRecord([])),
-            // Restores a backup from the installer; the installer has no catalogue, like before.
-            new IslandSignature("install-restore", TRecord([
-                new FieldInfo("restoreLimit", TInt),
-                new FieldInfo("csrfToken", TString),
-                new FieldInfo("useVerifiedDatabase", TBool)
-            ]))
+            new IslandSignature("local-datetime", TRecord([]))
         ];
     }
 }

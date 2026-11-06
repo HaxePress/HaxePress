@@ -11,6 +11,7 @@ import hx.press.i18n.TranslationCatalogue;
 import hx.press.plugins.PhpModuleDefinition;
 #if jvm
 import hx.press.themes.ThemeDesignPackage;
+import hx.press.view.PluginViews;
 import hx.press.view.ThemeViews;
 #end
 #if jvm
@@ -149,10 +150,14 @@ class SafePackageArchive {
         }
         if (manifest.views != "") {
             #if jvm
-            ThemeViews.inspectPackage(disk, '${root}/${manifest.views}');
+            if (manifest.kind == "theme") {
+                ThemeViews.inspectPackage(disk, '${root}/${manifest.views}');
+            } else {
+                PluginViews.inspectPackage(disk, '${root}/${manifest.views}');
+            }
             #else
             // Templates are checked with Wellout, which only the JVM application includes.
-            throw new Exception("Theme template packages require the JVM host.");
+            throw new Exception("Packages with Wellout templates require the JVM host.");
             #end
         }
         PackageManifest.serverArtifact(manifest);

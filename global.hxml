@@ -6,11 +6,11 @@
 -resource resources/lang/editor/tr.json@lang.editor.tr
 -resource resources/lang/packages/en.json@lang.packages.en
 -resource resources/lang/packages/tr.json@lang.packages.tr
--resource resources/lang/backups/en.json@lang.backups.en
--resource resources/lang/backups/tr.json@lang.backups.tr
 -resource resources/themes/simple/cms-package.json@hx.press.theme.simple
 -resource resources/themes/simple/lang/en.json@hx.press.theme.simple.lang.en
 -resource resources/themes/simple/lang/tr.json@hx.press.theme.simple.lang.tr
+# JVM plugins load the standard library from the application, so its classes stay whole.
+-dce no
 -D analyzer-optimize
 -D scriptable
 -D env_file=.env

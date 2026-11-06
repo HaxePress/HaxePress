@@ -1,0 +1,103 @@
+{
+  "views": {
+    "BackupSectionsView": {
+      "content": "Bool",
+      "themes": "Bool",
+      "plugins": "Bool"
+    },
+    "BackupFormView": {
+      "content": "Bool",
+      "themes": "Bool",
+      "plugins": "Bool",
+      "encrypted": "Bool",
+      "download": "String",
+      "md5": "String"
+    },
+    "BackupScheduleView": {
+      "id": "String",
+      "name": "String",
+      "sections": "BackupSectionsView",
+      "encrypted": "Bool",
+      "retain": "Int",
+      "enabled": "Bool",
+      "running": "Bool",
+      "lastError": "String",
+      "summaryLabel": "String",
+      "statusLabel": "String"
+    },
+    "BackupPeriodView": {
+      "seconds": "Int",
+      "label": "String",
+      "selected": "Bool"
+    },
+    "BackupScheduleFormView": {
+      "id": "String",
+      "action": "String",
+      "name": "String",
+      "every": "Int",
+      "everyMaximum": "Int",
+      "periods": "List<BackupPeriodView>",
+      "retain": "Int",
+      "content": "Bool",
+      "themes": "Bool",
+      "plugins": "Bool",
+      "encrypted": "Bool",
+      "enabled": "Bool"
+    },
+    "BackupArchiveView": {
+      "id": "String",
+      "createdLabel": "String",
+      "detailsLabel": "String",
+      "md5": "String",
+      "download": "Url"
+    },
+    "BackupSavedFilesView": {
+      "name": "String",
+      "archives": "List<BackupArchiveView>"
+    },
+    "InstallRestoreView": {
+      "limit": "Int",
+      "target": "String",
+      "useVerifiedDatabase": "Bool"
+    }
+  },
+  "islands": {
+    "backup-restore-check": {
+      "module": "restore-check.js",
+      "props": {
+        "uploadLimit": "Int",
+        "csrfToken": "String"
+      },
+      "messages": [
+        "Backup created by HaxePress {version}",
+        "Choose a backup within the upload size limit.",
+        "The backup could not be verified.",
+        "The backup upload could not be completed.",
+        "The server returned an invalid backup upload.",
+        "The server returned an invalid backup chunk confirmation.",
+        "This backup upload is no longer available.",
+        "The backup chunk has an invalid length.",
+        "The backup upload is incomplete.",
+        "The encrypted backup could not be opened. Use the original APP_KEY and an intact file.",
+        "The encrypted backup belongs to a different APP_KEY.",
+        "A valid original APP_KEY is required for encrypted backups.",
+        "The encrypted backup has an invalid size.",
+        "This encrypted backup format is unsupported.",
+        "The encrypted backup is incomplete.",
+        "The encrypted backup contains unexpected data.",
+        "Choose a supported .hxpress site backup.",
+        "The .hxpress backup has an invalid size.",
+        "Verifying backup…",
+        "Verify backup"
+      ]
+    },
+    "install-restore": {
+      "module": "install-restore.js",
+      "props": {
+        "restoreLimit": "Int",
+        "csrfToken": "String",
+        "useVerifiedDatabase": "Bool"
+      }
+    }
+  }
+}

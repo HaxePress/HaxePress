@@ -106,13 +106,18 @@ def verify_wire_limits():
     token = "a" * 32
     path = f"{VERIFY}/uploads/{token}/0"
     oversized = 1024 * 1024 + 1
-    for target, length, chunked in [
-        (path, oversized, False),
-        (path, oversized, True),
-        (VERIFY, 4097, False),
-        (RESTORE, 4097, False),
-    ]:
-        connection = http.client.HTTPConnection(BASE.hostname, BASE.port, timeout=5)
+    reject_oversized(
+        BASE.hostname,
+        BASE.port,
+        [(path, oversized, False), (path, oversized, True), (VERIFY, 4097, False)],
+    )
+    verify_http2_limits(path, oversized)
+
+
+def reject_oversized(host, port, targets):
+    """Each POST declares a body above its route's limit and is refused before it is sent."""
+    for target, length, chunked in targets:
+        connection = http.client.HTTPConnection(host, port, timeout=5)
         try:
             connection.putrequest("POST", target)
             if chunked:
@@ -126,6 +131,8 @@ def verify_wire_limits():
         finally:
             connection.close()
 
+
+def verify_http2_limits(path, oversized):
     probe = """
 const http2 = require('node:http2');
 const [origin, path, size] = process.argv.slice(1);
@@ -522,6 +529,15 @@ def reject_wrong_key(content):
         try:
             client = SetupClient(server.url)
             client.request("/admin/install", data=True)
+            # The restore step belongs to the Backups plugin, which runs only while installing.
+            reject_oversized(
+                "127.0.0.1",
+                server.port,
+                [
+                    (RESTORE, 4097, False),
+                    (f"{RESTORE}/uploads/{'a' * 32}/0", 1024 * 1024 + 1, False),
+                ],
+            )
             environment = (work / ".env").read_bytes()
             status, _, result = upload_backup(client, RESTORE, content)
             check(

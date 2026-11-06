@@ -1,12 +1,12 @@
-package hx.press.backup;
+package extensions.backup;
 
 #if jvm
 import haxe.Exception;
 import haxe.Json;
 import haxe.io.Bytes;
-import hx.press.backup.BackupTable.BackupTableDefinition;
-import hx.press.backup.SiteBackupArchive.BackupSelection;
-import hx.press.backup.SiteBackupArchive.ExtractedBackup;
+import extensions.backup.BackupTable.BackupTableDefinition;
+import extensions.backup.SiteBackupArchive.BackupSelection;
+import extensions.backup.SiteBackupArchive.ExtractedBackup;
 import hx.press.media.MediaReferences;
 import hx.press.packages.BuiltInTheme;
 import hx.press.packages.PackageArchiveInput.ArchiveSource;

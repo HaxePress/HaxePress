@@ -22,7 +22,6 @@ import hx.press.model.Tag;
 import hx.press.model.ContentTag;
 import hx.press.model.InstalledPackage;
 import hx.press.model.ScheduledJob;
-import hx.press.model.ScheduledBackup;
 import hx.press.model.ThemeDesign;
 import hx.press.model.ThemeAsset;
 import hx.press.model.ThemeAiConnection;
@@ -228,7 +227,7 @@ class FixtureProcess {
             case "content_tags": execute(ContentTag.query, command);
             case "cms_packages": execute(InstalledPackage.query, command);
             case "scheduled_jobs": execute(ScheduledJob.query, command);
-            case "scheduled_backup_files": execute(ScheduledBackup.query, command);
+            case "scheduled_backup_files": execute(ScheduledBackupRecord.query, command);
             case "theme_designs": execute(ThemeDesign.query, command);
             case "theme_assets": execute(ThemeAsset.query, command);
             case "theme_ai_connections": execute(ThemeAiConnection.query, command);
@@ -391,6 +390,15 @@ class FixturePluginHost implements PluginHost {
 
     public function schedule(pluginId:String, key:String, intervalSeconds:Int,
             ?payload:String):Void {
+        throw new Exception("Scheduling requires the application host.");
+    }
+
+    public function saveSchedule(pluginId:String, key:String, intervalSeconds:Int, payload:String,
+            enabled:Bool, ?nextRun:Float):Void {
+        throw new Exception("Scheduling requires the application host.");
+    }
+
+    public function schedules(pluginId:String, limit:Int):String {
         throw new Exception("Scheduling requires the application host.");
     }
 

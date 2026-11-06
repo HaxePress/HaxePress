@@ -20,5 +20,11 @@
   "The GitHub release ZIP did not match its published size or checksum.": "The GitHub release ZIP did not match its published size or checksum.",
   "This public GitHub repository or release asset could not be found.": "This public GitHub repository or release asset could not be found.",
   "GitHub is limiting release requests. Try again later.": "GitHub is limiting release requests. Try again later.",
-  "GitHub releases are temporarily unavailable.": "GitHub releases are temporarily unavailable."
+  "GitHub releases are temporarily unavailable.": "GitHub releases are temporarily unavailable.",
+  "Bundled plugin": "Bundled plugin",
+  "Bundled plugins are updated with HaxePress.": "Bundled plugins are updated with HaxePress.",
+  "Bundled plugins can be deactivated in the Plugins panel.": "Bundled plugins can be deactivated in the Plugins panel.",
+  "Plugin ZIPs must declare a stable pluginId UUID.": "Plugin ZIPs must declare a stable pluginId UUID.",
+  "A plugin update must keep its installed plugin ID.": "A plugin update must keep its installed plugin ID.",
+  "This plugin ID already belongs to another installed package.": "This plugin ID already belongs to another installed package."
 }

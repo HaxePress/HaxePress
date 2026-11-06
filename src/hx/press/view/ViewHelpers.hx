@@ -70,6 +70,14 @@ class ViewHelpers {
             return ~/^[A-Za-z0-9_\/-]+(?:\.[A-Za-z0-9_-]+)+$/.match(path)
                 && path.indexOf("..") < 0 ? '${base}${path}' : "";
         });
+        // A file of the plugin or theme package whose template is rendering.
+        runtime.addHelper("packageAsset", (arguments, context) -> {
+            var base = host(context).packageAssetBase;
+            var path = arguments.string(0);
+            return base != null
+                && ~/^[A-Za-z0-9_\/-]+(?:\.[A-Za-z0-9_-]+)+$/.match(path)
+                && path.indexOf("..") < 0 ? '${base}${path}' : "";
+        });
         runtime.addFilter("slice", (input, arguments, _) -> {
             var text = Values.toText(input);
             var end:Null<Int> = arguments.get(1);

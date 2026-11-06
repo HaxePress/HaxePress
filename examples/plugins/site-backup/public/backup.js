@@ -1,17 +1,7 @@
-export const backupFileTypes = '.hxpress';
-export const backupsPath = '/admin/backups';
-export const encryptedBackupWarning =
-  'This file is unusable on projects with a different APP_KEY. If the original APP_KEY is lost, the backup is permanently unrecoverable.';
+// Shared by the backups page and the installation step: the backup file
+// header and the chunked upload the server verifies or restores.
 
-export const backupSections = [
-  ['content', 'Content'],
-  ['themes', 'Themes'],
-  ['plugins', 'Plugins'],
-] as const;
-
-export type BackupSections = Record<(typeof backupSections)[number][0], boolean>;
-
-export async function readBackupHeader(file: File) {
+export async function readBackupHeader(file) {
   const bytes = new Uint8Array(await file.slice(0, 80).arrayBuffer());
   const magic = new TextDecoder().decode(bytes.slice(0, 8));
   const length = bytes[11];
@@ -32,7 +22,7 @@ export async function readBackupHeader(file: File) {
   };
 }
 
-export async function backupResponse<T>(response: Response): Promise<T> {
+async function backupResponse(response) {
   const result = await response.json().catch(() => null);
   if (!response.ok || !result) {
     throw new Error(result?.error || 'The backup upload could not be completed.');
@@ -40,19 +30,15 @@ export async function backupResponse<T>(response: Response): Promise<T> {
   return result;
 }
 
-export async function uploadBackup<T>(
-  action: string,
-  file: File,
-  csrfToken: string | null,
-  options?: URLSearchParams,
-): Promise<T> {
+/** Uploads `file` to `${action}/uploads` in chunks, then posts `action` with the upload. */
+export async function uploadBackup(action, file, csrfToken, options) {
   const uploads = `${action}/uploads`;
   const headers = {
     Accept: 'application/json',
     'X-CSRF-TOKEN': csrfToken || '',
   };
   const jsonHeaders = { ...headers, 'Content-Type': 'application/json' };
-  const ticket = await backupResponse<{ id: string; chunkSize: number }>(
+  const ticket = await backupResponse(
     await fetch(uploads, {
       method: 'POST',
       headers: jsonHeaders,
@@ -73,7 +59,7 @@ export async function uploadBackup<T>(
     const chunkHeaders = { ...headers, 'Content-Type': 'application/octet-stream' };
     for (let offset = 0, index = 0; offset < file.size; offset += ticket.chunkSize, index++) {
       const chunk = file.slice(offset, offset + ticket.chunkSize);
-      const result = await backupResponse<{ received: number }>(
+      const result = await backupResponse(
         await fetch(`${staged}/${index}`, {
           method: 'POST',
           headers: chunkHeaders,
@@ -85,7 +71,7 @@ export async function uploadBackup<T>(
       }
     }
     const query = options?.size ? `?${options}` : '';
-    return await backupResponse<T>(
+    return await backupResponse(
       await fetch(`${action}${query}`, {
         method: 'POST',
         headers: jsonHeaders,

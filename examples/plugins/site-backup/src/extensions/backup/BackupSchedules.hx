@@ -1,17 +1,12 @@
-package hx.press.backup;
+package extensions.backup;
 
 #if jvm
 import haxe.Exception;
 import haxe.Json;
 import haxe.crypto.Sha256;
-import hx.press.AdminController;
 import hx.press.CmsVersion;
-import hx.press.backup.SiteBackupArchive.BackupSelection;
-import hx.press.model.ScheduledBackup;
-import hx.press.model.ScheduledJob;
-import hx.press.packages.BuiltInPlugins;
-import hx.press.scheduling.ScheduledJobs;
-import hx.press.view.View;
+import extensions.backup.SiteBackupArchive.BackupSelection;
+import hx.press.view.Pages;
 import hx.well.facades.Storage;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -48,40 +43,67 @@ private typedef BackupPolicy = {
     var retain:Int;
 }
 
+typedef ScheduledTask = {
+    var key:String;
+    var payload:String;
+    var intervalSeconds:Int;
+    var enabled:Bool;
+    var nextRun:Float;
+    var lastRun:Float;
+    var lastError:String;
+    var running:Bool;
+}
+
+/**
+    Backup schedules are the plugin's tasks in the host's scheduler; each
+    task's payload holds its policy. Saved files are listed in the
+    plugin's `scheduled_backup_files` table.
+**/
 class BackupSchedules {
-    static inline var OWNER = BuiltInPlugins.BACKUP_IDENTITY;
     static inline var DIRECTORY = "scheduled-backups";
     static inline var MAX_SCHEDULES = 24;
     static inline var MAX_RETENTION = 50;
 
+    /** The longest interval the host's scheduler accepts: one year. **/
+    static inline var MAX_INTERVAL = 365 * 24 * 60 * 60;
+
+    /** The plugin's own housekeeping task, which is not a backup schedule. **/
+    public static inline var CLEANUP = "cleanup";
+
     public static function list():Array<Dynamic> {
-        var jobs = ScheduledJob.query.select([
-            "job_key",
-            "payload",
-            "interval_seconds",
-            "enabled",
-            "next_epoch",
-            "last_epoch",
-            "last_error",
-            "lease_until"
-        ]).where("plugin_id", OWNER).orderBy("next_epoch").orderBy("id").limit(MAX_SCHEDULES).get();
-        var now = Date.now().getTime();
-        return jobs.map(job -> {
-            var policy = options(job.payload);
+        return tasks().map(task -> {
+            var policy = options(task.payload);
             return {
-                id: job.job_key,
+                id: task.key,
                 name: policy.name,
                 sections: policy.sections,
                 encrypted: policy.encrypted,
                 retain: policy.retain,
-                intervalSeconds: job.interval_seconds,
-                enabled: job.enabled == 1,
-                nextRun: job.next_epoch,
-                lastRun: job.last_epoch,
-                lastError: job.last_error,
-                running: job.lease_until > now
+                intervalSeconds: task.intervalSeconds,
+                enabled: task.enabled,
+                nextRun: task.nextRun,
+                lastRun: task.lastRun,
+                lastError: task.lastError,
+                running: task.running
             };
         });
+    }
+
+    /** The backup schedules among the plugin's scheduled tasks. **/
+    static function tasks():Array<ScheduledTask> {
+        var all:Array<ScheduledTask> = Json.parse(BackupPlugin.host.schedules(BackupPlugin.identity,
+            MAX_SCHEDULES
+            + 1));
+        return all.filter(task -> task.key != CLEANUP);
+    }
+
+    static function task(key:String):Null<ScheduledTask> {
+        return Lambda.find(tasks(), item -> item.key == key);
+    }
+
+    /** The identifier saved files use for their schedule. **/
+    static function scheduleId(key:String):String {
+        return '${BackupPlugin.identity}:${key}';
     }
 
     public static function save(request:Request):AbstractResponse {
@@ -108,23 +130,19 @@ class BackupSchedules {
         var interval = input.interval;
         var firstRun = input.firstRun;
         if (key == null) {
-            if (ScheduledJob.query.where("plugin_id", OWNER).count() >= MAX_SCHEDULES) {
+            if (tasks().length >= MAX_SCHEDULES) {
                 return rejected(request, "You can create up to 24 backup schedules.", formUrl);
             }
             var token = Sha256.encode(SecureToken.generate(24)).substr(0, 24);
             key = 'backup-${token}';
         } else {
-            var existing = ScheduledJob.query.select(["interval_seconds", "next_epoch"])
-                .where("id", ScheduledJobs.id(OWNER, key))
-                .where("plugin_id", OWNER)
-                .limit(1)
-                .first();
+            var existing = task(key);
             if (existing == null) {
                 abort(404);
             }
-            if (firstRun == null && existing.interval_seconds == interval
-                && existing.next_epoch > Date.now().getTime()) {
-                firstRun = existing.next_epoch;
+            if (firstRun == null && existing.intervalSeconds == interval
+                && existing.nextRun > Date.now().getTime()) {
+                firstRun = existing.nextRun;
             }
         }
         var policy:BackupPolicy = {
@@ -134,10 +152,10 @@ class BackupSchedules {
             retain: input.retain
         };
         try {
-            ScheduledJobs.save(OWNER, key, interval, Json.stringify(policy), input.enabled,
-                firstRun);
-            prune(ScheduledJobs.id(OWNER, key), policy.retain);
-            if (View.redirectsValidation(request)) {
+            BackupPlugin.host.saveSchedule(BackupPlugin.identity, key, interval,
+                Json.stringify(policy), input.enabled, firstRun);
+            prune(scheduleId(key), policy.retain);
+            if (Pages.redirectsValidation(request)) {
                 return ResponseBuilder.asRedirect(SiteBackup.PATH, 303);
             }
             return json({saved: true, id: key});
@@ -156,7 +174,7 @@ class BackupSchedules {
         if (contentType.indexOf("application/x-www-form-urlencoded") < 0) {
             if (!request.validate([
                 "name" => [Required, String, Max(100)],
-                "intervalSeconds" => [Required, Int, Min(60), Max(ScheduledJobs.MAX_INTERVAL)],
+                "intervalSeconds" => [Required, Int, Min(60), Max(MAX_INTERVAL)],
                 "retain" => [Required, Int, Min(1), Max(MAX_RETENTION)],
                 "enabled" => [Required, Bool],
                 "firstRun" => [Number],
@@ -191,7 +209,7 @@ class BackupSchedules {
             || retain == null
             || ![60, 3600, 86400, 604800].contains(unit)
             || every < 1
-            || every * 1.0 * unit > ScheduledJobs.MAX_INTERVAL
+            || every * 1.0 * unit > MAX_INTERVAL
             || retain < 1
             || retain > MAX_RETENTION
             || (firstRun != null && !Math.isFinite(firstRun))) {
@@ -218,26 +236,21 @@ class BackupSchedules {
     /** A refused schedule change: the backups page with the error for forms, JSON otherwise. **/
     static function rejected(request:Request, message:String, url:String,
             scope:String = "schedule", status:Int = 422):AbstractResponse {
-        var redirect = AdminController.validationRedirect(request, scope, message, url);
+        var redirect = Pages.validationRedirect(request, scope, message, url);
         return redirect ?? error(message, status);
     }
 
     public static function remove(request:Request):AbstractResponse {
         SiteBackup.requireAccess();
-        var key = request.route("key");
-        var id = requireSchedule(key);
-        var now = Date.now().getTime();
-        ScheduledJob.query.where("id", id).where("lease_until", "<=", now).update(["enabled" => 0]);
+        var key = requireSchedule(request.route("key"));
         var running = "Wait for the running backup before deleting this schedule.";
-        if (ScheduledJob.query.where("id", id).where("lease_until", ">", now).exists()) {
-            return rejected(request, running, SiteBackup.PATH, "schedules", 409);
-        }
         try {
-            prune(id, 0);
-            if (!ScheduledJobs.remove(OWNER, key)) {
+            // The scheduler keeps a task while a run holds it, so files are pruned once it is gone.
+            if (!BackupPlugin.host.unschedule(BackupPlugin.identity, key)) {
                 return rejected(request, running, SiteBackup.PATH, "schedules", 409);
             }
-            if (View.redirectsValidation(request)) {
+            prune(scheduleId(key), 0);
+            if (Pages.redirectsValidation(request)) {
                 return ResponseBuilder.asRedirect(SiteBackup.PATH, 303);
             }
             return json({deleted: true});
@@ -253,8 +266,8 @@ class BackupSchedules {
 
     /** The saved backups of a schedule, newest first. **/
     public static function archives(key:String):Array<BackupArchive> {
-        var id = requireSchedule(key);
-        var rows = ScheduledBackup.query.select(["id", "created_epoch", "cms_version", "encrypted", "size", "md5"])
+        var id = scheduleId(requireSchedule(key));
+        var rows = ScheduledBackupFile.query.select(["id", "created_epoch", "cms_version", "encrypted", "size", "md5"])
             .where("schedule_id", id)
             .orderBy("created_epoch", "DESC")
             .orderBy("id", "DESC")
@@ -281,10 +294,9 @@ class BackupSchedules {
         if (id == null || !~/^[A-Za-z0-9_-]{32}$/.match(id)) {
             abort(404);
         }
-        var schedules = ScheduledJob.query.select(["id"]).where("plugin_id", OWNER);
-        var file = ScheduledBackup.query.select(["created_epoch"])
+        var file = ScheduledBackupFile.query.select(["created_epoch"])
             .where("id", id)
-            .whereInQuery("schedule_id", schedules)
+            .where("schedule_id", "LIKE", '${BackupPlugin.identity}:%')
             .limit(1)
             .first();
         var disk = Storage.disk("exports");
@@ -300,25 +312,19 @@ class BackupSchedules {
         ]);
     }
 
-    public static function run(context:Dynamic):Void {
-        var job = ScheduledJob.query.select(["id", "payload"])
-            .where("id", context.id)
-            .where("plugin_id", OWNER)
-            .where("enabled", 1)
-            .limit(1)
-            .first();
-        if (job == null) {
-            return;
-        }
-        var policy = options(job.payload);
+    /** Runs a schedule: `data` is the scheduler's `{id, key, payload}` of the task. **/
+    public static function run(data:Dynamic):Void {
+        var key:String = data.key;
+        var payload:Dynamic = data.payload;
+        var policy:BackupPolicy = Std.isOfType(payload, String) ? options(payload) : payload;
         var id = SecureToken.generate(32);
         var disk = Storage.disk("exports");
         var path = archivePath(id);
         try {
             var md5 = SiteBackup.createArchive(disk, path, policy.sections, policy.encrypted);
-            ScheduledBackup.query.insert([
+            ScheduledBackupFile.query.insert([
                 "id" => id,
-                "schedule_id" => job.id,
+                "schedule_id" => scheduleId(key),
                 "created_epoch" => Date.now().getTime(),
                 "cms_version" => CmsVersion.version,
                 "encrypted" => policy.encrypted ? 1 : 0,
@@ -327,15 +333,27 @@ class BackupSchedules {
             ]);
         } catch (failure:Dynamic) {
             disk.delete(path);
-            throw failure;
+            // A storage failure wraps the problem that caused it; the schedule shows both.
+            throw new Exception(describe(failure));
         }
-        prune(job.id, policy.retain);
+        prune(scheduleId(key), policy.retain);
+    }
+
+    static function describe(failure:Dynamic):String {
+        var message = Std.string(failure);
+        var cause:Null<haxe.Exception> = Std.isOfType(failure,
+            haxe.Exception) ? (failure : haxe.Exception).previous : null;
+        while (cause != null) {
+            message += ' ${cause.message}';
+            cause = cause.previous;
+        }
+        return message.substr(0, 500);
     }
 
     static function prune(scheduleId:String, retain:Int):Void {
         var keep:Array<Dynamic> = [];
         if (retain > 0) {
-            keep = ScheduledBackup.query.select(["id"])
+            keep = ScheduledBackupFile.query.select(["id"])
                 .where("schedule_id", scheduleId)
                 .orderBy("created_epoch", "DESC")
                 .orderBy("id", "DESC")
@@ -345,7 +363,7 @@ class BackupSchedules {
         }
         var disk = Storage.disk("exports");
         while (true) {
-            var old = ScheduledBackup.query.select(["id"])
+            var old = ScheduledBackupFile.query.select(["id"])
                 .where("schedule_id", scheduleId)
                 .whereNotIn("id", keep)
                 .orderBy("id")
@@ -365,13 +383,11 @@ class BackupSchedules {
         return '${DIRECTORY}/${id}.${BackupFormat.EXTENSION}';
     }
 
-    static function requireSchedule(key:String):String {
-        var id = ScheduledJobs.id(OWNER, key);
-        if (!ScheduledJobs.validKey(key)
-            || !ScheduledJob.query.where("id", id).where("plugin_id", OWNER).exists()) {
+    static function requireSchedule(key:Null<String>):String {
+        if (key == null || key == CLEANUP || task(key) == null) {
             abort(404);
         }
-        return id;
+        return key;
     }
 
     static function options(payload:String):BackupPolicy {

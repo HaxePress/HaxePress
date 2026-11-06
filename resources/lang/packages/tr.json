@@ -20,5 +20,11 @@
   "The GitHub release ZIP did not match its published size or checksum.": "GitHub sürüm paketi yayınlanan boyut veya sağlama toplamıyla eşleşmedi.",
   "This public GitHub repository or release asset could not be found.": "Herkese açık GitHub deposu veya sürüm dosyası bulunamadı.",
   "GitHub is limiting release requests. Try again later.": "GitHub sürüm isteklerini sınırlıyor. Daha sonra tekrar deneyin.",
-  "GitHub releases are temporarily unavailable.": "GitHub sürümlerine geçici olarak erişilemiyor."
+  "GitHub releases are temporarily unavailable.": "GitHub sürümlerine geçici olarak erişilemiyor.",
+  "Bundled plugin": "Uygulamayla gelen eklenti",
+  "Bundled plugins are updated with HaxePress.": "Birlikte gelen eklentiler HaxePress ile güncellenir.",
+  "Bundled plugins can be deactivated in the Plugins panel.": "Birlikte gelen eklentileri Eklentiler panelinden devre dışı bırakabilirsiniz.",
+  "Plugin ZIPs must declare a stable pluginId UUID.": "Eklenti ZIP dosyaları sabit bir pluginId UUID içermelidir.",
+  "A plugin update must keep its installed plugin ID.": "Eklenti güncellemesi kurulu eklenti kimliğini korumalıdır.",
+  "This plugin ID already belongs to another installed package.": "Bu eklenti kimliği başka bir kurulu pakete ait."
 }
