@@ -15,6 +15,7 @@ class AdminMcpRoutes {
             Route.get("", AdminMcpController.state);
             Route.post("/sessions", AdminMcpController.issue);
             Route.delete("/sessions/{id}", AdminMcpController.end);
+            Route.post("/sessions/{id}/expiry", AdminMcpController.expiry);
             Route.get("/routes", AdminMcpController.routes);
             Route.get("/media/{id}", AdminMcpMedia.image).whereNumber("id");
             Route.get("/media/{id}/info", AdminMcpMedia.info).whereNumber("id");

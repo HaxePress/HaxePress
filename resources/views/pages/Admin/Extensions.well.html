@@ -204,6 +204,11 @@
           {{ t('Version') }} {{ item.version }} · {{ item.author ? item.author : t('Independent
           author') }}
         </p>
+        <p :if="item.unpublished" class="unpublished-theme-note">
+          {{ icon('alert') }}<span
+            >{{ t('Unpublished changes. Visitors see the last published design.') }}</span
+          >
+        </p>
         <p :if="item.built_in" class="built-in-theme-note">
           {{ icon('lock') }} {{ kind == 'theme' ? t('Built-in theme') : t('Bundled plugin') }}
         </p>

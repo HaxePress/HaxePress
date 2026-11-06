@@ -16,6 +16,10 @@ typedef ExtensionPackageView = {
     var restart_required:Int;
     var built_in:Bool;
     var designed:Bool;
+
+    /** A designed theme whose saved changes are not published yet. */
+    var unpublished:Bool;
+
     var localizedName:String;
     var localizedDescription:String;
 

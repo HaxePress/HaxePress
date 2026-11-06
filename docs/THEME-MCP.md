@@ -6,7 +6,7 @@ The site's JVM starts and stops its private SDK worker. Build the worker with `n
 
 ## Connection setup
 
-Each generated connection has a unique `/mcp/sessions/{id}` URL and bearer token. The token is bound to that URL and must be sent in the `Authorization` header on each request. The session expires after 24 hours or when the administrator selects **Revoke session**. Restarting the JVM clears the process's sessions. MCP uses the administrator's current permissions for every action. [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
+Each generated connection has a unique `/mcp/sessions/{id}` URL and bearer token. The token is bound to that URL and must be sent in the `Authorization` header on each request. Choose how long the link lasts when you generate it: 1 hour, 1 day (the default), 7 days or 30 days. Until a client first connects, **Change expiry** sets a new expiry counted from now; after that it stays fixed. The session ends when it expires or when the administrator selects **Revoke session**. A URL that was never generated, or whose session was revoked, returns 404; a generated URL without its bearer token returns 401. Restarting the JVM clears the process's sessions. MCP uses the administrator's current permissions for every action. [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
 
 The session list shows the first and most recent authenticated requests that the server answered successfully. New sessions show **Not used yet**. The open dialog refreshes this information every ten seconds.
 

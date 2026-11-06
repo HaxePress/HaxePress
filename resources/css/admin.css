@@ -617,6 +617,41 @@
     margin-top: 3px;
   }
 
+  .admin-ai-panel > h3 {
+    margin: 24px 0 4px;
+    font-size: 13px;
+  }
+
+  .admin-ai-panel .theme-ai-credentials > :is(.button, .easy-mode-switch) {
+    justify-self: start;
+  }
+
+  .admin-ai-generate {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 12px;
+  }
+
+  .admin-ai-generate label,
+  .admin-ai-expiry {
+    display: grid;
+    gap: 6px;
+    color: var(--admin-muted);
+    font-size: 12px;
+  }
+
+  .admin-ai-generate select,
+  .admin-ai-expiry select {
+    width: auto;
+    min-width: 150px;
+    padding: 8px 10px;
+  }
+
+  .admin-ai-expiry {
+    margin-top: 8px;
+  }
+
   .admin-breadcrumbs {
     gap: 11px;
     font-size: 12px;
@@ -1872,6 +1907,24 @@
     border-top: 1px solid var(--admin-line);
   }
 
+  .unpublished-theme-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-block: 4px 12px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    background: var(--admin-warning-tint);
+    color: var(--admin-warning);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .unpublished-theme-note svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
   .media-reference-warning {
     padding: 12px;
     margin-bottom: 16px;
@@ -3094,4 +3147,114 @@
   color: var(--admin-muted);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* Connect AI dialogs: the administration dialog and the theme builder's AI panel share them. */
+.theme-ai-panel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  border: 1px solid var(--admin-line);
+  border-radius: 10px;
+  padding: 28px;
+  color: var(--admin-ink);
+  background: #fff;
+  overflow-y: auto;
+  box-shadow: 0 20px 80px #172b4d26;
+}
+
+.theme-ai-panel::backdrop {
+  background: #14223e73;
+}
+
+.theme-ai-panel > .easy-panel-title {
+  margin-top: 0;
+}
+
+.theme-ai-panel h2 {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.theme-ai-panel > p {
+  font-size: 13px;
+  line-height: 1.7;
+  margin-block: 16px;
+}
+
+.theme-ai-credentials {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin-block: 16px;
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  background: #f7f9fc;
+}
+
+.theme-ai-credentials label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.theme-ai-credentials input,
+.theme-ai-credentials select {
+  min-width: 0;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--admin-line);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--admin-ink);
+  font: 12px var(--sans);
+}
+
+.easy-mode-switch {
+  display: flex;
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.easy-mode-switch button {
+  border: 0;
+  border-radius: 4px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.easy-mode-switch button[aria-pressed='true'] {
+  color: var(--admin-action);
+  background: var(--admin-tint);
+}
+
+.easy-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 24px 0 16px;
+}
+
+.theme-ai-presence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+
+.theme-ai-credentials h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.theme-ai-credentials code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
 }

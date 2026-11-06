@@ -113,5 +113,21 @@
   "First seen {time}": "İlk görülme {time}",
   "Last seen {time}": "Son görülme {time}",
   "Not used yet": "Henüz kullanılmadı",
-  "Revoke session": "Oturumu iptal et"
+  "Revoke session": "Oturumu iptal et",
+  "Link expires after": "Bağlantının süresi",
+  "1 hour": "1 saat",
+  "1 day": "1 gün",
+  "7 days": "7 gün",
+  "30 days": "30 gün",
+  "Change expiry": "Süreyi değiştir",
+  "Choose a new expiry": "Yeni süre seçin",
+  "1 hour from now": "Şu andan itibaren 1 saat",
+  "1 day from now": "Şu andan itibaren 1 gün",
+  "7 days from now": "Şu andan itibaren 7 gün",
+  "30 days from now": "Şu andan itibaren 30 gün",
+  "The expiry was changed.": "Süre değiştirildi.",
+  "The expiry could not be changed.": "Süre değiştirilemedi.",
+  "Choose a supported expiry.": "Desteklenen bir süre seçin.",
+  "This MCP link is already connected; its expiry can no longer change.": "Bu MCP bağlantısı kullanılmaya başlandı; süresi artık değiştirilemez.",
+  "Unpublished changes. Visitors see the last published design.": "Yayımlanmamış değişiklikler var. Ziyaretçiler son yayımlanan tasarımı görür."
 }

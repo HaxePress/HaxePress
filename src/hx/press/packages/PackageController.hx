@@ -59,13 +59,15 @@ class PackageController {
         var serverLimit:Int = Config.get("http.max_content_length");
         var uploadLimit = serverLimit > 0 ? Std.int(Math.min(serverLimit,
             SafePackageArchive.MAX_BYTES)) : SafePackageArchive.MAX_BYTES;
-        var designedThemes = kind == "theme" ? ThemeDesignData.identifiers(page.items.map(item ->
-            item.id)) : [];
+        var publishStates:Map<String,
+            Bool> = kind == "theme" ? ThemeDesignData.publishStates(page.items.map(item ->
+                item.id)) : [];
         var packages = page.items.map(item -> {
             var props:Dynamic = Reflect.copy(item);
             props.built_in = BuiltInTheme.isBuiltIn(item.id)
                 || BuiltInPlugins.isBuiltIn(item.id, item.plugin_id);
-            props.designed = designedThemes.contains(item.id);
+            props.designed = publishStates.exists(item.id);
+            props.unpublished = publishStates.get(item.id) == true;
             return props;
         });
         var themePreviewRevision = "";

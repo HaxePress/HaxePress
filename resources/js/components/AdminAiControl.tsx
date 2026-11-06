@@ -25,6 +25,22 @@ interface AiState {
   hosted: boolean;
 }
 
+/** How long a new MCP link lasts, in hours; the server accepts these values. */
+const lifetimes = [1, 24, 168, 720] as const;
+type Lifetime = (typeof lifetimes)[number];
+const lifetimeLabels: Record<Lifetime, string> = {
+  1: '1 hour',
+  24: '1 day',
+  168: '7 days',
+  720: '30 days',
+};
+const lifetimeFromNow: Record<Lifetime, string> = {
+  1: '1 hour from now',
+  24: '1 day from now',
+  168: '7 days from now',
+  720: '30 days from now',
+};
+
 export default function AdminAiControl({
   adminId,
   csrfToken,
@@ -37,6 +53,7 @@ export default function AdminAiControl({
   const [state, setState] = useState<AiState | null>(null);
   const [profile, setProfile] = useState<ClientChoice>('web');
   const [useCodexCli, setUseCodexCli] = useState(false);
+  const [hours, setHours] = useState<Lifetime>(24);
   const [connection, setConnection] = useState<McpConnection | null>(null);
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -124,7 +141,7 @@ export default function AdminAiControl({
           'Content-Type': 'application/json',
           'X-CSRF-TOKEN': csrfToken || '',
         },
-        ...(method === 'POST' && { body: JSON.stringify({ profile: selection }) }),
+        ...(method === 'POST' && { body: JSON.stringify({ profile: selection, hours }) }),
         signal: AbortSignal.timeout(15000),
       });
       const result = await response.json().catch(() => null);
@@ -140,6 +157,35 @@ export default function AdminAiControl({
       setError(
         failure instanceof Error ? failure.message : 'The AI connection could not be updated.',
       );
+    } finally {
+      await refresh();
+      setBusy(false);
+    }
+  }
+
+  /** A link no client has used yet gets a new expiry, counted from now. */
+  async function changeExpiry(id: string, lifetime: Lifetime) {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch(`/admin/ai/sessions/${id}/expiry`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken || '',
+        },
+        body: JSON.stringify({ hours: lifetime }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || response.redirected) {
+        throw new Error(result?.error || 'The expiry could not be changed.');
+      }
+      setNotice('The expiry was changed.');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'The expiry could not be changed.');
     } finally {
       await refresh();
       setBusy(false);
@@ -251,14 +297,30 @@ export default function AdminAiControl({
                   </div>
                 )}
                 <p className="field-help">{t(setupInstructions[setupProfile])}</p>
-                <button
-                  className="button"
-                  type="button"
-                  disabled={busy || !state?.hosted}
-                  onClick={() => void change('POST', profile)}
-                >
-                  {t('Generate MCP connection')}
-                </button>
+                <div className="admin-ai-generate">
+                  <label>
+                    {t('Link expires after')}
+                    <select
+                      value={hours}
+                      disabled={busy}
+                      onChange={(event) => setHours(Number(event.target.value) as Lifetime)}
+                    >
+                      {lifetimes.map((lifetime) => (
+                        <option key={lifetime} value={lifetime}>
+                          {t(lifetimeLabels[lifetime])}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="button"
+                    type="button"
+                    disabled={busy || !state?.hosted}
+                    onClick={() => void change('POST', profile)}
+                  >
+                    {t('Generate MCP connection')}
+                  </button>
+                </div>
                 {remote && (
                   <label>
                     {t('MCP URL')}
@@ -313,7 +375,28 @@ export default function AdminAiControl({
                     </small>
                   </>
                 ) : (
-                  <small>{t('Not used yet')}</small>
+                  <>
+                    <small>{t('Not used yet')}</small>
+                    <label className="admin-ai-expiry">
+                      {t('Change expiry')}
+                      <select
+                        value=""
+                        disabled={busy}
+                        onChange={(event) =>
+                          void changeExpiry(session.id, Number(event.target.value) as Lifetime)
+                        }
+                      >
+                        <option value="" disabled>
+                          {t('Choose a new expiry')}
+                        </option>
+                        {lifetimes.map((lifetime) => (
+                          <option key={lifetime} value={lifetime}>
+                            {t(lifetimeFromNow[lifetime])}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
                 )}
               </div>
               <div className="admin-ai-actions">

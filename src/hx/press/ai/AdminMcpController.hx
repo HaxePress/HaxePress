@@ -24,12 +24,29 @@ class AdminMcpController {
                 Required,
                 String,
                 Regex("^(chatgpt|claude|codex|gemini|cursor|copilot|grok|http)$")
-            ]
+            ],
+            "hours" => [Int]
         ])) {
             return json({error: "Choose a supported MCP client."}, 422);
         }
         try {
-            return json(AdminMcpAccess.issue(CmsAccess.current(), request.input("profile")), 201);
+            var hours:Int = request.input("hours", AdminMcpAccess.DEFAULT_LIFETIME);
+            var issued = AdminMcpAccess.issue(CmsAccess.current(), request.input("profile"), hours);
+            return json(issued, 201);
+        } catch (error:AdminMcpError) {
+            return rejected(error);
+        }
+    }
+
+    /** Changes the expiry of a link no client has used yet. **/
+    public static function expiry(request:Request):AbstractResponse {
+        if (!request.validate(["hours" => [Required, Int]])) {
+            return json({error: "Choose a supported expiry."}, 422);
+        }
+        try {
+            var hours:Int = request.input("hours");
+            AdminMcpAccess.changeExpiry(CmsAccess.current().id, request.route("id"), hours);
+            return state(request);
         } catch (error:AdminMcpError) {
             return rejected(error);
         }

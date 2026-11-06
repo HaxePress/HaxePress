@@ -168,8 +168,8 @@ def run():
                 "Could not revoke the theme's MCP session",
             )
             check(
-                public.request(endpoint(connection), extra_headers=headers)[0] == 401,
-                "The revoked MCP bearer retained theme access",
+                public.request(endpoint(connection), extra_headers=headers)[0] == 404,
+                "A revoked MCP URL did not return 404",
             )
             password = secrets.token_urlsafe(22)
             check(

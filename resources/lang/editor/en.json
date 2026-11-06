@@ -113,5 +113,21 @@
   "First seen {time}": "First seen {time}",
   "Last seen {time}": "Last seen {time}",
   "Not used yet": "Not used yet",
-  "Revoke session": "Revoke session"
+  "Revoke session": "Revoke session",
+  "Link expires after": "Link expires after",
+  "1 hour": "1 hour",
+  "1 day": "1 day",
+  "7 days": "7 days",
+  "30 days": "30 days",
+  "Change expiry": "Change expiry",
+  "Choose a new expiry": "Choose a new expiry",
+  "1 hour from now": "1 hour from now",
+  "1 day from now": "1 day from now",
+  "7 days from now": "7 days from now",
+  "30 days from now": "30 days from now",
+  "The expiry was changed.": "The expiry was changed.",
+  "The expiry could not be changed.": "The expiry could not be changed.",
+  "Choose a supported expiry.": "Choose a supported expiry.",
+  "This MCP link is already connected; its expiry can no longer change.": "This MCP link is already connected; its expiry can no longer change.",
+  "Unpublished changes. Visitors see the last published design.": "Unpublished changes. Visitors see the last published design."
 }

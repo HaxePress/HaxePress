@@ -56,7 +56,11 @@ class AdminMcpAccess {
     public static inline var BROWSER_HEADER = "X-HaxePress-Browser-Session";
     public static inline var TICKET_HEADER = "X-HaxePress-Admin-Request";
     public static inline var INTERNAL = "hx.press.admin-mcp.internal";
-    static inline var LIFETIME = 24 * 60 * 60 * 1000;
+
+    /** How long a new MCP link lasts, in hours: an hour, a day, a week or 30 days. **/
+    public static final lifetimes = [1, 24, 168, 720];
+
+    public static inline var DEFAULT_LIFETIME = 24;
     static inline var HISTORY = 60 * 60 * 1000;
     static final sessions:Map<String, RemoteSession> = [];
     static final owners:Map<Int, Array<String>> = [];
@@ -81,7 +85,16 @@ class AdminMcpAccess {
         return pattern.matched(1);
     }
 
-    public static function issue(admin:Admin, profile:String):Dynamic {
+    /** Whether `id` names an MCP link this site generated and has not removed. **/
+    public static function exists(id:Null<String>):Bool {
+        return validId(id) && locked(() -> sessions.exists(id));
+    }
+
+    public static function issue(admin:Admin, profile:String,
+            hours:Int = DEFAULT_LIFETIME):Dynamic {
+        if (!lifetimes.contains(hours)) {
+            throw new AdminMcpError("invalid_lifetime", "Choose a supported expiry.", 422);
+        }
         var id = SecureToken.generate(32);
         var address = origin();
         var token = newToken();
@@ -91,7 +104,7 @@ class AdminMcpAccess {
             authVersion: Sha256.encode(admin.password),
             profile: profile,
             origin: address,
-            expires: Date.now().getTime() + LIFETIME,
+            expires: Date.now().getTime() + hours * 60 * 60 * 1000.0,
             tokenHash: Sha256.encode(token),
             firstSeenAt: null,
             lastSeenAt: null
@@ -144,6 +157,30 @@ class AdminMcpAccess {
             }
             return true;
         });
+    }
+
+    /**
+        Sets a new expiry, counted from now, for a link that no client has
+        used yet. Once a client connects, its expiry stays as it is.
+    **/
+    public static function changeExpiry(adminId:Int, id:String, hours:Int):Void {
+        if (!lifetimes.contains(hours)) {
+            throw new AdminMcpError("invalid_lifetime", "Choose a supported expiry.", 422);
+        }
+        locked(() -> {
+            var session = validId(id) ? sessions.get(id) : null;
+            var now = Date.now().getTime();
+            if (session == null || session.adminId != adminId || session.expires <= now) {
+                throw new AdminMcpError("session_inactive", "This MCP session is inactive.", 404);
+            }
+            if (session.firstSeenAt != null) {
+                throw new AdminMcpError("session_used",
+                    "This MCP link is already connected; its expiry can no longer change.", 409);
+            }
+            session.expires = now + hours * 60 * 60 * 1000.0;
+            return true;
+        });
+        AdminMcpSockets.changed(adminId);
     }
 
     public static function end(adminId:Int, id:String):Void {

@@ -102,14 +102,22 @@ class ThemeDesignData {
         return document;
     }
 
-    public static function identifiers(ids:Array<String>):Array<String> {
+    /**
+        The designed themes among `ids`, each with whether its saved design
+        has changes that are not published yet.
+    **/
+    public static function publishStates(ids:Array<String>):Map<String, Bool> {
+        var states:Map<String, Bool> = [];
         if (ids.length == 0) {
-            return [];
+            return states;
         }
-        return ThemeDesign.query.select(["id"])
+        var designs = ThemeDesign.query.select(["id", "version", "published_version"])
             .whereIn("id", cast ids)
             .limit(ids.length)
-            .get()
-            .map(model -> model.id);
+            .get();
+        for (design in designs) {
+            states.set(design.id, design.version != design.published_version);
+        }
+        return states;
     }
 }

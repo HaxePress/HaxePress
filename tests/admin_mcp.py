@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import secrets
 import struct
+import time
 from urllib.parse import urlsplit
 
 from cms_management import login
@@ -19,8 +20,9 @@ STATE = "/admin/ai"
 ACCEPT = "application/json, text/event-stream"
 
 
-def issue(owner, profile="claude"):
-    status, headers, body = post_json(owner, f"{STATE}/sessions", {"profile": profile})
+def issue(owner, profile="claude", hours=None):
+    payload = {"profile": profile} if hours is None else {"profile": profile, "hours": hours}
+    status, headers, body = post_json(owner, f"{STATE}/sessions", payload)
     check(status == 201 and "no-store" in headers["cache-control"], "MCP issuance failed")
     return json.loads(body)
 
@@ -67,6 +69,32 @@ def succeeded(result):
         f"Tool failed: {result.get('content', [{}])[0].get('text', '')[:250]}",
     )
     return result["structuredContent"]
+
+
+def verify_expiry(owner, public):
+    """A link's expiry is chosen when it is generated and can change until a client connects."""
+    hour = issue(owner, "cursor", hours=1)
+    remaining = hour["expires"] / 1000 - time.time()
+    check(3000 < remaining <= 3600, f"A one-hour MCP link expires in {remaining:.0f} seconds")
+    status, _, _ = post_json(owner, f"{STATE}/sessions", {"profile": "cursor", "hours": 5})
+    check(status == 422, "An unsupported MCP link lifetime was accepted")
+    status, _, body = post_json(owner, f"{STATE}/sessions/{hour['id']}/expiry", {"hours": 720})
+    changed = next(item for item in json.loads(body)["sessions"] if item["id"] == hour["id"])
+    check(
+        status == 200 and changed["expires"] - hour["expires"] > 700 * 3600 * 1000,
+        "An unused MCP link's expiry did not change",
+    )
+    tool_names(public, hour)
+    status, _, body = post_json(owner, f"{STATE}/sessions/{hour['id']}/expiry", {"hours": 1})
+    check(
+        status == 409 and session_status(owner, hour)["expires"] == changed["expires"],
+        f"A connected MCP link's expiry changed: {status} {body[:160]}",
+    )
+    owner.request(f"{STATE}/sessions/{hour['id']}", "DELETE", {})
+    print(
+        "PASS Admin MCP: chosen link lifetimes, expiry changes before first use, unknown links 404",
+        flush=True,
+    )
 
 
 def verify_browser(owner):
@@ -179,6 +207,13 @@ def run():
         "MCP links shared credentials",
     )
     check(public.request(endpoint(first))[0] == 401, "A session URL granted unauthenticated access")
+    unknown = f"/mcp/sessions/{secrets.token_urlsafe(24)[:32]}"
+    check(
+        public.request(unknown)[0] == 404
+        and public.request(unknown, extra_headers=credentials(first))[0] == 404,
+        "An MCP URL that was never generated did not return 404",
+    )
+    verify_expiry(owner, public)
     check(
         public.request(endpoint(first), extra_headers=credentials(second))[0] == 401,
         "A bearer crossed its session audience",
@@ -274,8 +309,8 @@ def run():
         "Session could not be revoked",
     )
     check(
-        public.request(endpoint(first), extra_headers=credentials(first))[0] == 401,
-        "Revoked bearer retained access",
+        public.request(endpoint(first), extra_headers=credentials(first))[0] == 404,
+        "A revoked MCP URL did not return 404",
     )
     check(session_status(owner, first) is None, "Revoked session stayed in the panel")
     check("list_content" in tool_names(public, second), "Revocation affected another connection")

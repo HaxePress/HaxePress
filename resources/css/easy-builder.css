@@ -15,58 +15,6 @@
     margin-inline-start: auto;
   }
 }
-.theme-ai-panel {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100dvh - 48px);
-  border: 1px solid var(--admin-line);
-  border-radius: 10px;
-  padding: 28px;
-  color: var(--admin-ink);
-  background: #fff;
-  overflow-y: auto;
-  box-shadow: 0 20px 80px #172b4d26;
-}
-.theme-ai-panel::backdrop {
-  background: #14223e73;
-}
-.theme-ai-panel > .easy-panel-title {
-  margin-top: 0;
-}
-.theme-ai-panel h2 {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.theme-ai-panel > p {
-  font-size: 13px;
-  line-height: 1.7;
-  margin-block: 16px;
-}
-.theme-ai-credentials {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  margin-block: 16px;
-  border: 1px solid var(--admin-line);
-  border-radius: 6px;
-  background: #f7f9fc;
-}
-.theme-ai-credentials label {
-  display: grid;
-  gap: 8px;
-  font-size: 12px;
-}
-.theme-ai-credentials input,
-.theme-ai-credentials select {
-  min-width: 0;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--admin-line);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--admin-ink);
-  font: 12px var(--sans);
-}
 .theme-ai-update {
   display: flex;
   flex-wrap: wrap;
@@ -77,25 +25,6 @@
   background: #f0f4ff;
   border-bottom: 1px solid #ccd6f7;
   font-size: 12px;
-}
-.easy-mode-switch {
-  display: flex;
-  border: 1px solid var(--admin-line);
-  border-radius: 6px;
-  padding: 3px;
-  gap: 2px;
-}
-.easy-mode-switch button {
-  border: 0;
-  border-radius: 4px;
-  padding: 6px 10px;
-  background: transparent;
-  color: var(--admin-muted);
-  font-size: 12px;
-}
-.easy-mode-switch button[aria-pressed='true'] {
-  color: var(--admin-action);
-  background: var(--admin-tint);
 }
 .theme-studio-easy .studio-workspace {
   grid-template-columns: 260px minmax(0, 1fr) 300px;
@@ -337,13 +266,6 @@
   display: flex;
   gap: 8px;
   align-items: center;
-}
-.easy-panel-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 24px 0 16px;
 }
 .easy-panel-title h2,
 .easy-library h2,
@@ -1330,22 +1252,6 @@
   }
 }
 
-.theme-ai-presence {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  align-items: center;
-  font-size: 12px;
-  color: var(--admin-muted);
-}
-.theme-ai-credentials h3 {
-  margin: 0;
-  font-size: 13px;
-}
-.theme-ai-credentials code {
-  overflow-wrap: anywhere;
-  font-size: 12px;
-}
 .theme-ai-permissions {
   display: grid;
   gap: 12px;
