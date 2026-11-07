@@ -281,6 +281,8 @@ export default function DesignPage({
       };
       const text = boundText(node, 'text', node.text, data);
       const href = linkValue(boundText(node, 'href', node.href, data));
+      // Matches the server: a new tab gets no access to this page.
+      const linkTarget = node.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {};
       const image = imageValue(
         boundText(node, 'image', node.image, data),
         props.mediaRules?.imagePattern,
@@ -340,7 +342,10 @@ export default function DesignPage({
             attributes.dateTime = datetime;
             delete attributes.datetime;
           }
-          if (node.tag === 'a') attributes.href = href || '/';
+          if (node.tag === 'a') {
+            attributes.href = href || '/';
+            if (node.newTab) Object.assign(attributes, linkTarget);
+          }
           const actualChildren = voidTags.includes(node.tag || '') ? undefined : (
             <>
               {text}
@@ -357,7 +362,13 @@ export default function DesignPage({
           element = createElement(
             `h${node.level}`,
             common,
-            href ? <SiteLink href={href}>{text}</SiteLink> : text,
+            href ? (
+              <SiteLink href={href} {...linkTarget}>
+                {text}
+              </SiteLink>
+            ) : (
+              text
+            ),
           );
           break;
         case 'text':
@@ -369,7 +380,12 @@ export default function DesignPage({
           break;
         case 'image':
           element = href ? (
-            <SiteLink {...common} className={`${classes} hp-design-image-link`} href={href}>
+            <SiteLink
+              {...common}
+              {...linkTarget}
+              className={`${classes} hp-design-image-link`}
+              href={href}
+            >
               {blockImage}
             </SiteLink>
           ) : (
@@ -380,7 +396,12 @@ export default function DesignPage({
           break;
         case 'button':
           element = (
-            <SiteLink {...common} className={`${classes} hp-design-button`} href={href || '/'}>
+            <SiteLink
+              {...common}
+              {...linkTarget}
+              className={`${classes} hp-design-button`}
+              href={href || '/'}
+            >
               {text}
             </SiteLink>
           );

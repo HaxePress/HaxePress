@@ -84,8 +84,13 @@ A section is a horizontal band of a page.
 
 Every block has `id`, `type`, `text`, `href`, `image`, `alt`, `level`, and
 optionally `name`, `tag`, `children`, `styles`, `classes`, `attributes`,
-`bindings`, `source`, `component`, `slot`, `condition`. IDs are unique ASCII
-strings of up to 40 characters across the whole document.
+`bindings`, `source`, `component`, `slot`, `condition`, `newTab`. IDs are
+unique ASCII strings of up to 40 characters across the whole document.
+
+`newTab: true` opens the link of a `button`, a linked `heading` or `image`, or
+an `element` with `tag: "a"` in a new tab, with `rel="noopener noreferrer"`.
+Use it for links that leave the site, such as documentation or a shop, and
+leave it out elsewhere. Any other block with `newTab` is rejected.
 
 | Type                                                                | What it renders                        | Notes                                                                        |
 | ------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------- |
@@ -118,7 +123,8 @@ Attributes: a fixed safe list (`id`, `title`, `role`, `name`, `type`,
 `value`, `placeholder`, `for`, `method`, `action`, `target`, `rel`,
 `datetime`, `colspan`, `open`) plus any `aria-*` and `data-*` attribute, at
 most 32 per element. **Only `element` blocks take attributes**; a save with
-attributes on any other block type is rejected. Event handlers, `style`,
+attributes on any other block type is rejected. To open a link in a new tab,
+set the block's `newTab` instead of `target` and `rel`. Event handlers, `style`,
 `src` and `href` are not attributes: use `styles`, the `image` field and the
 block's `href` field.
 

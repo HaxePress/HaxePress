@@ -423,6 +423,17 @@ export default function DesignInspector(props: DesignInspectorProps) {
                     />
                   </label>
                 )}
+                {(['button', 'heading', 'image'].includes(block.type) ||
+                  (block.type === 'element' && block.tag === 'a')) && (
+                  <label className="studio-check">
+                    <input
+                      type="checkbox"
+                      checked={block.newTab === true}
+                      onChange={(event) => onBlock({ newTab: event.target.checked })}
+                    />
+                    <span>{t('Open in a new tab')}</span>
+                  </label>
+                )}
                 {block.type === 'heading' && (
                   <label>
                     {t('Heading level')}

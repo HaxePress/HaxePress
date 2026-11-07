@@ -59,6 +59,8 @@ Consequences worth knowing:
   `aspect-ratio` or `height` on the image block to crop it.
 - **Element links:** an `element` with `tag: "a"` takes its link from the
   block's `href` field, not from an `href` attribute.
+- **New tabs:** with `newTab: true`, the block's `<a>` also gets
+  `target="_blank" rel="noopener noreferrer"`.
 - **Article text starts after a plugin area,** so `:first-child` never matches
   the first heading or paragraph of `content-body`. Use
   `:scope .hp-design-prose > .extension-slot + *` or `:first-of-type` instead.

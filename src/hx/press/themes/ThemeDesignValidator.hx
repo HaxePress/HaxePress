@@ -82,6 +82,8 @@ class ThemeDesignValidator {
         "desc",
         "text"
     ];
+    // Blocks whose href becomes a link.
+    static final linkBlocks = ["button", "heading", "image"];
     static final attributes = [
         "id",
         "title",
@@ -327,6 +329,7 @@ class ThemeDesignValidator {
             var kind = choice(node, "type", ThemeDesignSchema.blockTypes, "text");
             var href = text(node, "href", 500);
             safeLink(href);
+            var newTab = opensNewTab(node, id, kind);
             var image = text(node, "image", 500);
             if (image != "" && !(MediaReferences.imageUrl(image) || ThemeAssets.imageUrl(image))) {
                 throw new Exception("Choose uploaded images from this theme or the media library.");
@@ -401,7 +404,7 @@ class ThemeDesignValidator {
             if (slot != "" && !~/^[a-z][a-z0-9_.-]{0,79}$/.match(slot)) {
                 throw new Exception("Choose a valid plugin slot name.");
             }
-            return {
+            var block:Dynamic = {
                 id: id,
                 type: kind,
                 name: text(node, "name", 80),
@@ -421,7 +424,32 @@ class ThemeDesignValidator {
                 slot: slot,
                 condition: condition
             };
+            // Only links that open in a new tab carry the field, so other documents stay unchanged.
+            if (newTab) {
+                block.newTab = true;
+            }
+            return block;
         });
+    }
+
+    /** Whether a link block opens its link in a new tab; other blocks have no link to open. **/
+    static function opensNewTab(node:Dynamic, id:String, kind:String):Bool {
+        var value:Dynamic = node.newTab;
+        if (value == null) {
+            return false;
+        }
+        if (!Std.isOfType(value, Bool)) {
+            throw new Exception('Set newTab of block ${id} to true or false.');
+        }
+        var opens:Bool = value;
+        if (!opens) {
+            return false;
+        }
+        var linkElement = kind == "element" && node.tag == "a";
+        if (!linkBlocks.contains(kind) && !linkElement) {
+            throw new Exception('Only buttons, headings, images and link elements open in a new tab. Remove newTab from ${kind} block ${id}.');
+        }
+        return true;
     }
 
     function sections(value:Dynamic):Array<Dynamic> {

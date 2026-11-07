@@ -261,6 +261,20 @@ def verify(owner, public, fixtures):
                     children=[
                         title,
                         block("description", "text", text="An editable nested layout"),
+                        block(
+                            "manual-link",
+                            "heading",
+                            text="Read the manual",
+                            href="https://haxe.org/manual/",
+                            newTab=True,
+                        ),
+                        block(
+                            "manual-button",
+                            "button",
+                            text="Open the manual",
+                            href="https://haxe.org/manual/",
+                            newTab=True,
+                        ),
                     ],
                 ),
                 block(
@@ -497,6 +511,22 @@ def verify(owner, public, fixtures):
             "A list source exposed custom fields outside its public list fields",
         )
         document = normalized["document"]
+        # Only links that open in a new tab carry newTab, so other blocks keep their old shape.
+        intro = document["templates"]["Home"][0]["blocks"][0]["children"][0]["children"]
+        check(
+            [node.get("newTab") for node in intro] == [None, None, True, True],
+            f"newTab was lost or added: {[node.get('newTab') for node in intro]}",
+        )
+        for index, value, kind in [(1, True, "text block"), (2, "yes", "text value")]:
+            invalid = copy.deepcopy(document)
+            invalid["templates"]["Home"][0]["blocks"][0]["children"][0]["children"][index][
+                "newTab"
+            ] = value
+            status, _, body = save(invalid)
+            check(
+                status == 422 and "newTab" in json.loads(body)["error"],
+                f"newTab on a {kind} was accepted: {body[:200]}",
+            )
 
         invalid = copy.deepcopy(document)
         invalid["templates"]["Home"][0]["blocks"][0]["children"][0]["children"][0]["tag"] = "script"
@@ -590,6 +620,17 @@ def verify(owner, public, fixtures):
         html = public.request("/")[2]
         for expected in ["A composed layout", "Reusable notice", "Composable source 000"]:
             check(expected in html, f"Composed server HTML is missing: {expected}")
+        new_tab = 'target="_blank" rel="noopener noreferrer"'
+        check(
+            f'<a href="https://haxe.org/manual/" {new_tab}>Read the manual</a>' in html
+            and re.search(
+                rf'<a [^>]*hp-design-button[^>]*href="{re.escape("https://haxe.org/manual/")}" {new_tab}>'
+                r"Open the manual</a>",
+                html,
+            )
+            is not None,
+            "A heading or button link did not open in a new tab",
+        )
         design_link = re.search(r'<link rel="stylesheet" href="(/theme-design/[^"]+\.css)"', html)
         check(design_link is not None, "Composed server HTML did not link its design stylesheet")
         css_status, css_headers, css = public.request(design_link.group(1))

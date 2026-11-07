@@ -51,6 +51,8 @@ export interface DesignBlock {
   type: BlockType;
   text: string;
   href: string;
+  /** Buttons, headings, images and link elements open their link in a new tab. */
+  newTab?: boolean;
   image: string;
   alt: string;
   level: number;

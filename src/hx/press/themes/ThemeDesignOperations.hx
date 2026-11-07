@@ -14,6 +14,7 @@ class ThemeDesignOperations {
         "name",
         "text",
         "href",
+        "newTab",
         "image",
         "alt",
         "level",

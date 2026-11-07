@@ -39,7 +39,7 @@ added node, in operation order.
 | `duplicate` | `target`                                                            | Copy a block or section next to itself with fresh IDs                                                                       |
 | `remove`    | `target`                                                            | Delete a block or section                                                                                                   |
 
-`update` accepts, for blocks: `name`, `text`, `href`, `image`, `alt`, `level`,
+`update` accepts, for blocks: `name`, `text`, `href`, `newTab`, `image`, `alt`, `level`,
 `tag`, `classes`, `attributes`, `bindings`, `source`, `component`, `slot`,
 `condition`, `styles`, `children`; for sections: `name`, `background`,
 `color`, `padding`, `columns`, `align`, `width`, `classes`, `styles`. Setting

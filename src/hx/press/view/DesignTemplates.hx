@@ -108,6 +108,16 @@ class DesignTemplates {
         return '{ ${entries.join(", ")} }';
     }
 
+    /** The attributes of a link that opens in a new tab, without access to this page. **/
+    static function newTab(node:Dynamic):String {
+        return opensNewTab(node) ? ' target="_blank" rel="noopener noreferrer"' : "";
+    }
+
+    static function opensNewTab(node:Dynamic):Bool {
+        var value:Dynamic = node.newTab;
+        return Std.isOfType(value, Bool) && (value : Bool);
+    }
+
     /** The design's font stack; the presets `serif` and `sans` name the bundled fonts. **/
     static function designFont(document:Dynamic):String {
         var tokens:Dynamic = document.tokens == null ? {} : document.tokens;
@@ -309,7 +319,7 @@ class DesignTemplates {
                 output.add('<h${level}${common(node)}>');
                 var linked = linkGiven(node);
                 if (linked) {
-                    output.add('<a href="{{ ${href} }}">${printed(text)}</a>');
+                    output.add('<a href="{{ ${href} }}"${newTab(node)}>${printed(text)}</a>');
                 } else {
                     output.add(printed(text));
                 }
@@ -319,12 +329,12 @@ class DesignTemplates {
             case "image":
                 var picture = '<img :if="${image}" class="hp-design-image" src="{{ ${image} }}" alt="{{ ${alt} }}" loading="lazy" />';
                 if (linkGiven(node)) {
-                    output.add('<a${common(node, "hp-design-image-link")} href="{{ ${href} }}">${picture}</a>');
+                    output.add('<a${common(node, "hp-design-image-link")} href="{{ ${href} }}"${newTab(node)}>${picture}</a>');
                 } else {
                     output.add('<figure${common(node, "hp-design-image-node")}>${picture}</figure>');
                 }
             case "button":
-                output.add('<a${common(node, "hp-design-button")} href="{{ ${href} ? ${href} : \'/\' }}">${printed(text)}</a>');
+                output.add('<a${common(node, "hp-design-button")} href="{{ ${href} ? ${href} : \'/\' }}"${newTab(node)}>${printed(text)}</a>');
             case "spacer":
                 var height = Std.int(Math.max(0, Math.min(64, number(node.level)))) * 16;
                 output.add('<div${common(node, "hp-design-spacer")} style="min-height: ${height}px"></div>');
@@ -431,6 +441,10 @@ class DesignTemplates {
                 if (tag == "a" && name == "href") {
                     continue;
                 }
+                // newTab writes these itself, so a link never carries two targets.
+                if (tag == "a" && opensNewTab(node) && (name == "target" || name == "rel")) {
+                    continue;
+                }
                 attributes.add(' ${name}="{{ ${literal(raw)} }}"');
             }
         }
@@ -446,7 +460,7 @@ class DesignTemplates {
             attributes.add(' datetime="{{ ${datetime} }}"');
         }
         if (tag == "a") {
-            attributes.add(' href="{{ ${href} ? ${href} : \'/\' }}"');
+            attributes.add(' href="{{ ${href} ? ${href} : \'/\' }}"${newTab(node)}');
         }
         if (voidTags.indexOf(tag) >= 0) {
             output.add('<${tag}${attributes.toString()}${common(node)} />');
