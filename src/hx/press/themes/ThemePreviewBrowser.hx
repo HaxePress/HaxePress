@@ -67,7 +67,8 @@ class ThemePreviewBrowser {
     static inline var IDLE_SECONDS = 120;
     static inline var MAX_HEIGHT = 8000;
     static inline var LOAD_SECONDS = 20;
-    static inline var START_SECONDS = 15;
+    // A cold start on a busy host can take well over ten seconds; Puppeteer allows 30.
+    static inline var START_SECONDS = 30;
     static inline var MISSING_BROWSER = "Theme previews need Chrome or Chromium on the server. Install one, or set HAXEPRESS_CHROME to its executable.";
 
     /**
@@ -299,9 +300,11 @@ class ThemePreviewBrowser {
             var stderr = process.getErrorStream();
             VirtualThread.create(() -> output.drain(stderr)).start();
             if (!output.ready.wait(START_SECONDS)) {
+                output.report('did not start in ${START_SECONDS} seconds');
                 throw new PreviewFailure("The preview browser did not start.");
             }
             if (output.address == null) {
+                output.report("stopped while starting");
                 throw new PreviewFailure("The preview browser stopped while starting.");
             }
             browser.tools = DevToolsConnection.open(output.address);
@@ -576,15 +579,26 @@ private class PreviewBrowserProcess {
 
 /** Reads the browser's stderr until DevTools reports its address, then keeps draining it. */
 private class BrowserOutput {
+    static inline var REPORTED_CHARACTERS = 2000;
+
     public final ready = new Lock();
     public var address:Null<String> = null;
 
+    /** What the browser has written so far, kept to explain a failed start. */
+    var output = "";
+
     public function new() {}
+
+    /** Logs why the browser did not start, with the end of what it wrote. */
+    public function report(problem:String):Void {
+        var written = StringTools.trim(output.substr(-REPORTED_CHARACTERS));
+        var detail = written == "" ? "it wrote nothing" : 'it wrote:\n${written}';
+        trace('The preview browser ${problem}; ${detail}');
+    }
 
     public function drain(stream:InputStream):Void {
         var pattern = ~/DevTools listening on (ws:\/\/\S+)\s/;
         var buffer = Bytes.alloc(4096);
-        var output = "";
         var waiting = true;
         try {
             var count = stream.read(buffer.getData(), 0, buffer.length);
@@ -596,7 +610,7 @@ private class BrowserOutput {
                         waiting = false;
                         ready.release();
                     } else if (output.length > 65536) {
-                        output = output.substr(-1024);
+                        output = output.substr(-REPORTED_CHARACTERS);
                     }
                 }
                 // The pipe must never fill, or the browser would stall.
