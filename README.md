@@ -106,6 +106,16 @@ The source is organized as follows:
 | `examples/`              | Native plugin and theme sources                          |
 | `tests/`                 | Isolated JVM/CPPIA/PHP checks and ORM fixtures           |
 
+## Releases
+
+Publishing a release on GitHub runs the Release workflow (`.github/workflows/release.yml`). It builds the release's tag with `make build`, packages it with `scripts/release.py`, starts the packaged application to check that it serves the installer, and attaches the files to the release. Those files are:
+
+- `haxepress-<version>-jvm.zip`, the application for Java 21+, with `start.sh`, which creates `.env` with a new `APP_KEY` on first run;
+- the plugin, theme and SDK packages of that build, where each plugin contains its JVM, CPPIA and PHP builds;
+- `SHA256SUMS.txt`.
+
+The application itself has no PHP build, because its HTTP server needs a threaded target. The release tag names the download; the CMS and plugin API versions inside come from `cms.json`. To rebuild a release's files, run the workflow by hand with its tag.
+
 ## Upgrading an existing installation
 
 Back up `.env`, the database and managed `storage/` data before upgrading. The legacy naming migration renames the old content/tag tables and reference column through Schema APIs, preserves IDs/content/relationships, normalizes the old content type, working-copy keys and revision snapshots, and updates factory defaults only when they still match the original values. Existing custom site text is retained. The structure migration replaces the global slug constraint with `(content_type, slug)`, renames menu references to `content_id`, and adds registry/value/grant tables. Old public URLs redirect to canonical routes.

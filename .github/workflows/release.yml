@@ -1,0 +1,91 @@
+name: Release
+
+# Publishing a release builds its tag and attaches the JVM application, the
+# extension packages (each plugin with its JVM, CPPIA and PHP builds) and
+# their checksums to that release. Run it by hand to rebuild a release's files.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and attach files to
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Build and attach release files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends neko
+          python3 -m pip install --disable-pip-version-check uv==0.11.8
+          php --version
+
+      - name: Install project dependencies
+        run: make setup
+
+      - name: Build the JVM application and the extension packages
+        run: make build
+
+      - name: Package the release files
+        run: python3 scripts/release.py "$TAG" dist
+
+      - name: Check that the packaged application starts
+        run: |
+          smoke="$RUNNER_TEMP/smoke"
+          mkdir -p "$smoke"
+          unzip -q dist/haxepress-*-jvm.zip -d "$smoke"
+          cd "$smoke"/haxepress-*/
+          if [ -f .env ]; then echo "The archive contains an .env file."; exit 1; fi
+          ./start.sh > server.log 2>&1 &
+          server=$!
+          for attempt in $(seq 1 90); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/admin/install; then
+              echo "The packaged application serves the installer."
+              kill "$server"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat server.log
+          exit 1
+
+      - name: Attach the files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
