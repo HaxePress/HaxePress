@@ -3,12 +3,11 @@
 
 Run `make build` first, then `python3 scripts/release.py <tag> <output folder>`.
 The output holds the application built for the JVM and for PHP, one archive
-each, the extension packages of this build (each plugin carries its JVM,
-CPPIA and PHP builds) and a SHA256SUMS.txt file.
+each. The plugins and themes of this build are inside both archives, in
+`public/packages`, and are not released as files of their own.
 """
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -103,11 +102,11 @@ check for changes every few seconds instead of receiving them live. The
 `preview_theme_design` tool, which looks at a theme in headless Chrome,
 needs the JVM build.
 
-## Extension packages
+## Plugins and themes
 
-The `.zip` packages published next to this archive install through Themes and
-Plugins in the administration panel. Each plugin package contains its JVM,
-CPPIA and PHP builds.
+The plugins and themes of this release are inside this archive, in
+`public/packages`. Install them from Plugins and Themes in the
+administration panel; each plugin contains its JVM, CPPIA and PHP builds.
 """
 
 README = """# HaxePress {version}
@@ -135,11 +134,11 @@ The database lives in `data/` and uploaded files in `storage/`; the site
 creates both. Keep `.env`, `data/` and `storage/` when you upgrade; replace
 everything else.
 
-## Extension packages
+## Plugins and themes
 
-The `.zip` packages published next to this archive install through Themes and
-Plugins in the administration panel. Each plugin package contains its JVM,
-CPPIA and PHP builds. `cms-plugin-api-{api}.jar` and `.zip` are the plugin SDK.
+The plugins and themes of this release are inside this archive, in
+`public/packages`. Install them from Plugins and Themes in the
+administration panel; each plugin contains its JVM, CPPIA and PHP builds.
 """
 
 
@@ -151,7 +150,7 @@ def release_version(tag):
 
 
 def packages(cms):
-    """The extension packages this build produced, by their manifests' versions."""
+    """The packages this build produced, by their manifests' versions; the archives carry them."""
     names = [f"cms-plugin-api-{cms['pluginApiVersion']}.{kind}" for kind in ("jar", "zip")]
     for plugin in sorted((ROOT / "examples/plugins").iterdir()):
         manifest = plugin / "cms-package.json"
@@ -272,13 +271,6 @@ def main():
         application(version, cms, current, output),
         php_application(version, cms, current, output),
     ]
-    for name in current:
-        files.append(Path(shutil.copy2(ROOT / "Export/packages" / name, output / name)))
-    sums = []
-    for path in sorted(files):
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        sums.append(f"{digest}  {path.name}")
-    (output / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n")
     for path in sorted(files):
         print(f"{path.stat().st_size:>12,}  {path.name}")
 

@@ -130,9 +130,9 @@ The MCP server is the same Haxe code on both builds and keeps no state between r
 Publishing a release on GitHub runs the Release workflow (`.github/workflows/release.yml`). It builds the release's tag with `make build`, packages it with `scripts/release.py`, starts the packaged application to check that it serves the installer, and attaches the files to the release. Those files are:
 
 - `haxepress-<version>-jvm.zip`, the application for Java 21+, with `start.sh`, which creates `.env` with a new `APP_KEY` on first run;
-- `haxepress-<version>-php.zip`, the application for PHP 8.1+, with `setup.php`, which creates `.env` with a new `APP_KEY`, and a README for web servers and cron;
-- the plugin, theme and SDK packages of that build, where each plugin contains its JVM, CPPIA and PHP builds;
-- `SHA256SUMS.txt`.
+- `haxepress-<version>-php.zip`, the application for PHP 8.1+, with `setup.php`, which creates `.env` with a new `APP_KEY`, and a README for web servers and cron.
+
+Nothing else is attached. The plugins and themes of that build, where each plugin contains its JVM, CPPIA and PHP builds, are inside both archives in `public/packages` and install from the administration panel.
 
 The workflow checks that each installation of either archive creates its own private `APP_KEY` (`tests/release_keys.py`) and serves both packaged applications before it attaches them. The release tag names the download; the CMS and plugin API versions inside come from `cms.json`. To rebuild a release's files, run the workflow by hand with its tag.
 

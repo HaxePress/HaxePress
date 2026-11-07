@@ -1,9 +1,8 @@
 name: Release
 
 # Publishing a release builds its tag and attaches the application for the
-# JVM and for PHP, the extension packages (each plugin with its JVM, CPPIA and
-# PHP builds) and their checksums to that release. Run it by hand to rebuild a
-# release's files.
+# JVM and for PHP, one zip each, to that release. The plugins and themes of the
+# build are inside both archives. Run it by hand to rebuild a release's files.
 on:
   release:
     types: [published]
@@ -116,4 +115,6 @@ jobs:
       - name: Attach the files to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          gh release upload "$TAG" dist/haxepress-*-jvm.zip dist/haxepress-*-php.zip \
+            --clobber --repo "$GITHUB_REPOSITORY"
