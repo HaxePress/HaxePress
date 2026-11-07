@@ -171,6 +171,96 @@ def verify_role_limits(owner, public):
     )
 
 
+def verify_role_edits(owner, public):
+    """Editing a role's capabilities or the account's password applies to existing MCP links."""
+    role = f"mcp_role_{secrets.token_hex(4)}"
+    role_form = {"key": role, "name": "MCP taxonomy role", "description": "MCP role edit test"}
+    password = secrets.token_urlsafe(18)
+    email = f"mcp-edit-{secrets.token_hex(4)}@example.test"
+    member = {"name": "MCP Role Edit", "email": email, "role": role}
+    category = f"MCP edit {secrets.token_hex(3)}"
+    attempted = f"{category} after"
+    member_id = None
+    status = owner.request(
+        "/admin/roles/create",
+        "POST",
+        {
+            **role_form,
+            "enabled": "1",
+            "capabilities": json.dumps(["content", "taxonomy", "account"]),
+        },
+    )[0]
+    check(status == 303, f"Could not create a custom role: {status}")
+    try:
+        status = owner.request(
+            "/admin/team/save",
+            "POST",
+            {**member, "id": "", "active": "1", "password": password},
+        )[0]
+        check(status == 303, f"Could not create an account with the custom role: {status}")
+        with FixtureStore.from_environment() as store:
+            member_id = store.rows("admins", ["id"], [("email", "=", email)], limit=1)[0]["id"]
+        connection = issue(login(email, password), "claude")
+        check(
+            "save_category" in tool_names(public, connection),
+            "The custom role's MCP tools lack category management",
+        )
+        succeeded(call(public, connection, "save_category", {"name": category}))
+
+        # Removing a capability from the role applies to the same link on its next request.
+        status = owner.request(
+            f"/admin/roles/{role}/save",
+            "POST",
+            {**role_form, "enabled": "1", "capabilities": json.dumps(["content", "account"])},
+        )[0]
+        check(status == 303, f"Could not edit the role's capabilities: {status}")
+        attempt = call(
+            public,
+            connection,
+            "write_admin",
+            {"path": "/admin/categories/save", "method": "POST", "data": {"name": attempted}},
+        )
+        check(refused(attempt), "A link kept a capability its role no longer grants")
+        routes = routes_of(public, connection)
+        check(
+            "/admin/categories/save" not in routes and "/admin/content/save" in routes,
+            "MCP route discovery did not follow the edited role",
+        )
+        with FixtureStore.from_environment() as store:
+            check(
+                store.count("categories", [("name", "=", attempted)]) == 0,
+                "A refused MCP request created a category",
+            )
+
+        # A new password stops links issued with the old one.
+        changed = {
+            **member,
+            "id": str(member_id),
+            "active": "1",
+            "password": secrets.token_urlsafe(18),
+        }
+        status = owner.request("/admin/team/save", "POST", changed)[0]
+        check(status == 303, f"Could not change the account's password: {status}")
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        status = post_json(public, endpoint(connection), request, credentials(connection))[0]
+        check(status == 401, f"A link survived a password change: {status}")
+    finally:
+        with FixtureStore.from_environment() as store:
+            store.delete("categories", [("name", "in", [category, attempted])])
+            if member_id is not None:
+                store.delete("admins", [("id", "=", member_id)])
+        if owner.request(f"/admin/roles/{role}/delete", "POST", {})[0] != 303:
+            with FixtureStore.from_environment() as store:
+                store.delete("role_grants", [("role_key", "=", role)])
+                store.delete("roles", [("key", "=", role)])
+        with FixtureStore.from_environment() as store:
+            check(store.count("roles", [("key", "=", role)]) == 0, "The test role was not removed")
+    print(
+        "PASS Admin MCP: editing a role's capabilities and changing the password apply to existing links",
+        flush=True,
+    )
+
+
 def verify_expiry(owner, public):
     """A link's expiry is chosen when it is generated and can change until a client connects."""
     hour = issue(owner, "cursor", hours=1)
@@ -359,6 +449,7 @@ def run():
     )
     verify_expiry(owner, public)
     verify_role_limits(owner, public)
+    verify_role_edits(owner, public)
     check(
         public.request(endpoint(first), extra_headers=credentials(second))[0] == 401,
         "A bearer crossed its session audience",
