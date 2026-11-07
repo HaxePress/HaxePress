@@ -31,6 +31,9 @@ METADATA = ("database/", "content/", "backup.", "content.index.json")
 # Archives cannot name hidden folders, so the site's media/.trash is stored as media/trash.
 TRASHED_MEDIA = "media/trash/"
 SHOWN_ROWS = 2000
+# The scheduler records each run in scheduled_jobs at any moment; a job's definition is the rest.
+SCHEDULED = "scheduled_jobs"
+JOB_DEFINITION = ["id", "plugin_id", "job_key", "payload", "interval_seconds", "enabled"]
 IMAGE = (Path(__file__).parent / "fixtures/media/logo-transparent.png").read_bytes()
 
 
@@ -52,6 +55,21 @@ def trashed_image(owner):
 
 def digests(store):
     return {table["name"]: table for table in store.call("table_digests", skip=TRANSIENT)}
+
+
+def job_definitions(store):
+    rows = store.rows(SCHEDULED, JOB_DEFINITION, limit=100)
+    check(len(rows) < 100, f"{SCHEDULED} has too many rows to compare one by one")
+    return sorted(json.dumps(row, sort_keys=True) for row in rows)
+
+
+def changed_tables(expected, actual):
+    """Tables whose data differ, leaving out the scheduler's own records of its runs."""
+    return sorted(
+        name
+        for name in set(expected) | set(actual)
+        if name != SCHEDULED and expected.get(name) != actual.get(name)
+    )
 
 
 def rows(store, table, columns):
@@ -125,11 +143,17 @@ def compare_tables(source, restored, expected):
         restored_table = actual[name]
         if restored_table["columns"] != table["columns"]:
             problems.append(f"{name} columns are {restored_table['columns']}")
-        elif name not in REINSTALLED and restored_table["digest"] != table["digest"]:
+        elif (
+            name not in REINSTALLED
+            and name != SCHEDULED
+            and restored_table["digest"] != table["digest"]
+        ):
             problems.append(
                 f"{name} has {restored_table['rows']} rows, expected {table['rows']}; "
                 f"{describe(source, restored, name)}"
             )
+    if job_definitions(restored) != job_definitions(source):
+        problems.append(f"{SCHEDULED} definitions differ")
     check(not problems, "Restored tables differ from the source:\n" + "\n".join(problems))
     return compare_reinstalled(
         source, restored, {name: expected[name]["columns"] for name in REINSTALLED}
@@ -194,13 +218,18 @@ def run():
 def verify_round_trip(owner, trashed):
     with FixtureStore.from_environment() as source:
         expected = digests(source)
+        jobs = job_definitions(source)
         check(
             expected["content_items"]["rows"] > 0 and expected["media_assets"]["rows"] > 0,
             "The source site has no content or media to compare",
         )
         media = [row["filename"] for row in source.scan("media_assets", ["id", "filename"])]
         archive = export(owner, FULL)
-        check(digests(source) == expected, "Exporting a backup changed the site's data")
+        changed = changed_tables(expected, digests(source))
+        check(
+            not changed and job_definitions(source) == jobs,
+            f"Exporting a backup changed the site's data: {changed or SCHEDULED}",
+        )
         with tempfile.TemporaryDirectory(prefix="haxepress-backup-roundtrip-") as name:
             work = Path(name)
             server = SetupServer(work, None)
