@@ -51,8 +51,8 @@ Every block carries `data-design-node="ID"`, `data-block-id="ID"` and
 
 Consequences worth knowing:
 
-- **`attributes` render only on `element` blocks.** On any other type they pass
-  validation and disappear. To give a box `data-*` or `aria-*` attributes,
+- **Only `element` blocks take `attributes`.** A save with attributes on any
+  other block type is rejected. To give a box `data-*` or `aria-*` attributes,
   make it an `element` with `tag: "div"`; to style it, give it a class instead.
 - **Image styles land on the wrapper** (`figure` or `a`); the `img` inside
   fills it (`width` and `height` 100%, `object-fit: cover`). Set
@@ -68,14 +68,19 @@ Consequences worth knowing:
 - `styles.tablet` applies at `max-width: 900px` and `styles.mobile` at
   `max-width: 600px`. The preview's tablet (834px) and mobile (390px) devices
   fall inside them. Section `columns` collapse on their own at 800px and 580px.
-- The stylesheet is written selector by selector: for each class, then each
-  section and block, its desktop rule followed by its tablet and mobile
-  rules. Classes come first, so a block's own styles win over its classes,
-  even a block's desktop rule over a class's mobile rule. The order between
-  two classes is not guaranteed, so one class's desktop rule can beat
-  another's mobile rule. Keep a property's desktop and mobile values in the
-  same place (one class, or the block itself), or write the responsive part in
-  `css` inside a media query.
+- The stylesheet writes every desktop rule first, then one
+  `@media(max-width:900px)` block with all tablet rules, then one
+  `@media(max-width:600px)` block with all mobile rules. A tablet or mobile
+  value therefore beats any desktop value on the same element, whether it comes
+  from the block itself or from any of its classes.
+- Inside each of those parts, classes come first in name order, then sections
+  and blocks. At the same breakpoint and state, a block's own styles beat its
+  classes, and of two classes the one whose name sorts later wins.
+- Within one rule, properties are written in alphabetical order, so a
+  shorthand overrides a longhand that sorts before it: `gap` overrides
+  `column-gap` and `inset` overrides `bottom`, while `padding` is written
+  before `padding-top`. Don't set a shorthand and a longhand that sorts before
+  it in the same state.
 - Block and class rules look like `.hp-design [data-design-node="ID"]` and
   `.hp-design .design-class-NAME`. Inside `css` (wrapped in
   `@scope (.hp-design)`) a selector needs at least the same weight to beat

@@ -11,7 +11,10 @@ package hx.press.view;
 class DesignTemplates {
     static inline final MAX_DEPTH = 32;
     static final identifier = ~/^[A-Za-z0-9_-]{1,80}$/;
-    static final bindingPath = ~/^(site|item|collection|page)(\.[A-Za-z_][A-Za-z0-9_]*){1,5}$/;
+    static final bindingPath = ~/^(site|item|collection|page)\.[A-Za-z_][A-Za-z0-9_]*$/;
+    static inline final CUSTOM_FIELDS = "item.fields.";
+    // Custom field keys, as content types define them.
+    static final fieldKey = ~/^[a-z][a-z0-9_]{0,31}$/;
     static final siteFields = [
         "locale",
         "site_name",
@@ -211,13 +214,16 @@ class DesignTemplates {
 
     /** The template expression for a binding path, or null when it is not a public field. **/
     function binding(path:String):Null<String> {
+        var key = customField(path);
+        if (key != null) {
+            // Item views carry only the custom fields their page may show: public fields on
+            // detail pages and public list fields in lists and content sources.
+            return 'item.fields[${literal(key)}]';
+        }
         if (!bindingPath.match(path)) {
             return null;
         }
         var parts = path.split(".");
-        if (parts.length != 2) {
-            return null;
-        }
         return switch parts[0] {
             case "site" if (siteFields.indexOf(parts[1]) >= 0): 'site.${parts[1]}';
             case "item" if (itemFields.indexOf(parts[1]) >= 0): 'item.${parts[1]}';
@@ -227,13 +233,26 @@ class DesignTemplates {
         }
     }
 
+    /** The key of an `item.fields.<key>` path, or null for any other path. **/
+    static function customField(path:String):Null<String> {
+        if (!StringTools.startsWith(path, CUSTOM_FIELDS)) {
+            return null;
+        }
+        var key = path.substr(CUSTOM_FIELDS.length);
+        return fieldKey.match(key) ? key : null;
+    }
+
     /** A bound value, or the node's own text, as a template expression. **/
     function value(node:Dynamic, field:String, fallback:String):String {
         var bindings:Dynamic = node.bindings;
         var path:Null<String> = bindings == null ? null : Reflect.field(bindings, field);
         if (path != null && path != "") {
             var bound = binding(path);
-            return bound == null ? "''" : bound;
+            if (bound == null) {
+                return "''";
+            }
+            // Custom field values keep their JSON types; links, images and attributes take text.
+            return customField(path) == null ? bound : '(${bound} | string)';
         }
         return literal(fallback);
     }

@@ -10,6 +10,8 @@ class ThemeDesignValidator {
     final references:Array<String> = [];
     final sourceReferences:Array<String> = [];
 
+    static inline final FONT_STACK = "Enter a font family name or font stack, such as 'DM Sans', Arial, sans-serif. Quote names that start with a digit.";
+
     static final tags = [
         "div",
         "section",
@@ -225,12 +227,35 @@ class ThemeDesignValidator {
         }
     }
 
+    /** A path the renderer can read: `prefix.field`, or a custom field as `item.fields.<key>`. **/
     static function binding(value:String):Void {
         if (value != ""
-            && (!~/^(site|item|collection|page)(\.[A-Za-z_][A-Za-z0-9_]*){1,5}$/.match(value)
+            && (!~/^((site|item|collection|page)\.[A-Za-z_][A-Za-z0-9_]*|item\.fields\.[a-z][a-z0-9_]{0,31})$/.match(value)
                 || ~/(^|\.)(__proto__|prototype|constructor)(\.|$)/.match(value))) {
-            throw new Exception("Choose a public CMS field for this binding.");
+            throw new Exception("Choose a public CMS field for this binding, such as item.title, or a custom field as item.fields.<key>.");
         }
+    }
+
+    /**
+        A CSS `font-family` list: comma-separated families, each a quoted name
+        or a sequence of identifiers, such as `'DM Sans', Arial, sans-serif`.
+        Names that start with a digit, CSS-wide keywords, empty entries and
+        unbalanced quotes would make browsers drop the whole declaration.
+    **/
+    static function fontStack(value:String):String {
+        if (!~/^[A-Za-z0-9 ,"'-]+$/.match(value)) {
+            throw new Exception(FONT_STACK);
+        }
+        for (entry in value.split(",")) {
+            var family = StringTools.trim(entry);
+            var quoted = ~/^("[^"]*[A-Za-z0-9][^"]*"|'[^']*[A-Za-z0-9][^']*')$/.match(family);
+            var identifiers = ~/^-?[A-Za-z][A-Za-z0-9-]*( +-?[A-Za-z][A-Za-z0-9-]*)*$/.match(family);
+            var keyword = ~/^(initial|inherit|unset|revert|revert-layer|default)$/i.match(family);
+            if (!quoted && (!identifiers || keyword)) {
+                throw new Exception(FONT_STACK);
+            }
+        }
+        return value;
     }
 
     static function styles(value:Dynamic):Dynamic {
@@ -317,7 +342,11 @@ class ThemeDesignValidator {
             var values:Dynamic = {};
             var attributesInput = node.attributes == null ? {} : object(node.attributes,
                 "HTML attributes");
-            if (Reflect.fields(attributesInput).length > 32) {
+            var attributeCount = Reflect.fields(attributesInput).length;
+            if (attributeCount > 0 && kind != "element") {
+                throw new Exception('Only HTML element blocks take attributes. Remove the attributes of ${kind} block ${id}, or make it an element block.');
+            }
+            if (attributeCount > 32) {
                 throw new Exception("Use at most 32 HTML attributes on an element.");
             }
             for (key in Reflect.fields(attributesInput)) {
@@ -421,10 +450,7 @@ class ThemeDesignValidator {
             throw new Exception("This theme design version is not supported.");
         }
         var tokens = object(input.tokens, "Design tokens");
-        var font = text(tokens, "font", 200, "sans");
-        if (!~/^[A-Za-z0-9 ,"'-]+$/.match(font)) {
-            throw new Exception("Enter a font family name or font stack.");
-        }
+        var font = fontStack(text(tokens, "font", 200, "sans"));
         var header = sections(input.header);
         var footer = sections(input.footer);
         var pages:Dynamic = {};

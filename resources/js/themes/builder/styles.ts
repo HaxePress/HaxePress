@@ -1,43 +1,52 @@
 import type { Breakpoint, DesignBlock, ResponsiveStyles, StyleMap, ThemeDocument } from './types';
 import {
-  scopesFor,
   sectionsFor,
   visitBlocks,
   selectionFor,
+  type DesignScope,
   type DesignSelection,
   type Interaction,
 } from './types';
 
+// Mirrors src/hx/press/view/DesignStyles.hx: every desktop rule, then one tablet and one mobile
+// media block, classes before sections and blocks, with names and properties sorted.
+const breakpoints: Breakpoint[] = ['desktop', 'tablet', 'mobile'];
+const interactions = ['normal', 'hover', 'focus'] as const;
+
 function declarations(properties: StyleMap): string {
-  return Object.entries(properties)
-    .map(([property, value]) => `${property}:${value};`)
+  return Object.keys(properties)
+    .sort()
+    .map((property) => `${property}:${properties[property]};`)
     .join('');
 }
-function rules(selector: string, styles: ResponsiveStyles = {}): string {
-  let css = '';
-  for (const breakpoint of ['desktop', 'tablet', 'mobile'] as Breakpoint[]) {
-    let device = '';
-    for (const interaction of ['normal', 'hover', 'focus'] as const) {
+function rules(layers: string[], selector: string, styles: ResponsiveStyles = {}): void {
+  breakpoints.forEach((breakpoint, index) => {
+    for (const interaction of interactions) {
       const values = styles[breakpoint]?.[interaction];
       if (!values || Object.keys(values).length === 0) continue;
       const suffix =
         interaction === 'normal' ? '' : interaction === 'focus' ? ':focus-visible' : ':hover';
-      device += `${selector}${suffix}{${declarations(values)}}`;
+      layers[index] += `${selector}${suffix}{${declarations(values)}}`;
     }
-    if (breakpoint === 'desktop') css += device;
-    else if (device) css += `@media(max-width:${breakpoint === 'tablet' ? 900 : 600}px){${device}}`;
-  }
-  return css;
+  });
+}
+function stylesheetScopes(document: ThemeDocument): DesignScope[] {
+  const templates = Object.keys(document.templates).sort();
+  const components = Object.keys(document.components || {})
+    .sort()
+    .map((id) => `@${id}`);
+  return ['header', 'footer', ...templates, ...components];
 }
 export function designStyles(
   document: ThemeDocument,
   selection?: DesignSelection | null,
   preview?: { breakpoint: Breakpoint; interaction: Interaction; styleClass: string },
 ): string {
-  let css = '';
-  for (const [name, styles] of Object.entries(document.classes || {}))
-    css += rules(`.hp-design .design-class-${name}`, styles);
-  for (const scope of scopesFor(document)) {
+  const layers = ['', '', ''];
+  const classes = document.classes || {};
+  for (const name of Object.keys(classes).sort())
+    rules(layers, `.hp-design .design-class-${name}`, classes[name]);
+  for (const scope of stylesheetScopes(document)) {
     for (const section of sectionsFor(document, scope)) {
       const selector = `.hp-design [data-design-node="${section.id}"]`;
       const base: StyleMap = {
@@ -46,13 +55,17 @@ export function designStyles(
       };
       if (section.background) base.background = section.background;
       if (section.color) base.color = section.color;
-      css += `.hp-design :where([data-design-node="${section.id}"]){${declarations(base)}}`;
-      css += rules(selector, section.styles);
+      layers[0] += `.hp-design :where([data-design-node="${section.id}"]){${baseDeclarations(base)}}`;
+      rules(layers, selector, section.styles);
       visitBlocks(section.blocks, (node: DesignBlock) => {
-        css += rules(`.hp-design [data-design-node="${node.id}"]`, node.styles);
+        rules(layers, `.hp-design [data-design-node="${node.id}"]`, node.styles);
       });
     }
   }
+  const [desktop, tablet, mobile] = layers;
+  let css = desktop;
+  if (tablet) css += `@media(max-width:900px){${tablet}}`;
+  if (mobile) css += `@media(max-width:600px){${mobile}}`;
   if (document.css) css += `@scope (.hp-design){${document.css}}`;
   if (preview && preview.interaction !== 'normal') {
     const found = selectionFor(document, selection || null);
@@ -72,6 +85,12 @@ export function designStyles(
     }
   }
   return css;
+}
+// The section base keeps its fixed property order, as the server writes it.
+function baseDeclarations(properties: StyleMap): string {
+  return Object.entries(properties)
+    .map(([property, value]) => `${property}:${value};`)
+    .join('');
 }
 export function classNames(classes: string[] = []): string {
   return classes.flatMap((name) => [name, `design-class-${name}`]).join(' ');

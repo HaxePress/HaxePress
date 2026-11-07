@@ -252,6 +252,16 @@ export function upgradeDocument(input: ThemeDocument): ThemeDocument {
   document.feeds ||= [];
   document.templateMeta ||= {};
   document.css ||= '';
+  // Attributes render only on HTML element blocks and the server rejects them elsewhere, so
+  // earlier designs drop the ones they never showed.
+  for (const scope of scopesFor(document)) {
+    for (const section of sectionsFor(document, scope)) {
+      visitBlocks(section.blocks || [], (block) => {
+        const unused = block.type !== 'element' && Object.keys(block.attributes || {}).length > 0;
+        if (unused) block.attributes = {};
+      });
+    }
+  }
   return document;
 }
 export function scopesFor(document: ThemeDocument): string[] {

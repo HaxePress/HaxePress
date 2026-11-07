@@ -62,7 +62,8 @@ export function importHtml(
         node.href = attribute.value;
         continue;
       }
-      node.attributes[attribute.name] = attribute.value;
+      // Only HTML element blocks take attributes; an imported image keeps its classes and styles.
+      if (node.type === 'element') node.attributes[attribute.name] = attribute.value;
     }
     const style = (element as HTMLElement).style;
     if (style) {

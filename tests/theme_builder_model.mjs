@@ -182,6 +182,52 @@ const css = designStyles(upgraded);
 assert.ok(css.includes('@media(max-width:600px)'));
 assert.ok(css.includes(':hover{transform:translateY(-4px)'));
 assert.ok(css.includes('@scope (.hp-design)'));
+
+// The cascade: every desktop rule, then one tablet and one mobile block, classes before nodes.
+const cascade = structuredClone(upgraded);
+cascade.css = '';
+cascade.classes = {
+  split: { desktop: { normal: { 'flex-direction': 'row', display: 'flex' } } },
+  collapse: {
+    desktop: { normal: { gap: '24px' } },
+    tablet: { normal: { gap: '16px' } },
+    mobile: { normal: { 'flex-direction': 'column', padding: '16px' } },
+  },
+};
+const row = newBlock('container');
+row.classes = ['split', 'collapse'];
+row.styles = {
+  desktop: { normal: { padding: '48px' } },
+  mobile: { normal: { gap: '8px' } },
+};
+cascade.templates.Home[0].blocks.push(row);
+const cascadeCss = designStyles(cascade);
+const rowSelector = `.hp-design [data-design-node="${row.id}"]`;
+const tabletStart = cascadeCss.indexOf('@media(max-width:900px){');
+const mobileStart = cascadeCss.indexOf('@media(max-width:600px){');
+assert.equal(cascadeCss.split('@media(max-width:900px)').length, 2, 'Tablet rules were split up');
+assert.equal(cascadeCss.split('@media(max-width:600px)').length, 2, 'Mobile rules were split up');
+const collapseDesktop = cascadeCss.indexOf('.hp-design .design-class-collapse{gap:24px;}');
+const splitDesktop = cascadeCss.indexOf(
+  '.hp-design .design-class-split{display:flex;flex-direction:row;}',
+);
+const rowDesktop = cascadeCss.indexOf(`${rowSelector}{padding:48px;}`);
+const collapseMobile = cascadeCss.indexOf(
+  '.hp-design .design-class-collapse{flex-direction:column;padding:16px;}',
+);
+const rowMobile = cascadeCss.indexOf(`${rowSelector}{gap:8px;}`);
+assert.ok(
+  collapseDesktop >= 0 && collapseDesktop < splitDesktop,
+  'Classes were not written in name order with sorted properties',
+);
+assert.ok(
+  splitDesktop < rowDesktop && rowDesktop < tabletStart,
+  'Desktop rules did not precede the tablet block, classes before nodes',
+);
+assert.ok(
+  tabletStart < mobileStart && mobileStart < collapseMobile && collapseMobile < rowMobile,
+  "A class's mobile rule did not follow another class's and the node's desktop rules",
+);
 assert.equal(templateIdentifier('Contact us', upgraded), 'ContactUs');
 assert.equal(templateIdentifier('Home', upgraded), 'Home2');
 assert.equal(templateIdentifier('123', upgraded), 'PageLayout123');
@@ -206,6 +252,22 @@ assert.deepEqual(effectiveStyles(upgraded, responsive, 'mobile', 'hover'), {
 assert.equal(effectiveStyles(upgraded, responsive, 'desktop', 'normal').width, '80%');
 assert.equal(effectiveStyles(upgraded, responsive, 'mobile', 'normal').opacity, undefined);
 assert.deepEqual(responsive.styles, untouchedStyles, 'Reading appearance rewrote stored overrides');
+const decorated = newBlock('heading');
+decorated.attributes = { 'data-kind': 'title' };
+const described = newBlock('element');
+described.attributes = { 'aria-label': 'Kept' };
+const withAttributes = structuredClone(upgraded);
+withAttributes.templates.Home[0].blocks.push(decorated, described);
+const cleaned = upgradeDocument(withAttributes);
+assert.deepEqual(
+  findBlock(cleaned.templates.Home[0].blocks, decorated.id).attributes,
+  {},
+  'Upgrading kept attributes the server rejects on a heading',
+);
+assert.deepEqual(findBlock(cleaned.templates.Home[0].blocks, described.id).attributes, {
+  'aria-label': 'Kept',
+});
+assert.deepEqual(decorated.attributes, { 'data-kind': 'title' }, 'Upgrading mutated its input');
 const context = {
   site: { site_name: 'Example' },
   item: { title: 'Bound title', image: '' },
@@ -213,6 +275,13 @@ const context = {
   page: { count: 3 },
 };
 assert.equal(bindingValue(context, 'item.title'), 'Bound title');
+assert.equal(
+  bindingValue(
+    { ...context, item: { ...context.item, fields: { price: 12.5 } } },
+    'item.fields.price',
+  ),
+  12.5,
+);
 assert.equal(bindingValue(context, 'item.__proto__.title'), '');
 assert.equal(bindingValue(context, 'auth.admin.email'), '');
 assert.equal(bindingValue(context, 'item.constructor'), '');
@@ -232,5 +301,5 @@ assert.equal(linkValue('//example.test/redirect'), '');
 assert.equal(linkValue('/content/item'), '/content/item');
 assert.equal(imageValue('https://example.test/image.jpg', '^/media/[A-Za-z0-9_-]+\\.jpg$'), '');
 console.log(
-  'PASS Composable design: nested moves, cycle prevention, cross-scope/end drops, deep cloning, legacy upgrade, responsive/hover CSS, safe bindings and visibility',
+  'PASS Composable design: nested moves, cycle prevention, cross-scope/end drops, deep cloning, legacy upgrade, responsive/hover CSS and cascade order, element-only attributes, safe and custom-field bindings and visibility',
 );

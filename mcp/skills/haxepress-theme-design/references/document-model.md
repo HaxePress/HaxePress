@@ -117,10 +117,10 @@ Only `container`, `repeat` and non-text `element` tags may have children.
 Attributes: a fixed safe list (`id`, `title`, `role`, `name`, `type`,
 `value`, `placeholder`, `for`, `method`, `action`, `target`, `rel`,
 `datetime`, `colspan`, `open`) plus any `aria-*` and `data-*` attribute, at
-most 32 per element. Attributes render **only on `element` blocks**; on other
-types they are accepted and dropped. Event handlers, `style`, `src` and
-`href` are not attributes: use `styles`, the `image` field and the block's
-`href` field.
+most 32 per element. **Only `element` blocks take attributes**; a save with
+attributes on any other block type is rejected. Event handlers, `style`,
+`src` and `href` are not attributes: use `styles`, the `image` field and the
+block's `href` field.
 
 Inline SVG is built from `element` blocks (`svg`, `path`, `g`, `circle`,
 `rect`, `line`, `polyline`, `polygon`, `ellipse`, gradients, `clipPath`,
@@ -161,7 +161,8 @@ is rejected; set those as CSS properties in the element's `styles`.
 ## 5. Content: bindings, repeaters, feeds, conditions
 
 `bindings` maps a block field (`text`, `href`, `image`, `alt`, `value`,
-`datetime`) to a path with exactly two parts:
+`datetime`) to a path: a prefix and one field from this table, or a custom
+field as `item.fields.<key>`. `condition.field` takes the same paths.
 
 | Prefix        | Fields                                                                                                                                                          |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -170,8 +171,13 @@ is rejected; set those as CSS properties in the element's `styles`.
 | `collection.` | `name`, `singular`, `description`, `publicBase`                                                                                                                 |
 | `page.`       | `count`, `resultCount`, `query`, `category`, `archiveUrl`                                                                                                       |
 
-Longer paths such as `item.fields.price` pass validation but render nothing.
-A collection's custom fields appear inside `content-body` on detail pages.
+`item.fields.<key>` reads a collection's custom field by its key (lowercase
+letters, digits and `_`), such as `item.fields.price`. Lists and feeds carry
+only the public fields marked to show in lists; detail pages carry every
+public field; private fields never render. A field the page does not carry
+renders nothing. Any other path, such as `item.fields.price.amount` or
+`site.links.home`, is rejected. `content-body` also shows the custom fields on
+detail pages.
 
 A `repeat` block renders its children once per item:
 
@@ -261,17 +267,18 @@ components are counted.
 | `Keep every core CMS template`                                             | Restore the missing template key, even as an empty list                                                                                                      |
 | `unique identifier`                                                        | Two nodes share an ID, or an ID is missing; IDs are document-wide                                                                                            |
 | `cannot contain children` / `Only containers, HTML elements and repeaters` | Move the children into a `container` or a non-text `element`                                                                                                 |
-| `public CMS field for this binding` / `bindable property`                  | Use a path and field from section 5                                                                                                                          |
+| `public CMS field for this binding` / `bindable property`                  | Use a path and field from section 5, or `item.fields.<key>`; nothing deeper                                                                                  |
 | `missing content source`                                                   | Add the feed to `feeds`, or use `page.items`                                                                                                                 |
 | `uploaded images from this theme or the media library`                     | Use a URL from `search_media_for_theme`, `search_theme_assets` or `verify_theme_image`                                                                       |
 | `CSS resources must use the media library or application assets`           | Replace remote `url()` values                                                                                                                                |
 | `without imports, executable values or HTML markup`                        | Remove `@import`, `expression()`, `javascript:` or tags from `css`                                                                                           |
 | `without a rule or declaration separator`                                  | A style value contains `;`, `{` or `}`; split it into separate properties                                                                                    |
 | `valid CSS property`                                                       | Use a real property name in lowercase, such as `background-color`                                                                                            |
-| `font family name or font stack`                                           | Use a comma-separated stack of names, quoting names with spaces                                                                                              |
+| `font family name or font stack`                                           | Use comma-separated family names with no empty entry, close every quote, and quote a name that starts with a digit; no sizes or weights                      |
 | `internal path or a valid web, email or phone link`                        | Use `/path`, `https://…`, `mailto:` or `tel:`                                                                                                                |
 | `Forms must submit to a CMS route`                                         | Point `action` at a site path such as `/search`                                                                                                              |
 | `HTML attribute is not supported`                                          | Use `styles` instead of `style` and SVG paint extras, `image` instead of `src`, the block's `href` field instead of an `href` attribute; drop event handlers |
+| `Only HTML element blocks take attributes`                                 | Remove `attributes` from the named block, or rebuild it as an `element` with the same tag                                                                    |
 | `current-page list or a named content source`                              | A block has `source: ""`; remove the field or set `page.items`                                                                                               |
 | `supported value for order` / `direction`                                  | Use `published_at`, `title` or `id`, and `ASC` or `DESC` in capitals                                                                                         |
 | `node document limit` / `nesting limit` / `repeated or reusable elements`  | Simplify: fewer wrappers, smaller feeds, components instead of copies                                                                                        |

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import subprocess
 
 from cms_content import props
 from cms_management import login
@@ -44,6 +45,93 @@ def section(identifier, blocks):
     }
 
 
+def field(key, kind, public=True, listed=False):
+    return {
+        "key": key,
+        "label": key.title(),
+        "kind": kind,
+        "help": "",
+        "required": False,
+        "publicVisible": public,
+        "inList": listed,
+        "filterable": False,
+        "options": [],
+    }
+
+
+def create_products(owner, suffix):
+    """A collection with a public list field, a public detail-only field and a private field."""
+    key = f"composable_{suffix}"
+    prefix = f"composable-{suffix}"
+    definition = {
+        "key": key,
+        "name": "Composable products",
+        "singular": "Composable product",
+        "publicPath": prefix,
+        "publicVisible": True,
+        "hasArchive": True,
+        "enabled": True,
+        "dedicatedAccess": False,
+        "features": ["image"],
+        "template": "ContentDetail",
+        "archiveTemplate": "ContentIndex",
+        "fields": [
+            field("price", "number", listed=True),
+            field("note", "text"),
+            field("secret", "text", public=False, listed=True),
+        ],
+    }
+    created = owner.request(
+        "/admin/content-types/create", "POST", {"definition": json.dumps(definition)}
+    )
+    check(created[0] == 303, f"Create custom field collection: {created[2][:300]}")
+    base = f"/admin/collections/{key}"
+    editor = props(owner, f"{base}/new")
+    slug = f"product-{suffix}"
+    values = {"price": 35.5, "note": f"NOTE-{suffix}", "secret": f"SECRET-{suffix}"}
+    data = {
+        "id": "",
+        "title": f"Composable product {suffix}",
+        "slug": slug,
+        "excerpt": "",
+        "content": "",
+        "category": "",
+        "image": "",
+        "image_alt": "",
+        "status": "published",
+        "featured": "0",
+        "published_at": "2026-11-04",
+        "version": "1",
+        "draft_key": editor["draftKey"],
+        "tags": "",
+        "stay": "1",
+        "custom_fields": json.dumps(values),
+    }
+    status, headers, body = owner.request(f"{base}/save", "POST", data)
+    check(status == 303, f"Save custom field content: {body[:300]}")
+    identifier = int(re.search(r"/(\d+)/edit", headers["location"]).group(1))
+    return {
+        "key": key,
+        "base": base,
+        "path": f"/{prefix}/{slug}",
+        "id": identifier,
+        "values": values,
+    }
+
+
+def editor_stylesheet(document):
+    """The editor preview's stylesheet for a document (resources/js/themes/builder/styles.ts)."""
+    generated = subprocess.run(
+        ["node", str(ROOT / "tests/design_stylesheet.mjs")],
+        input=json.dumps(document),
+        text=True,
+        capture_output=True,
+        check=True,
+        cwd=ROOT,
+    )
+    return generated.stdout
+
+
 def run():
     owner = login(os.environ["TEST_ADMIN_EMAIL"], os.environ["TEST_ADMIN_PASSWORD"])
     public = Client()
@@ -70,6 +158,7 @@ def verify(owner, public, fixtures):
     data_url = f"{editor_url}/data"
     document = studio["document"]
     media_id = None
+    products = None
     category = f"Source {secrets.token_hex(6)}"
     version = 1
 
@@ -317,6 +406,98 @@ def verify(owner, public, fixtures):
         )
         document = normalized["document"]
 
+        # One class's mobile rule must beat another class's and the node's own desktop rules.
+        document["classes"]["split"] = {
+            "desktop": {"normal": {"flex-direction": "row", "display": "flex"}}
+        }
+        document["classes"]["collapse"] = {
+            "desktop": {"normal": {"gap": "24px"}},
+            "tablet": {"normal": {"gap": "16px"}},
+            "mobile": {"normal": {"flex-direction": "column", "padding": "16px"}},
+        }
+        document["templates"]["Home"][0]["blocks"].append(
+            block(
+                "hero-actions",
+                classes=["split", "collapse"],
+                styles={
+                    "desktop": {"normal": {"padding": "48px"}},
+                    "mobile": {"normal": {"gap": "8px"}},
+                },
+            )
+        )
+        # Custom fields follow the item's public/list visibility in lists and on detail pages.
+        products = create_products(owner, secrets.token_hex(4))
+        document["feeds"].append(
+            {
+                "id": "products",
+                "name": "Products",
+                "collection": products["key"],
+                "limit": 4,
+                "category": "",
+                "tag": "",
+                "query": "",
+                "order": "id",
+                "direction": "DESC",
+            }
+        )
+        document["templates"]["Home"][1]["blocks"].append(
+            block(
+                "product-cards",
+                "repeat",
+                source="feed:products",
+                children=[
+                    block("product-price", "text", bindings={"text": "item.fields.price"}),
+                    block("product-note", "text", bindings={"text": "item.fields.note"}),
+                    block("product-secret", "text", bindings={"text": "item.fields.secret"}),
+                    block(
+                        "product-badge",
+                        "element",
+                        tag="span",
+                        attributes={"aria-label": "Price"},
+                        bindings={"text": "item.fields.price"},
+                    ),
+                    block(
+                        "product-priced",
+                        "text",
+                        text="Priced",
+                        condition={
+                            "field": "item.fields.price",
+                            "operator": "present",
+                            "value": "",
+                        },
+                    ),
+                    block(
+                        "product-noted",
+                        "text",
+                        text="Noted in list",
+                        condition={"field": "item.fields.note", "operator": "present", "value": ""},
+                    ),
+                ],
+            )
+        )
+        document["templates"]["ContentDetail"].append(
+            section(
+                "product-detail",
+                [
+                    block("detail-price", "text", bindings={"text": "item.fields.price"}),
+                    block("detail-note", "text", bindings={"text": "item.fields.note"}),
+                    block("detail-secret", "text", bindings={"text": "item.fields.secret"}),
+                ],
+            )
+        )
+        status, _, body = preview(document, normalize=True)
+        check(status == 200, f"Custom field bindings were rejected: {body[:200]}")
+        normalized = json.loads(body)
+        check(
+            set(normalized["feeds"]) == {"used", "products"},
+            "The custom field source was not resolved",
+        )
+        check(
+            [row["fields"] for row in normalized["feeds"]["products"]] == [{"price": 35.5}],
+            "A list source exposed custom fields outside its public list fields",
+        )
+        document = normalized["document"]
+
         invalid = copy.deepcopy(document)
         invalid["templates"]["Home"][0]["blocks"][0]["children"][0]["children"][0]["tag"] = "script"
         check(save(invalid)[0] == 422, "Executable HTML tag accepted")
@@ -340,6 +521,52 @@ def verify(owner, public, fixtures):
         invalid = copy.deepcopy(document)
         invalid["templates"]["Home"][0]["blocks"][0]["bindings"] = {"text": "auth.admin.email"}
         check(save(invalid)[0] == 422, "Private data binding accepted")
+        for path in [
+            "item.fields.price.amount",
+            "item.fields.Price",
+            "item.title.length",
+            "site.links.home",
+        ]:
+            invalid = copy.deepcopy(document)
+            invalid["templates"]["Home"][0]["blocks"][0]["bindings"] = {"text": path}
+            status, _, body = save(invalid)
+            check(
+                status == 422 and "item.fields.<key>" in json.loads(body)["error"],
+                f"A binding the renderer cannot read was accepted: {path}",
+            )
+            invalid = copy.deepcopy(document)
+            invalid["templates"]["Home"][0]["blocks"][0]["condition"] = {
+                "field": path,
+                "operator": "present",
+                "value": "",
+            }
+            check(save(invalid)[0] == 422, f"A condition the renderer cannot read: {path}")
+        invalid = copy.deepcopy(document)
+        invalid["templates"]["Home"][0]["blocks"][0]["attributes"] = {"data-kind": "grid"}
+        status, _, body = save(invalid)
+        check(
+            status == 422
+            and "Only HTML element blocks take attributes" in json.loads(body)["error"]
+            and "container block grid" in json.loads(body)["error"],
+            "Attributes on a container were accepted although only elements render them",
+        )
+        for font in ["16px Inter", "Inter,,serif", '"Inter', "Inter,", "   ", "inherit"]:
+            invalid = copy.deepcopy(document)
+            invalid["tokens"]["font"] = font
+            status, _, body = save(invalid)
+            check(
+                status == 422 and "font family name or font stack" in json.loads(body)["error"],
+                f"An invalid font stack was accepted: {font}",
+            )
+        for font in [
+            "sans",
+            "'DM Sans', Arial, sans-serif",
+            "IBM Plex Sans, -apple-system, system-ui, sans-serif",
+            '"Bob\'s Serif 2", Georgia, serif',
+        ]:
+            accepted = copy.deepcopy(document)
+            accepted["tokens"]["font"] = font
+            check(preview(accepted)[0] == 200, f"A valid font stack was rejected: {font}")
         deep = block("deep-0")
         cursor = deep
         for index in range(1, 18):
@@ -355,7 +582,10 @@ def verify(owner, public, fixtures):
             owner.request(f"{base}/enable", "POST", {})[0] == 303, "Composed theme activate failed"
         )
         public_props = props(public, "/")
-        check(set(public_props["themeFeeds"]) == {"used"}, "Public source context is incorrect")
+        check(
+            set(public_props["themeFeeds"]) == {"used", "products"},
+            "Public source context is incorrect",
+        )
         check(len(public_props["themeFeeds"]["used"]) == 2, "Public source lost its SQL limit")
         html = public.request("/")[2]
         for expected in ["A composed layout", "Reusable notice", "Composable source 000"]:
@@ -376,6 +606,54 @@ def verify(owner, public, fixtures):
             "max-width:600px",
         ]:
             check(expected in css, f"Composed design stylesheet is missing: {expected}")
+        check(
+            css == editor_stylesheet(document),
+            "The published stylesheet differs from the editor preview's",
+        )
+        check(
+            css.count("@media(max-width:900px)") == 1 and css.count("@media(max-width:600px)") == 1,
+            "Responsive rules were not grouped into one tablet and one mobile block",
+        )
+        actions = '.hp-design [data-design-node="hero-actions"]'
+        order = [
+            css.find(".hp-design .design-class-collapse{gap:24px;}"),
+            css.find(".hp-design .design-class-split{display:flex;flex-direction:row;}"),
+            css.find(f"{actions}{{padding:48px;}}"),
+            css.find("@media(max-width:900px){"),
+            css.find("@media(max-width:600px){"),
+            css.find(".hp-design .design-class-collapse{flex-direction:column;padding:16px;}"),
+            css.find(f"{actions}{{gap:8px;}}"),
+        ]
+        check(
+            -1 not in order and order == sorted(order),
+            f"Stylesheet cascade order is wrong: {order}",
+        )
+        price = re.escape("35.5")
+        for pattern, message in [
+            (rf'data-design-node="product-price"[^>]*>{price}</p>', "List custom field"),
+            (
+                rf'<span [^>]*aria-label="Price" data-design-node="product-badge"[^>]*>{price}</span>',
+                "Element custom field",
+            ),
+            (r'data-design-node="product-priced"[^>]*>Priced</p>', "Custom field condition"),
+        ]:
+            check(re.search(pattern, html) is not None, f"{message} did not render")
+        check(
+            products["values"]["note"] not in html
+            and products["values"]["secret"] not in html
+            and "Noted in list" not in html,
+            "A list rendered a custom field outside its public list fields",
+        )
+        detail = public.request(products["path"])[2]
+        check(
+            re.search(rf'data-design-node="detail-price"[^>]*>{price}</p>', detail) is not None
+            and re.search(
+                rf'data-design-node="detail-note"[^>]*>{products["values"]["note"]}</p>', detail
+            )
+            is not None
+            and products["values"]["secret"] not in detail,
+            "A detail page did not follow the public custom field rules",
+        )
         check(html.count("Reusable notice") >= 2, "Shared component did not render both instances")
         check(
             owner.request(f"/admin/media/{str(media_id)}/trash", "POST", {})[0] == 422,
@@ -436,6 +714,10 @@ def verify(owner, public, fixtures):
         owner.request("/admin/settings", "POST", original_site)
         owner.request(f"/admin/themes/{original_theme}/enable", "POST", {})
         owner.request(f"{base}/uninstall", "POST", {})
+        if products is not None:
+            owner.request(f"{products['base']}/{str(products['id'])}/delete", "POST", {})
+            fixtures.delete("editor_drafts", [("kind", "=", products["key"])])
+            owner.request(f"/admin/content-types/{products['key']}/delete", "POST", {})
         fixtures.delete("items", [("category", "=", category)])
         if media_id is not None:
             owner.request(f"/admin/media/{str(media_id)}/trash", "POST", {})

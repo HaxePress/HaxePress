@@ -687,7 +687,7 @@ export default function DesignInspector(props: DesignInspectorProps) {
             )}
             {selectedTab === 'advanced' && (
               <>
-                {block && (
+                {block?.type === 'element' && (
                   <Attributes
                     value={block.attributes || {}}
                     onChange={(attributes) => onBlock({ attributes })}
