@@ -129,7 +129,7 @@
   "Choose a supported expiry.": "Choose a supported expiry.",
   "This MCP link is already connected; its expiry can no longer change.": "This MCP link is already connected; its expiry can no longer change.",
   "Unpublished changes. Visitors see the last published design.": "Unpublished changes. Visitors see the last published design.",
-  "Via MCP": "Via MCP",
+  "MCP": "MCP",
   "Image library sections": "Image library sections",
   "Deleted permanently in {count} days": "Deleted permanently in {count} days",
   "Delete permanently": "Delete permanently",

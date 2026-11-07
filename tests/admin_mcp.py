@@ -424,7 +424,9 @@ def verify_media_and_content(owner, public, connection):
             )
         activity = owner.request("/admin/activity")[2]
         check(
-            'class="featured-text"' in activity and "Via MCP" in activity,
+            'class="featured-text"' in activity
+            and " MCP</span>" in activity
+            and "Via MCP" not in activity,
             "The activity page did not mark MCP changes",
         )
     finally:

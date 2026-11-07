@@ -601,6 +601,12 @@ def run():
             "/storage/cms.sqlite",
         ]:
             check(public.request(path)[0] in (403, 404), f"unsafe storage path exposed: {path}")
+        # A missing image gets the site's own 404 page, like any other missing page.
+        status, _, missing = public.request(f"/media/{'b' * 32}.png")
+        check(
+            status == 404 and "<html" in missing and "Image not found." not in missing,
+            f"a missing image did not get the site's 404 page: {missing[:120]!r}",
+        )
         mark(
             "Private image staging, session-bound hash confirmation and PublicHandler media serving"
         )
@@ -829,6 +835,14 @@ def run():
             str(json.loads(payload)["props"]["featured"]["id"]) == content_id,
             "featured homepage cache is stale",
         )
+        # The administration marks the featured item in Recent content and in the content list.
+        for page in ["/admin", "/admin/content"]:
+            rows = [row.split("</tr>", 1)[0] for row in admin.request(page)[2].split("<tr>")]
+            featured_row = next((row for row in rows if f"/{content_id}/edit" in row), "")
+            check(
+                'class="featured-text"' in featured_row,
+                f"{page} does not mark the featured content item",
+            )
         data["status"] = "draft"
         check(
             admin.request("/admin/content/save", "POST", data)[0] == 303,

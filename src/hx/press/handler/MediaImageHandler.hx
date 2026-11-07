@@ -1,28 +1,30 @@
 package hx.press.handler;
 
 import hx.press.media.MediaReferences;
-import hx.well.handler.PublicHandler;
-import hx.well.http.Request;
-import hx.well.http.AbstractResponse;
-import hx.well.http.ResponseBuilder;
 import hx.well.facades.Storage;
+import hx.well.handler.PublicHandler;
+import hx.well.http.AbstractResponse;
+import hx.well.http.Request;
+import hx.well.http.ResponseStatic.abort;
 import hx.well.storage.InvalidStoragePath;
 
+/** Serves media library images; anything else gets the site's own error page. **/
 class MediaImageHandler extends PublicHandler {
     public override function execute(request:Request):AbstractResponse {
         var filename = request.route("filename");
-        if (!MediaReferences.validFilename(filename))
-            return ResponseBuilder.asString("Image not found.", 404)
-                .header("Content-Type", "text/plain; charset=utf-8");
+        if (!MediaReferences.validFilename(filename)) {
+            abort(404);
+        }
         var disk = Storage.disk("media");
         try {
             if (!disk.fileExists(filename)) {
-                return ResponseBuilder.asString("Image not found.", 404);
+                abort(404);
             }
             return disk.response(filename, filename,
                 ["Cache-Control" => "public, max-age=31536000, immutable"]);
         } catch (_:InvalidStoragePath) {
-            return ResponseBuilder.asString("Image not found.", 403);
+            abort(403);
+            return null;
         }
     }
 }

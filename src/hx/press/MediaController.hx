@@ -5,6 +5,7 @@ import hx.press.Pagination;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
+import hx.well.http.ResponseStatic.abort;
 import hx.press.model.MediaAsset;
 import hx.press.media.MediaUsage;
 import hx.press.media.MediaReferenceReport;
@@ -184,7 +185,7 @@ class MediaController {
         var disk = Storage.disk("media");
         var path = image == null ? "" : MediaCatalog.trashPath(image.filename);
         if (image == null || !disk.fileExists(path)) {
-            return ResponseBuilder.asString("Image not found.", 404);
+            abort(404);
         }
         return disk.response(path, image.filename, ["Cache-Control" => "private, no-store"]);
     }

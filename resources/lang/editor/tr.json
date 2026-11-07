@@ -129,7 +129,7 @@
   "Choose a supported expiry.": "Desteklenen bir süre seçin.",
   "This MCP link is already connected; its expiry can no longer change.": "Bu MCP bağlantısı kullanılmaya başlandı; süresi artık değiştirilemez.",
   "Unpublished changes. Visitors see the last published design.": "Yayımlanmamış değişiklikler var. Ziyaretçiler son yayımlanan tasarımı görür.",
-  "Via MCP": "MCP üzerinden",
+  "MCP": "MCP",
   "Image library sections": "Görsel kitaplığı bölümleri",
   "Deleted permanently in {count} days": "{count} gün sonra kalıcı olarak silinecek",
   "Delete permanently": "Kalıcı olarak sil",
