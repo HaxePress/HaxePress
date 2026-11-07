@@ -281,8 +281,8 @@ class View {
 
     /**
         Whether to answer with page data instead of HTML: for tests, with the
-        `WELL_DATA_RESPONSES` switch, and for the site MCP host, which reads
-        administration pages as data on its authenticated internal requests.
+        `WELL_DATA_RESPONSES` switch, and for the site's MCP tools, which read
+        administration pages as data on their authorized in-process requests.
     **/
     public static function isDataRequest(request:Null<Request>):Bool {
         if (request == null || request.header("X-Well-Data") != "true") {

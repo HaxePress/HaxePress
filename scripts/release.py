@@ -85,11 +85,14 @@ The database lives in `data/` and uploaded files in `storage/`. Keep `.env`,
 `data/` and `storage/` when you upgrade; replace everything else. Compiled
 templates are kept in `storage/cache/views` as PHP files.
 
-## What needs the JVM build
+## AI connections (MCP)
 
-The site MCP server (AI connections) and live theme collaboration need a
-long-running process and WebSockets, which the PHP build does not have.
-Use the JVM build for them.
+The site serves MCP itself at the `/mcp/sessions/...` links that **Connect AI**
+generates; no other program is needed. The PHP build has no WebSockets, so
+the admin pages and the theme editor send their MCP messages over HTTP and
+check for changes every few seconds instead of receiving them live. The
+`preview_theme_design` tool, which looks at a theme in headless Chrome,
+needs the JVM build.
 
 ## Extension packages
 
@@ -104,9 +107,8 @@ HaxePress {cms} (plugin API {api}) built for the JVM.
 
 ## Requirements
 
-- Java 21 or later.
-- Node.js 22 or later, for the site's MCP server (AI connections). Without
-  it the site runs and MCP stays unavailable.
+- Java 21 or later. The site serves its pages and its MCP server (AI
+  connections) itself.
 - Chrome or Chromium, only for the MCP theme preview tool.
 
 ## Install

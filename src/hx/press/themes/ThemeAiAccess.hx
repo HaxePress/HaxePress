@@ -3,6 +3,7 @@ package hx.press.themes;
 import haxe.crypto.Sha256;
 import hx.press.ai.AdminMcpAccess;
 import hx.press.ai.AdminMcpAccess.AdminMcpError;
+import hx.press.ai.AdminMcpAccess.AdminMcpGrant;
 import hx.press.themes.ThemeAiPermissions.AiPermissions;
 import hx.well.facades.Cache;
 import hx.well.facades.Config;
@@ -34,7 +35,8 @@ class ThemeAiAccess {
         if (StringTools.startsWith(authorization, "Bearer hxb_")) {
             return authenticateToken(themeId, authorization);
         }
-        var actor = AdminMcpAccess.delegated(request);
+        // An in-process request of an MCP connection names the account it acts as.
+        var actor:Null<AdminMcpGrant> = request.getAttribute(AdminMcpAccess.ACTOR, null);
         if (actor == null) {
             return null;
         }

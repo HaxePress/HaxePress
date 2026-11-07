@@ -6,7 +6,7 @@ import type useThemeAiSync from './useThemeAiSync';
 import type { AiPermissions } from './ThemeDesignerConnection';
 
 interface Connection {
-  hosted: boolean;
+  websocket: boolean;
   permissions: AiPermissions;
   mediaAllowed: boolean;
 }
@@ -218,9 +218,6 @@ export default function ThemeAiPanel({
             </button>
           </fieldset>
           <div className="theme-ai-credentials">
-            {!connection.hosted && (
-              <Alert error message="The site collaboration service is unavailable." />
-            )}
             <button
               className="button button-outline"
               type="button"

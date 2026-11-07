@@ -22,7 +22,9 @@ class AdminMcpRemoteMiddleware extends AbstractMiddleware {
             return ResponseBuilder.asJson({error: "This MCP origin is not allowed."}, 403);
         }
         try {
-            AdminMcpAccess.authenticate(request.route("id"), request.header("Authorization", ""));
+            var actor = AdminMcpAccess.authenticate(request.route("id"),
+                request.header("Authorization", ""));
+            request.setAttribute(AdminMcpController.LINK, actor);
         } catch (error:AdminMcpError) {
             return AdminMcpController.rejected(error);
         }

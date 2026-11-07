@@ -8,7 +8,7 @@ The current release is **2.16.0**, with **plugin/theme API 4**. The application 
 
 ## Run locally
 
-Install Git, Make, Python 3.12+, Java 21+, Maven, Node.js 22.12+ with npm, and Neko for the HxWell CLI. Install uv if you run the format checks. Setup uses Haxe 4.3.7 and installs the Haxe libraries and Git snapshots from `dependencies.lock.json` in the workspace. Maven resolves the JVM dependencies from `pom.xml` and copies the runtime JARs into `java-lib`. For development, set `HXWELL_PATH`, `HXWELL_CROSSBYTE_PATH` or `WELLOUT_PATH` to a compatible local checkout.
+Install Git, Make, Python 3.12+, Java 21+, Maven, Node.js 22.12+ with npm (to build the front-end assets and run the tests; the site itself runs without Node.js), and Neko for the HxWell CLI. Install uv if you run the format checks. Setup uses Haxe 4.3.7 and installs the Haxe libraries and Git snapshots from `dependencies.lock.json` in the workspace. Maven resolves the JVM dependencies from `pom.xml` and copies the runtime JARs into `java-lib`. For development, set `HXWELL_PATH`, `HXWELL_CROSSBYTE_PATH` or `WELLOUT_PATH` to a compatible local checkout.
 
 ```sh
 make setup
@@ -40,7 +40,7 @@ python3 scripts/hxwell.py build jvm
 python3 scripts/run.py
 ```
 
-The launcher starts the JVM HTTP application, which renders every page itself; no Node.js process takes part in rendering. The JVM also manages the private Node.js MCP SDK host for admin and theme tools. Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `DATA_PATH`, `STORAGE_PATH`, `CACHE_PATH` and `SESSION_PATH` in `.env`. The default database is `data/cms.sqlite`; `storage/` holds uploaded files, caches and sessions. [MCP setup](docs/THEME-MCP.md)
+The launcher starts the JVM HTTP application, which renders every page and serves the site's MCP server (admin and theme tools) itself; no Node.js process runs with the site. Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `DATA_PATH`, `STORAGE_PATH`, `CACHE_PATH` and `SESSION_PATH` in `.env`. The default database is `data/cms.sqlite`; `storage/` holds uploaded files, caches and sessions. [MCP setup](docs/THEME-MCP.md)
 
 ## Definition-driven CMS
 
@@ -123,7 +123,7 @@ PHP starts the application for each request, so the PHP build:
 - runs due scheduled tasks after responses and from `php hxwell.boot.php schedule:run`, which cron can call every minute;
 - sends errors to PHP's error log.
 
-The site MCP server and live theme collaboration need a long-running process and WebSockets, so they are available only in the JVM build. `python3 tests/php_application.py` checks the packaged PHP build.
+The MCP server is the same Haxe code on both builds and keeps no state between requests, so PHP serves it too. PHP has no WebSockets: the admin pages and the theme editor post their MCP messages over HTTP and poll for changes instead of receiving them live, and the `preview_theme_design` tool, which drives headless Chrome, needs the JVM build. `python3 tests/php_application.py` checks the packaged PHP build, including an MCP link.
 
 ## Releases
 

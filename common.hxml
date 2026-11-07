@@ -17,3 +17,9 @@
 -D env_file=.env
 -D hxwell_config_package=hx.press.config
 -lib wellout
+# The theme design skill the MCP server serves; see hx.press.mcp.McpSkills.
+-resource mcp/skills/haxepress-theme-design/SKILL.md@mcp.skill.SKILL.md
+-resource mcp/skills/haxepress-theme-design/references/document-model.md@mcp.skill.references/document-model.md
+-resource mcp/skills/haxepress-theme-design/references/edit-operations.md@mcp.skill.references/edit-operations.md
+-resource mcp/skills/haxepress-theme-design/references/rendered-markup.md@mcp.skill.references/rendered-markup.md
+-resource mcp/skills/haxepress-theme-design/references/visual-review.md@mcp.skill.references/visual-review.md

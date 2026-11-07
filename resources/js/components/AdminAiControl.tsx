@@ -22,7 +22,8 @@ interface McpSession extends Omit<McpConnection, 'token'> {
 
 interface AiState {
   sessions: McpSession[];
-  hosted: boolean;
+  /** False where the site runs without WebSockets, as on PHP: the page then polls. */
+  websocket: boolean;
 }
 
 /** How long a new MCP link lasts, in hours; the server accepts these values. */
@@ -103,11 +104,7 @@ export default function AdminAiControl({
     setState(null);
     void refresh().then((initial) => {
       if (stopped) return;
-      if (initial?.hosted === false) {
-        setStatus('disconnected');
-        return;
-      }
-      stop = startAdminMcp(setStatus, () => void refresh());
+      stop = startAdminMcp(setStatus, () => void refresh(), initial?.websocket !== false);
     });
     window.addEventListener('haxepress:connect-ai', open);
     return () => {
@@ -123,10 +120,11 @@ export default function AdminAiControl({
   }, [show]);
 
   useEffect(() => {
-    if (!show || !hasSessions) return;
+    // Without WebSockets the server cannot announce changes, so an open dialog always polls.
+    if (!show || (!hasSessions && state?.websocket !== false)) return;
     const interval = window.setInterval(() => void refresh(), 10000);
     return () => window.clearInterval(interval);
-  }, [show, hasSessions]);
+  }, [show, hasSessions, state?.websocket]);
 
   async function change(method: 'POST' | 'DELETE', selection: RemoteProfile | string) {
     setBusy(true);
@@ -315,7 +313,7 @@ export default function AdminAiControl({
                   <button
                     className="button"
                     type="button"
-                    disabled={busy || !state?.hosted}
+                    disabled={busy || !state}
                     onClick={() => void change('POST', profile)}
                   >
                     {t('Generate MCP connection')}

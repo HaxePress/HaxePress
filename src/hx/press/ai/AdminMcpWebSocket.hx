@@ -3,12 +3,20 @@ package hx.press.ai;
 import haxe.Exception;
 import haxe.io.Bytes;
 import hx.press.CmsAccess;
-import hx.press.themes.ThemeMcpHost;
+import hx.press.mcp.McpEndpoint;
 import hx.well.database.Connection;
+import hx.well.http.Request;
 import hx.well.http.RequestStatic;
+import hx.well.http.Response;
 import hx.well.websocket.AbstractWebSocketHandler;
 import hx.well.websocket.WebSocketSession;
 
+/**
+    The signed-in admin page's MCP connection. Browsers send JSON-RPC
+    messages over a WebSocket, which also delivers change notices; where
+    the site runs without WebSockets (PHP), the page posts each message to
+    the same address and polls for changes instead.
+**/
 class AdminMcpWebSocket extends AbstractWebSocketHandler {
     public function new() {
         super();
@@ -19,7 +27,7 @@ class AdminMcpWebSocket extends AbstractWebSocketHandler {
         var request = RequestStatic.request();
         try {
             var admin = CmsAccess.current();
-            if (!ThemeMcpHost.available() || admin == null) {
+            if (admin == null) {
                 socket.close();
             } else {
                 AdminMcpSockets.browser(socket, admin.id, request.session.sessionKey);
@@ -31,35 +39,39 @@ class AdminMcpWebSocket extends AbstractWebSocketHandler {
     }
 
     public function onMessage(socket:WebSocketSession, message:String):Void {
-        var body = Bytes.ofString(message);
-        if (body.length > ThemeMcpHost.MAX_REQUEST_BYTES) {
+        if (Bytes.ofString(message).length > McpEndpoint.MAX_REQUEST_BYTES) {
             socket.close();
             return;
         }
         try {
-            var key = AdminMcpSockets.sessionKey(socket);
-            if (AdminMcpAccess.browser(key) == null) {
+            var grant = AdminMcpAccess.browserGrant(AdminMcpSockets.sessionKey(socket));
+            if (grant == null) {
                 Connection.free();
                 socket.close();
                 return;
             }
+            var reply = McpEndpoint.message(message, () -> AdminMcpServer.create(grant));
             Connection.free();
-            var headers = [
-                "Accept" => "application/json, text/event-stream",
-                "Content-Type" => "application/json",
-                "X-Haxepress-Transport" => "websocket",
-                AdminMcpAccess.BROWSER_HEADER => key
-            ];
-            var reply = ThemeMcpHost.exchangeAdmin(null, "", "POST", body, headers);
             if (reply.status >= 500) {
                 socket.close();
-            } else if (reply.status != 202 && reply.status != 204 && reply.body.length > 0) {
-                socket.send(reply.body.toString());
+            } else if (reply.body != null) {
+                socket.send(reply.body);
             }
         } catch (_:Dynamic) {
             Connection.free();
             socket.close();
         }
+    }
+
+    /** One message of a browser that cannot open a WebSocket, answered over HTTP. **/
+    override public function onPost(request:Request):Null<Response> {
+        var grant = AdminMcpAccess.browserGrant(request.session.sessionKey);
+        if (grant == null) {
+            return McpEndpoint.respond({status: 401, body: null});
+        }
+        var body = request.bodyBytes ?? Bytes.alloc(0);
+        return McpEndpoint.respond(McpEndpoint.message(body.toString(),
+            () -> AdminMcpServer.create(grant)));
     }
 
     public function onBinary(socket:WebSocketSession, data:Bytes):Void {

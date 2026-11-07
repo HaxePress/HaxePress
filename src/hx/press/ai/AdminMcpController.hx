@@ -2,23 +2,23 @@ package hx.press.ai;
 
 import hx.press.CmsAccess;
 import hx.press.access.Roles;
+import hx.press.ai.AdminMcpAccess.AdminMcpActor;
 import hx.press.ai.AdminMcpAccess.AdminMcpError;
-import hx.press.themes.ThemeMcpController;
-import hx.press.themes.ThemeMcpHost;
+import hx.press.mcp.McpEndpoint;
 import hx.press.view.ViewRoots;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
 
 class AdminMcpController {
+    /** The authenticated link of a remote MCP request, set by `AdminMcpRemoteMiddleware`. **/
+    public static inline var LINK = "hx.press.admin-mcp.link";
+
     public static function state(request:Request):AbstractResponse {
         return json(AdminMcpAccess.state(CmsAccess.current()));
     }
 
     public static function issue(request:Request):AbstractResponse {
-        if (!ThemeMcpHost.available()) {
-            return json({error: "The site MCP service is unavailable."}, 503);
-        }
         if (!request.validate([
             "profile" => [
                 Required,
@@ -62,24 +62,12 @@ class AdminMcpController {
         }
     }
 
+    /** Streamable HTTP for a generated MCP link, served by this process. **/
     public static function endpoint(request:Request):AbstractResponse {
-        if (request.bodyBytes != null && request.bodyBytes.length > ThemeMcpHost.MAX_REQUEST_BYTES) {
-            return json({error: "The MCP request exceeds its size limit."}, 413);
-        }
-        try {
-            var id = request.route("id");
-            var body = request.method == "POST" ? request.bodyBytes : null;
-            var headers = ThemeMcpController.forwardHeaders(request);
-            var reply = ThemeMcpHost.exchangeAdmin(id, request.header("Authorization"),
-                request.method, body, headers);
-            var response = ThemeMcpController.respond(reply);
-            if (reply.status >= 200 && reply.status < 300) {
-                AdminMcpAccess.recordSeen(id);
-            }
-            return response;
-        } catch (_:Dynamic) {
-            return json({error: "The site MCP service is unavailable."}, 503);
-        }
+        var actor:AdminMcpActor = request.getAttribute(LINK);
+        var grant = AdminMcpAccess.grant(actor);
+        return McpEndpoint.http(request, () -> AdminMcpServer.create(grant),
+            () -> AdminMcpAccess.recordSeen(actor.sessionId));
     }
 
     public static function routes(request:Request):AbstractResponse {

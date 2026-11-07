@@ -8,7 +8,6 @@ import hx.press.media.ImageUploads;
 import hx.press.packages.PackageManager;
 import hx.press.plugins.PluginRuntime;
 import hx.press.scheduling.ScheduledJobs;
-import hx.press.themes.ThemeMcpHost;
 import hx.well.database.Connection;
 import hx.well.facades.Cache;
 import hx.well.facades.Storage;
@@ -63,7 +62,6 @@ class SiteRuntime {
         #end
         PluginRuntime.boot();
         ScheduledJobs.start();
-        ThemeMcpHost.start();
         Connection.free();
         #if jvm
         JavaRuntime.getRuntime().addShutdownHook(new JavaThread(new JvmPluginShutdown()));

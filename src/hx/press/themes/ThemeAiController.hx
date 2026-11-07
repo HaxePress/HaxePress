@@ -32,12 +32,12 @@ class ThemeAiController {
             mediaAllowed: CmsAccess.can("media"),
             presence: ThemeCollaboration.presence(id),
             browserPath: '/admin/themes/${id}/ai/ws',
-            hosted: ThemeMcpHost.available()
+            websocket: #if php false #else true #end
         }).header("Cache-Control", "private, no-store");
     }
 
     /**
-        A one-minute pass for the MCP host's headless browser to load this
+        A one-minute pass for the preview browser to load this
         theme's preview pages as the connected admin, so an AI can look at
         the design: the frame address and the ticket it sends.
     **/

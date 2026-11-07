@@ -19,6 +19,7 @@ TRANSIENT = [
     "package_uploads",
     "image_uploads",
     "theme_ai_connections",
+    "admin_mcp_links",
     "scheduled_backup_files",
 ]
 # Backups leave out the markers that vouch for bundled plugin files, so a restored site

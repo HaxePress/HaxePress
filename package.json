@@ -8,19 +8,17 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "build": "npm run build:themes && npm run build:mcp && vite build",
+    "build": "npm run build:themes && vite build",
     "format:haxe": "haxelib run formatter -s src -s tests/haxe -s tests/plugins -s examples/plugins",
     "format:web": "prettier --write mcp resources/js resources/css resources/views resources/lang resources/themes examples tests/plugins scripts/*.mjs tests/*.mjs vite.config.ts",
     "format:python": "UV_TOOL_DIR=.tools/uv-tools uv --cache-dir .tools/uv-cache tool run --from black==26.10.1 black scripts tests",
     "format": "npm run format:haxe && npm run format:web && npm run format:python",
     "format:check": "haxelib run formatter -s src -s tests/haxe -s tests/plugins -s examples/plugins --check && prettier --check mcp resources/js resources/css resources/views resources/lang resources/themes examples tests/plugins scripts/*.mjs tests/*.mjs vite.config.ts && UV_TOOL_DIR=.tools/uv-tools uv --offline --cache-dir .tools/uv-cache tool run --from black==26.10.1 black --check scripts tests",
     "build:themes": "node scripts/build_themes.mjs",
-    "test:theme-builder": "node tests/theme_builder_model.mjs",
-    "build:mcp": "node scripts/build_theme_mcp.mjs"
+    "test:theme-builder": "node tests/theme_builder_model.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "2.4.0",
-    "@modelcontextprotocol/server": "2.4.0",
     "html-to-image": "1.11.13",
     "react": "19.2.9",
     "react-dom": "19.2.9",

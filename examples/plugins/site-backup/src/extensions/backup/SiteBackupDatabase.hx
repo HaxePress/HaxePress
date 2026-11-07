@@ -30,6 +30,7 @@ class SiteBackupDatabase {
         "package_uploads",
         "image_uploads",
         "theme_ai_connections",
+        "admin_mcp_links",
         "scheduled_backup_files"
     ];
     static final CONTENT = [

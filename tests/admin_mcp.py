@@ -275,6 +275,21 @@ def verify_expiry(owner, public):
         "An unused MCP link's expiry did not change",
     )
     tool_names(public, hour)
+    # Links live in the database, so they keep their lifetime across restarts.
+    with FixtureStore.from_environment() as store:
+        stored = store.rows(
+            "admin_mcp_links",
+            ["expires_epoch", "token_hash", "first_seen_epoch"],
+            [("id", "=", hour["id"])],
+            limit=1,
+        )
+    check(
+        len(stored) == 1
+        and stored[0]["expires_epoch"] == changed["expires"]
+        and stored[0]["token_hash"] == hashlib.sha256(hour["token"].encode()).hexdigest()
+        and stored[0]["first_seen_epoch"] > 0,
+        f"The MCP link was not kept in the database: {stored}",
+    )
     status, _, body = post_json(owner, f"{STATE}/sessions/{hour['id']}/expiry", {"hours": 1})
     check(
         status == 409 and session_status(owner, hour)["expires"] == changed["expires"],
@@ -282,7 +297,7 @@ def verify_expiry(owner, public):
     )
     owner.request(f"{STATE}/sessions/{hour['id']}", "DELETE", {})
     print(
-        "PASS Admin MCP: chosen link lifetimes, expiry changes before first use, unknown links 404",
+        "PASS Admin MCP: chosen link lifetimes kept in the database, expiry changes before first use, unknown links 404",
         flush=True,
     )
 

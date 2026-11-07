@@ -6,12 +6,15 @@ release, unpacks it into a temporary folder, creates its .env with
 setup.php and serves it with PHP's built-in server from public/, as a web
 server runs the front controller. It installs the site with sample content
 and checks public pages, the administration, a bundled plugin, a content
-save, the compiled template cache and the schedule command.
+save, the compiled template cache, the schedule command and MCP: a
+generated link answers initialize, tools/list and a read tool, and the
+signed-in page reaches its MCP tools over HTTP.
 """
 
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import socket
@@ -19,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.parse
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,6 +153,99 @@ def run(app, url):
         ["php", "hxwell.boot.php", "schedule:run"], cwd=app, capture_output=True, text=True
     )
     check(scheduled.returncode == 0, "the schedule command runs")
+    check_mcp(admin, url)
+
+
+MODERN = "2026-07-28"
+
+
+def check_mcp(admin, url):
+    """MCP on PHP, where each request runs in a new process: the server keeps no state."""
+    from e2e import Client
+    from validation import post_json
+
+    status, _, body = admin.request("/admin/ai")
+    check(status == 200 and json.loads(body)["websocket"] is False, "browsers reach MCP over HTTP")
+    status, _, body = post_json(admin, "/admin/ai/sessions", {"profile": "claude"})
+    check(status == 201, "an MCP link is generated")
+    link = json.loads(body)
+    path = urllib.parse.urlsplit(link["url"]).path
+    public = Client()
+    credentials = {
+        "Authorization": f"Bearer {link['token']}",
+        "Accept": "application/json, text/event-stream",
+    }
+
+    def rpc(message, headers=None):
+        status, _, body = post_json(public, path, message, {**credentials, **(headers or {})})
+        return status, json.loads(body) if body else None
+
+    initialize = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "php-check", "version": "1.0.0"},
+        },
+    }
+    status, reply = rpc(initialize)
+    result = reply["result"]
+    check(
+        status == 200
+        and result["serverInfo"]["name"] == "haxepress-admin"
+        and result["protocolVersion"] == "2025-11-25"
+        and "tools" in result["capabilities"],
+        "MCP initialize answers",
+    )
+    status, _ = rpc({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    check(status == 202, "MCP accepts the initialized notification")
+    status, reply = rpc({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+    names = {tool["name"] for tool in reply["result"]["tools"]}
+    check(
+        status == 200
+        and {"list_content", "get_content", "edit_theme_design", "upload_media_image"} <= names
+        and "preview_theme_design" not in names,
+        "MCP tools/list returns the admin catalog without the JVM-only preview",
+    )
+    call = {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {"name": "list_content", "arguments": {"collection": "entry", "query": "PHP"}},
+    }
+    status, reply = rpc(call)
+    result = reply["result"]
+    check(
+        status == 200
+        and not result.get("isError")
+        and result["structuredContent"]["status"] == 200
+        and "escaping-on-php" in json.dumps(result["structuredContent"]),
+        "the list_content tool reads content through the admin routes",
+    )
+    meta = {"io.modelcontextprotocol/protocolVersion": MODERN}
+    discover = {"jsonrpc": "2.0", "id": 4, "method": "server/discover", "params": {"_meta": meta}}
+    status, reply = rpc(discover, {"MCP-Protocol-Version": MODERN, "Mcp-Method": "server/discover"})
+    check(
+        status == 200 and reply["result"]["supportedVersions"] == [MODERN],
+        "the 2026-07-28 revision is discovered",
+    )
+    status, _, _ = public.request(path, extra_headers=credentials)
+    check(status == 405, "GET has no event stream and answers 405")
+    browser = {"jsonrpc": "2.0", "id": 5, "method": "tools/list", "params": {"_meta": meta}}
+    status, _, body = post_json(admin, "/admin/ai/ws", browser, {"Origin": url})
+    tools = json.loads(body)["result"]["tools"] if status == 200 else []
+    check(
+        any(tool["name"] == "set_content_cover" for tool in tools),
+        "the signed-in page's MCP messages work over HTTP",
+    )
+    check(
+        admin.request(f"/admin/ai/sessions/{link['id']}", "DELETE", {})[0] == 200,
+        "the MCP link is revoked",
+    )
+    status, _ = rpc({"jsonrpc": "2.0", "id": 6, "method": "tools/list"})
+    check(status == 404, "a revoked MCP link stops working")
 
 
 def main():
@@ -157,10 +254,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix="haxepress-php-") as name:
         app = unpack(Path(name))
         subprocess.run(["php", "setup.php"], cwd=app, check=True)
-        with open(app / ".env", "a") as settings:
-            settings.write("\nWELL_DATA_RESPONSES=1\n")
         port = free_port()
         url = f"http://127.0.0.1:{port}"
+        # MCP links and trusted browser origins use the site's own address.
+        settings = re.sub(r"(?m)^APP_URL=.*$", f"APP_URL={url}", (app / ".env").read_text())
+        (app / ".env").write_text(f"{settings}\nWELL_DATA_RESPONSES=1\n")
         os.environ["TEST_URL"] = url
         log = open(app / "server.log", "w")
         server = subprocess.Popen(

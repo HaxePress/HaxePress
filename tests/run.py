@@ -113,13 +113,23 @@ def stop(process):
             process.wait()
 
 
-def verify_shutdown(process, log):
+def child_processes(process):
+    """The site's direct child processes, by process ID and executable name."""
     snapshot = subprocess.check_output(["ps", "-axo", "pid=,ppid=,comm="], text=True)
     children = []
     for line in snapshot.splitlines():
         fields = line.split(maxsplit=2)
-        if len(fields) == 3 and fields[1] == str(process.pid) and Path(fields[2]).name == "node":
-            children.append(int(fields[0]))
+        if len(fields) == 3 and fields[1] == str(process.pid):
+            children.append((int(fields[0]), Path(fields[2]).name))
+    return children
+
+
+def verify_shutdown(process, log):
+    processes = child_processes(process)
+    if any(name == "node" for _, name in processes):
+        raise RuntimeError("The site started a Node.js process.")
+    # The MCP preview tool's headless browser is the only process the site starts.
+    children = [pid for pid, name in processes if "chrom" in name.lower()]
     stop(process)
     deadline = time.monotonic() + 3
     for child in children:
@@ -131,7 +141,7 @@ def verify_shutdown(process, log):
             time.sleep(0.02)
         else:
             os.kill(child, 15)
-            raise RuntimeError("The site left its MCP child process running after shutdown.")
+            raise RuntimeError("The site left its preview browser running after shutdown.")
     log.flush()
     log.seek(0)
     shutdown_log = log.read()
@@ -141,8 +151,9 @@ def verify_shutdown(process, log):
     ):
         raise RuntimeError("Plugin destruction failed during graceful JVM shutdown.")
     print("PASS Graceful JVM shutdown destroys all running plugin instances", flush=True)
+    print("PASS The site serves MCP without a Node.js process", flush=True)
     if children:
-        print("PASS Site shutdown terminates its hosted MCP process", flush=True)
+        print("PASS Site shutdown stops the MCP preview browser", flush=True)
 
 
 with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:

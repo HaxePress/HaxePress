@@ -21,7 +21,6 @@
   "include": [
     "resources/js/**/*.ts",
     "resources/js/**/*.tsx",
-    "vite.config.ts",
-    "mcp/**/*.ts"
+    "vite.config.ts"
   ]
 }

@@ -4,8 +4,11 @@ import haxe.Exception;
 import haxe.Json;
 import haxe.io.Bytes;
 import hx.press.CmsAccess;
+import hx.press.mcp.McpEndpoint;
 import hx.well.database.Connection;
+import hx.well.http.Request;
 import hx.well.http.RequestStatic;
+import hx.well.http.Response;
 import hx.well.websocket.AbstractWebSocketHandler;
 import hx.well.websocket.WebSocketSession;
 
@@ -20,13 +23,14 @@ class ThemeMcpWebSocket extends AbstractWebSocketHandler {
         var themeId = request.route("id");
         session.setAttribute("theme", themeId);
         try {
-            if (!ThemeMcpHost.available() || !CmsAccess.can("extensions")) {
+            if (!CmsAccess.can("extensions")) {
                 Connection.free();
                 session.close();
                 return;
             }
-            var authorization = ThemeAiAccess.browserCredential(themeId,
-                request.session.sessionKey);
+            var sessionKey = request.session.sessionKey;
+            session.setAttribute("browser", sessionKey);
+            var authorization = ThemeAiAccess.browserCredential(themeId, sessionKey);
             session.setAttribute("authorization", authorization);
             var actor = ThemeAiAccess.authenticateToken(themeId, authorization);
             if (actor == null) {
@@ -44,17 +48,17 @@ class ThemeMcpWebSocket extends AbstractWebSocketHandler {
     }
 
     public function onMessage(session:WebSocketSession, message:String):Void {
-        var body = Bytes.ofString(message);
-        if (body.length > ThemeMcpHost.MAX_REQUEST_BYTES) {
+        if (Bytes.ofString(message).length > McpEndpoint.MAX_REQUEST_BYTES) {
             session.close();
             return;
         }
         var themeId:String = session.getAttribute("theme");
         var authorization:String = session.getAttribute("authorization");
+        var sessionKey:String = session.getAttribute("browser");
         try {
             var actor = ThemeAiAccess.authenticateToken(themeId, authorization);
-            Connection.free();
             if (actor == null) {
+                Connection.free();
                 session.close();
                 return;
             }
@@ -67,25 +71,24 @@ class ThemeMcpWebSocket extends AbstractWebSocketHandler {
                     params: {themeId: themeId, permissions: actor.permissions}
                 }));
             }
-            var headers = [
-                "Accept" => "application/json, text/event-stream",
-                "Content-Type" => "application/json",
-                "X-Haxepress-Transport" => "websocket",
-                "X-Haxepress-Permissions" => permissions
-            ];
-            var reply = ThemeMcpHost.exchange(themeId, authorization, "POST", body, headers);
-            if (reply.status == 202 || reply.status == 204) {
-                return;
-            }
-            if (reply.body.length > 0 && reply.status < 500) {
-                session.send(reply.body.toString());
-            } else {
+            var reply = ThemeMcpController.message(themeId, sessionKey, message);
+            Connection.free();
+            if (reply.status >= 400 && reply.body == null) {
                 session.close();
+            } else if (reply.status >= 500) {
+                session.close();
+            } else if (reply.body != null) {
+                session.send(reply.body);
             }
         } catch (_:Dynamic) {
             Connection.free();
             session.close();
         }
+    }
+
+    /** One message of an editor that cannot open a WebSocket, answered over HTTP. **/
+    override public function onPost(request:Request):Null<Response> {
+        return ThemeMcpController.post(request);
     }
 
     public function onBinary(session:WebSocketSession, data:Bytes):Void {

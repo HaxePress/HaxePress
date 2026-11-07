@@ -69,6 +69,8 @@ class WebSocket:
         self.socket.sendall(header + payload)
 
     def receive(self):
+        """The next message, joining the frames of a fragmented one."""
+        kind, message = None, b""
         while True:
             first, second = self.exact(2)
             length = second & 127
@@ -82,7 +84,14 @@ class WebSocket:
             if opcode == 9:
                 self.send(payload, opcode=10)
                 continue
-            return opcode, payload
+            if opcode >= 8:
+                return opcode, payload
+            if opcode != 0:
+                kind, message = opcode, b""
+            message += payload
+            assert len(message) <= 10 * 1024 * 1024
+            if first & 128:
+                return kind, message
 
     def close(self, allow_eof=False):
         try:

@@ -1,7 +1,93 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { build } from 'esbuild';
 import * as z from 'zod/v4';
+
+// The visual editor's ready sections, layouts and blocks, which the site's MCP tools port.
+const bundle = await build({
+  stdin: {
+    contents: `export { friendlySection, sectionChoices } from './resources/js/themes/builder/friendly-presets';
+      export { layoutBlock, layoutPresets } from './resources/js/themes/builder/presets';
+      export { blockLabels, newBlock } from './resources/js/themes/builder/types';`,
+    resolveDir: fileURLToPath(new URL('../', import.meta.url)),
+    sourcefile: 'preset-parity.ts',
+    loader: 'ts',
+  },
+  bundle: true,
+  write: false,
+  platform: 'node',
+  format: 'esm',
+});
+const editorPresets = await import(
+  `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`
+);
+
+/**
+ * The MCP edit operations build the same ready sections, layouts and blocks as
+ * the editor: both are saved through the CMS validation and compared without
+ * their random IDs.
+ */
+async function verifyPresets(call, data, version) {
+  const scope = 'PresetParity';
+  const base = data(await call('get_design')).theme.document;
+  base.templates[scope] = [];
+  base.templateMeta[scope] = { label: 'Preset parity', fallback: 'Page' };
+  let saved = data(await call('replace_design', { expectedVersion: version, document: base }));
+  const kinds = [...editorPresets.sectionChoices.map((choice) => choice.id), 'header', 'footer'];
+  saved = data(
+    await call('edit_design', {
+      expectedVersion: saved.version,
+      operations: kinds.map((preset) => ({
+        action: 'section',
+        target: { scope, section: '' },
+        preset,
+      })),
+    }),
+  );
+  const host = saved.created.at(-1).section;
+  const blocks = [
+    ...Object.keys(editorPresets.layoutPresets).map((id) => `layout:${id}`),
+    // A component block needs a reusable component to render, so the CMS refuses an empty one.
+    ...Object.keys(editorPresets.blockLabels).filter((type) => type !== 'component'),
+  ];
+  saved = data(
+    await call('edit_design', {
+      expectedVersion: saved.version,
+      operations: blocks.map((preset) => ({
+        action: 'insert',
+        target: { scope, section: host },
+        preset,
+      })),
+    }),
+  );
+  const native = data(await call('get_design')).theme.document;
+  const document = structuredClone(native);
+  document.templates[scope] = kinds.map((kind) => editorPresets.friendlySection(kind));
+  document.templates[scope]
+    .at(-1)
+    .blocks.push(
+      ...blocks.map((preset) =>
+        preset.startsWith('layout:')
+          ? editorPresets.layoutBlock(preset.slice(7))
+          : editorPresets.newBlock(preset),
+      ),
+    );
+  saved = data(await call('replace_design', { expectedVersion: saved.version, document }));
+  const editor = data(await call('get_design')).theme.document;
+  const withoutIds = (value) =>
+    JSON.parse(JSON.stringify(value, (key, entry) => (key === 'id' ? undefined : entry)));
+  assert.deepEqual(
+    withoutIds(native.templates[scope]),
+    withoutIds(editor.templates[scope]),
+    'The MCP presets differ from the editor presets',
+  );
+  delete editor.templates[scope];
+  delete editor.templateMeta[scope];
+  saved = data(await call('replace_design', { expectedVersion: saved.version, document: editor }));
+  return saved.version;
+}
 
 const environment = {
   HXPRESS_THEME_ID: process.env.TEST_THEME_ID,
@@ -314,7 +400,8 @@ for (const mode of ['legacy', { pin: '2026-07-28' }]) {
       inspected.section.blocks.some((node) => node.id === block && node.image === ownedImage.url),
     );
     assert.equal(inspected.version, attached.version);
-    latestVersion = attached.version;
+    latestVersion =
+      mode === 'legacy' ? await verifyPresets(call, data, attached.version) : attached.version;
   } catch (error) {
     throw new Error(`Streamable HTTP / ${JSON.stringify(mode)}: ${error.message}`);
   } finally {

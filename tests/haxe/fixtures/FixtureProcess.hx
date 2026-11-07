@@ -25,6 +25,7 @@ import hx.press.model.InstalledPackage;
 import hx.press.model.ScheduledJob;
 import hx.press.model.ThemeDesign;
 import hx.press.model.ThemeAsset;
+import hx.press.model.AdminMcpLink;
 import hx.press.model.ThemeAiConnection;
 import hx.press.model.ThemeAiPermission;
 import hx.press.database.ThemeDesignSchema;
@@ -255,6 +256,7 @@ class FixtureProcess {
             case "theme_designs": execute(ThemeDesign.query, command);
             case "theme_assets": execute(ThemeAsset.query, command);
             case "theme_ai_connections": execute(ThemeAiConnection.query, command);
+            case "admin_mcp_links": execute(AdminMcpLink.query, command);
             case "theme_ai_permissions": execute(ThemeAiPermission.query, command);
             case "package_hooks": execute(PackageHook.query, command);
             case "package_uploads": execute(PackageUpload.query, command);

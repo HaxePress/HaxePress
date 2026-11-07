@@ -3,11 +3,11 @@ package hx.press.config;
 import hx.well.config.IConfig;
 import hx.well.server.instance.IInstance;
 import hx.press.ServerSettings;
-import hx.press.themes.ThemeMcpHost;
 #if (!cms_plugin && php)
 import hx.well.http.driver.php.PHPInstance;
 #elseif !cms_plugin
 import hx.press.http.BodyLimits;
+import hx.press.mcp.McpEndpoint;
 import hx.well.http.driver.crossbyte.CrossbyteInstance;
 #end
 
@@ -28,8 +28,8 @@ class InstanceConfig implements IConfig {
                 .setMaxConnections(ServerSettings.connections)
                 .setMaxConcurrentRequests(ServerSettings.connections)
                 .setPoolSize(ServerSettings.workers)
-                .setWebSocketLimits(ThemeMcpHost.MAX_REQUEST_BYTES,
-                    ThemeMcpHost.MAX_RESPONSE_BYTES, ThemeMcpHost.MAX_RESPONSE_BYTES)
+                .setWebSocketLimits(McpEndpoint.MAX_REQUEST_BYTES, McpEndpoint.MAX_RESPONSE_BYTES,
+                    McpEndpoint.MAX_RESPONSE_BYTES)
                 .configureHttp(http -> {
                     http.http2Enabled = true;
                     http.requestTimeout = 30;

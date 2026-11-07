@@ -4,7 +4,7 @@ import haxe.Exception;
 import haxe.crypto.Sha256;
 import hx.press.access.Roles;
 import hx.press.model.Admin;
-import hx.press.themes.ThemeMcpHost;
+import hx.press.model.AdminMcpLink;
 import hx.well.cache.FileSystemSessionCacheStore;
 import hx.well.facades.Cache;
 import hx.well.facades.Environment;
@@ -20,27 +20,22 @@ typedef AdminMcpActor = {
     var expires:Float;
 }
 
-private typedef AdminMcpTicket = {
-    var authorization:String;
-    var sessionId:String;
-    var browserSession:Null<String>;
-    var expires:Float;
-    var remaining:Int;
-
-    /** For a preview capture: the admin, and the theme whose preview pages it may read. */
-    var capture:Null<{adminId:Int, themeId:String}>;
+/**
+    The account an in-process MCP request acts as, and the session key of
+    its request-only session, so staged uploads stay bound to the
+    connection that made them.
+**/
+typedef AdminMcpGrant = {
+    var admin:Admin;
+    var sessionKey:String;
 }
 
-private typedef RemoteSession = {
-    var id:String;
+/** A pass for the preview browser: the admin, and the theme whose preview pages it may read. **/
+private typedef AdminMcpCapture = {
     var adminId:Int;
-    var authVersion:String;
-    var profile:String;
-    var origin:String;
+    var themeId:String;
     var expires:Float;
-    var tokenHash:String;
-    var firstSeenAt:Null<Float>;
-    var lastSeenAt:Null<Float>;
+    var remaining:Int;
 }
 
 class AdminMcpError extends Exception {
@@ -56,18 +51,23 @@ class AdminMcpError extends Exception {
 
 /** Each endpoint selects one grant. A bearer is valid only on its own endpoint. */
 class AdminMcpAccess {
-    public static inline var BROWSER_HEADER = "X-HaxePress-Browser-Session";
+    /** The header the preview browser sends its capture pass in. **/
     public static inline var TICKET_HEADER = "X-HaxePress-Admin-Request";
+
+    /** Marks an authorized in-process MCP request; pages answer it with data. **/
     public static inline var INTERNAL = "hx.press.admin-mcp.internal";
+
+    /** The `AdminMcpGrant` of an in-process MCP request, before it is authorized. **/
+    public static inline var ACTOR = "hx.press.admin-mcp.actor";
 
     /** How long a new MCP link lasts, in hours: an hour, a day, a week or 30 days. **/
     public static final lifetimes = [1, 24, 168, 720];
 
     public static inline var DEFAULT_LIFETIME = 24;
     static inline var HISTORY = 60 * 60 * 1000;
-    static final sessions:Map<String, RemoteSession> = [];
-    static final owners:Map<Int, Array<String>> = [];
-    static final tickets:Map<String, AdminMcpTicket> = [];
+    static inline var MAX_LINKS = 8;
+
+    static final captures:Map<String, AdminMcpCapture> = [];
     static final mutex = new MutexPool();
 
     public static function validId(value:Null<String>):Bool {
@@ -88,9 +88,8 @@ class AdminMcpAccess {
         return pattern.matched(1);
     }
 
-    /** Whether `id` names an MCP link this site generated and has not removed. **/
     public static function exists(id:Null<String>):Bool {
-        return validId(id) && locked(() -> sessions.exists(id));
+        return validId(id) && AdminMcpLink.query.where("id", id).exists();
     }
 
     public static function issue(admin:Admin, profile:String,
@@ -101,26 +100,29 @@ class AdminMcpAccess {
         var id = SecureToken.generate(32);
         var address = origin();
         var token = newToken();
-        var session:RemoteSession = {
-            id: id,
-            adminId: admin.id,
-            authVersion: Sha256.encode(admin.password),
-            profile: profile,
-            origin: address,
-            expires: Date.now().getTime() + hours * 60 * 60 * 1000.0,
-            tokenHash: Sha256.encode(token),
-            firstSeenAt: null,
-            lastSeenAt: null
-        };
+        var now = Date.now().getTime();
+        var expires = now + hours * 60 * 60 * 1000.0;
         locked(() -> {
-            var ids = activeIds(admin);
-            if (ids.length >= 8) {
+            var active = AdminMcpLink.query.where("admin_id", admin.id)
+                .where("expires_epoch", ">", now)
+                .where("auth_version", Sha256.encode(admin.password))
+                .count();
+            if (active >= MAX_LINKS) {
                 throw new AdminMcpError("connection_limit",
                     "End an MCP session before creating another.", 429);
             }
-            ids.push(id);
-            owners.set(admin.id, ids);
-            sessions.set(id, session);
+            AdminMcpLink.query.insert([
+                "id" => id,
+                "admin_id" => admin.id,
+                "auth_version" => Sha256.encode(admin.password),
+                "profile" => profile,
+                "origin" => address,
+                "token_hash" => Sha256.encode(token),
+                "expires_epoch" => expires,
+                "first_seen_epoch" => 0,
+                "last_seen_epoch" => 0,
+                "created_epoch" => now
+            ]);
             return true;
         });
         AdminMcpSockets.changed(admin.id);
@@ -129,37 +131,62 @@ class AdminMcpAccess {
             profile: profile,
             url: '${address}${path(id)}',
             token: token,
-            expires: session.expires
+            expires: expires
         };
     }
 
     public static function state(admin:Admin):Dynamic {
-        return locked(() -> {
-            var connections = activeIds(admin).map(id -> {
-                var session = sessions.get(id);
-                return {
-                    id: id,
-                    profile: session.profile,
-                    url: '${session.origin}${path(id)}',
-                    expires: session.expires,
-                    firstSeenAt: session.firstSeenAt,
-                    lastSeenAt: session.lastSeenAt
-                };
-            });
-            return {sessions: connections, hosted: ThemeMcpHost.available()};
-        });
+        var links = AdminMcpLink.query.select([
+            "id",
+            "profile",
+            "origin",
+            "expires_epoch",
+            "first_seen_epoch",
+            "last_seen_epoch"
+        ])
+            .where("admin_id", admin.id)
+            .where("expires_epoch", ">", Date.now().getTime())
+            .where("auth_version", Sha256.encode(admin.password))
+            .orderBy("created_epoch")
+            .orderBy("id")
+            .limit(MAX_LINKS)
+            .get();
+        var connections = [
+            for (link in links)
+                {
+                    id: link.id,
+                    profile: link.profile,
+                    url: '${link.origin}${path(link.id)}',
+                    expires: link.expires_epoch,
+                    firstSeenAt: seen(link.first_seen_epoch),
+                    lastSeenAt: seen(link.last_seen_epoch)
+                }
+        ];
+        // PHP answers each request in a new process, so browsers use HTTP there.
+        return {sessions: connections, websocket: #if php false #else true #end};
+    }
+
+    static function seen(epoch:Float):Null<Float> {
+        return epoch > 0 ? epoch : null;
     }
 
     public static function recordSeen(id:String):Void {
-        locked(() -> {
-            var session = sessions.get(id);
-            var now = Date.now().getTime();
-            if (session != null && now < session.expires) {
-                session.firstSeenAt = session.firstSeenAt ?? now;
-                session.lastSeenAt = Math.max(session.lastSeenAt ?? now, now);
-            }
-            return true;
-        });
+        var now = Date.now().getTime();
+        var link = AdminMcpLink.query.select(["first_seen_epoch", "last_seen_epoch"])
+            .where("id", id)
+            .where("expires_epoch", ">", now)
+            .limit(1)
+            .first();
+        if (link == null) {
+            return;
+        }
+        if (link.first_seen_epoch == 0) {
+            AdminMcpLink.query.where("id", id)
+                .where("first_seen_epoch", 0)
+                .update(["first_seen_epoch" => now, "last_seen_epoch" => now]);
+        } else if (now > link.last_seen_epoch) {
+            AdminMcpLink.query.where("id", id).update(["last_seen_epoch" => now]);
+        }
     }
 
     /**
@@ -170,35 +197,35 @@ class AdminMcpAccess {
         if (!lifetimes.contains(hours)) {
             throw new AdminMcpError("invalid_lifetime", "Choose a supported expiry.", 422);
         }
-        locked(() -> {
-            var session = validId(id) ? sessions.get(id) : null;
-            var now = Date.now().getTime();
-            if (session == null || session.adminId != adminId || session.expires <= now) {
-                throw new AdminMcpError("session_inactive", "This MCP session is inactive.", 404);
-            }
-            if (session.firstSeenAt != null) {
-                throw new AdminMcpError("session_used",
-                    "This MCP link is already connected; its expiry can no longer change.", 409);
-            }
-            session.expires = now + hours * 60 * 60 * 1000.0;
-            return true;
-        });
+        var now = Date.now().getTime();
+        var link = validId(id) ? AdminMcpLink.query.select(["first_seen_epoch"])
+            .where("id", id)
+            .where("admin_id", adminId)
+            .where("expires_epoch", ">", now)
+            .limit(1)
+            .first() : null;
+        if (link == null) {
+            throw new AdminMcpError("session_inactive", "This MCP session is inactive.", 404);
+        }
+        // Only an unused link changes, also when a client connects at this moment.
+        AdminMcpLink.query.where("id", id)
+            .where("first_seen_epoch", 0)
+            .update(["expires_epoch" => now + hours * 60 * 60 * 1000.0]);
+        if (link.first_seen_epoch != 0
+            || !AdminMcpLink.query.where("id", id).where("first_seen_epoch", 0).exists()) {
+            throw new AdminMcpError("session_used",
+                "This MCP link is already connected; its expiry can no longer change.", 409);
+        }
         AdminMcpSockets.changed(adminId);
     }
 
     public static function end(adminId:Int, id:String):Void {
-        locked(() -> {
-            var session = validId(id) ? sessions.get(id) : null;
-            if (session == null || session.adminId != adminId) {
-                throw new AdminMcpError("session_inactive", "This MCP session is inactive.", 404);
-            }
-            sessions.remove(id);
-            var ids = owners.get(adminId);
-            if (ids != null) {
-                ids.remove(id);
-            }
-            return true;
-        });
+        if (!validId(id) || !AdminMcpLink.query.where("id", id)
+            .where("admin_id", adminId)
+            .exists()) {
+            throw new AdminMcpError("session_inactive", "This MCP session is inactive.", 404);
+        }
+        AdminMcpLink.query.where("id", id).where("admin_id", adminId).delete();
         AdminMcpSockets.changed(adminId);
     }
 
@@ -210,19 +237,15 @@ class AdminMcpAccess {
         if (!~/^Bearer hxa_[A-Za-z0-9_-]{32}$/i.match(authorization)) {
             throw invalidToken();
         }
-        var hash = Sha256.encode(authorization.substr(7));
-        var session = locked(() -> {
-            var candidate = current(id);
-            if (candidate.tokenHash != hash) {
-                throw invalidToken();
-            }
-            return candidate;
-        });
-        var admin = activeAdmin(session.adminId);
-        if (!belongsTo(session, admin)) {
+        var link = current(id);
+        if (link.token_hash != Sha256.encode(authorization.substr(7))) {
             throw invalidToken();
         }
-        return {admin: admin, sessionId: id, expires: session.expires};
+        var admin = activeAdmin(link.admin_id);
+        if (!belongsTo(link, admin)) {
+            throw invalidToken();
+        }
+        return {admin: admin, sessionId: id, expires: link.expires_epoch};
     }
 
     public static function browser(sessionKey:String):Null<Admin> {
@@ -241,24 +264,26 @@ class AdminMcpAccess {
         return admin != null && admin.password == session.get("auth_version", "") ? admin : null;
     }
 
-    public static function delegate(authorization:String, sessionId:String,
-            browserSession:Null<String>):String {
-        var ticket = SecureToken.generate(32);
-        locked(() -> {
-            tickets.set(ticket, {
-                authorization: authorization,
-                sessionId: sessionId,
-                browserSession: browserSession,
-                expires: Date.now().getTime() + 30 * 1000,
-                remaining: 6,
-                capture: null
-            });
-            return true;
-        });
-        return ticket;
+    /** The grant of a remote MCP link's requests. **/
+    public static function grant(actor:AdminMcpActor):AdminMcpGrant {
+        return {
+            admin: actor.admin,
+            sessionKey: Sha256.encode('admin-mcp:${actor.sessionId}').substr(0, 32)
+        };
     }
 
-    public static function delegated(request:Request):Null<{admin:Admin, sessionKey:String}> {
+    /** The grant of a signed-in browser's MCP messages, or `null` once its session ends. **/
+    public static function browserGrant(sessionKey:String):Null<AdminMcpGrant> {
+        var admin = browser(sessionKey);
+        return admin == null ? null : {admin: admin, sessionKey: sessionKey};
+    }
+
+    /**
+        The account of a preview browser request: the headless browser on
+        this host sends a capture pass to read one theme's preview pages and
+        their assets as the admin.
+    **/
+    public static function delegated(request:Request):Null<AdminMcpGrant> {
         var value = request.header(TICKET_HEADER, "");
         if (!validId(value)
             || (request.ip != "127.0.0.1" && request.ip != "::ffff:127.0.0.1")
@@ -267,63 +292,51 @@ class AdminMcpAccess {
             || request.header("X-Real-IP") != null) {
             return null;
         }
-        var ticket = locked(() -> {
-            var grant = tickets.get(value);
-            if (grant == null || grant.remaining <= 0 || grant.expires <= Date.now().getTime()) {
+        var capture = locked(() -> {
+            var pass = captures.get(value);
+            if (pass == null || pass.remaining <= 0 || pass.expires <= Date.now().getTime()) {
                 return null;
             }
-            grant.remaining--;
-            return grant;
+            pass.remaining--;
+            return pass;
         });
-        if (ticket == null) {
+        if (capture == null || request.method != "GET"
+            || !capturable(request.path, capture.themeId)) {
             return null;
         }
-        if (ticket.capture != null) {
-            if (request.method != "GET" || !captures(request.path, ticket.capture.themeId)) {
-                return null;
-            }
-            var reader = activeAdmin(ticket.capture.adminId);
-            return reader == null ? null : {
-                admin: reader,
-                sessionKey: Sha256.encode('admin-preview:${value}').substr(0, 32)
-            };
-        }
-        if (ticket.browserSession != null) {
-            var admin = browser(ticket.browserSession);
-            return admin == null ? null : {admin: admin, sessionKey: ticket.browserSession};
-        }
-        var actor = authenticate(ticket.sessionId, ticket.authorization);
-        return {
-            admin: actor.admin,
-            sessionKey: Sha256.encode('admin-mcp:${actor.sessionId}').substr(0, 32)
+        var reader = activeAdmin(capture.adminId);
+        return reader == null ? null : {
+            admin: reader,
+            sessionKey: Sha256.encode('admin-preview:${value}').substr(0, 32)
         };
     }
 
     /**
-        A ticket a headless browser on this host sends to read one theme's
+        A pass a headless browser on this host sends to read one theme's
         preview pages and their assets, as the admin, for one minute: GET
         requests only, so an AI can look at the design it is editing.
     **/
     public static function captureTicket(adminId:Int, themeId:String):String {
         var ticket = SecureToken.generate(32);
+        var now = Date.now().getTime();
         locked(() -> {
-            tickets.set(ticket, {
-                authorization: "",
-                sessionId: "",
-                browserSession: null,
-                expires: Date.now().getTime() + 60 * 1000,
-                remaining: 400,
-                capture: {
-                    adminId: adminId,
-                    themeId: themeId
+            for (key => pass in captures) {
+                if (pass.expires <= now) {
+                    captures.remove(key);
                 }
+            }
+            captures.set(ticket, {
+                adminId: adminId,
+                themeId: themeId,
+                expires: now + 60 * 1000,
+                remaining: 400
             });
             return true;
         });
         return ticket;
     }
 
-    static function captures(path:String, themeId:String):Bool {
+    static function capturable(path:String, themeId:String):Bool {
         if (path.indexOf("..") >= 0 || path.indexOf("//") >= 0) {
             return false;
         }
@@ -331,10 +344,6 @@ class AdminMcpAccess {
         return path == frame
             || StringTools.startsWith(path, '${frame}/')
             || StringTools.startsWith(path, '/admin/extension-assets/${themeId}/');
-    }
-
-    public static function discardTicket(ticket:String):Void {
-        locked(() -> tickets.remove(ticket));
     }
 
     static function newToken():String {
@@ -350,30 +359,23 @@ class AdminMcpAccess {
         return admin != null && Roles.exists(admin.role) ? admin : null;
     }
 
-    static function belongsTo(session:RemoteSession, admin:Null<Admin>):Bool {
-        return admin != null && session.adminId == admin.id
-            && session.authVersion == Sha256.encode(admin.password);
+    static function belongsTo(link:AdminMcpLink, admin:Null<Admin>):Bool {
+        return admin != null && link.admin_id == admin.id
+            && link.auth_version == Sha256.encode(admin.password);
     }
 
-    static function activeIds(admin:Admin):Array<String> {
-        var now = Date.now().getTime();
-        var version = Sha256.encode(admin.password);
-        var ids = owners.get(admin.id) ?? [];
-        return ids.filter(id -> {
-            var session = sessions.get(id);
-            return session != null && session.expires > now && session.authVersion == version;
-        });
-    }
-
-    static function current(id:String):RemoteSession {
-        var session = validId(id) ? sessions.get(id) : null;
-        if (session == null) {
+    static function current(id:String):AdminMcpLink {
+        var link = validId(id) ? AdminMcpLink.query.select(["admin_id", "token_hash", "auth_version", "expires_epoch"])
+            .where("id", id)
+            .limit(1)
+            .first() : null;
+        if (link == null) {
             throw invalidToken();
         }
-        if (session.expires <= Date.now().getTime()) {
+        if (link.expires_epoch <= Date.now().getTime()) {
             throw new AdminMcpError("session_expired", "This MCP session has expired.");
         }
-        return session;
+        return link;
     }
 
     static function invalidToken():AdminMcpError {
@@ -381,24 +383,9 @@ class AdminMcpAccess {
             "Supply the active bearer token for this MCP URL.");
     }
 
+    /** Removes links an hour after they expire. **/
     public static function cleanup():Void {
-        var now = Date.now().getTime();
-        locked(() -> {
-            for (id in [for (id in sessions.keys()) id]) {
-                var session = sessions.get(id);
-                if (session.expires + HISTORY <= now) {
-                    sessions.remove(id);
-                    var ids = owners.get(session.adminId);
-                    if (ids != null) {
-                        ids.remove(id);
-                        if (ids.length == 0) {
-                            owners.remove(session.adminId);
-                        }
-                    }
-                }
-            }
-            return true;
-        });
+        AdminMcpLink.query.where("expires_epoch", "<=", Date.now().getTime() - HISTORY).delete();
     }
 
     static function locked<T>(action:Void->T):T {

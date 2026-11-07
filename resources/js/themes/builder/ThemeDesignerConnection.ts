@@ -122,6 +122,75 @@ export class BrowserSocketTransport implements Transport {
   }
 }
 
+/** The admin session's CSRF token, which the site keeps in a readable cookie. */
+function csrfToken(): string {
+  const match = /(?:^|;\s*)XSRF-TOKEN=([^;]*)/.exec(document.cookie);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+/**
+ * Sends each MCP message as an HTTP POST to the socket's address, for sites
+ * that run without WebSockets, such as the PHP build. The server answers
+ * every request with its JSON-RPC reply; there are no pushed notifications,
+ * so callers poll for changes.
+ */
+export class BrowserHttpTransport implements Transport {
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: (message: JSONRPCMessage) => void;
+  closeCode = 1000;
+  private closed = false;
+
+  constructor(private readonly url: URL) {}
+
+  async start(): Promise<void> {}
+
+  async send(message: JSONRPCMessage, _options?: TransportSendOptions): Promise<void> {
+    if (this.closed) throw new Error('The collaboration connection is closed.');
+    const source = JSON.stringify(message);
+    if (new TextEncoder().encode(source).length > MAX_MCP_REQUEST_BYTES) {
+      throw new Error('The design request exceeds its size limit.');
+    }
+    const response = await fetch(this.url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-XSRF-TOKEN': csrfToken(),
+      },
+      body: source,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (response.status === 202 || response.status === 204) return;
+    const reply = response.headers.get('content-type')?.includes('application/json')
+      ? await response.json().catch(() => null)
+      : null;
+    if (response.redirected || !reply || reply.jsonrpc !== '2.0') {
+      // A signed-out session or a revoked permission ends the connection, as a closed socket does.
+      this.closeCode = 1008;
+      await this.close();
+      throw new Error('The collaboration connection is closed.');
+    }
+    this.onmessage?.(reply);
+  }
+
+  async close(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    this.onclose?.();
+  }
+}
+
+interface ConnectionInfo {
+  permissions: AiPermissions;
+  presence: DesignerPresence;
+  websocket: boolean;
+}
+
+/** How often an editor without WebSockets checks for permission and draft changes. */
+const POLL_MS = 10000;
+
 /** A browser is an authenticated peer of the site's theme MCP, never a server process. */
 export class ThemeDesignerConnection {
   status: DesignerStatus = 'disconnected';
@@ -133,9 +202,51 @@ export class ThemeDesignerConnection {
   private retries = 0;
   private retry: ReturnType<typeof setTimeout> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private poll: ReturnType<typeof setInterval> | null = null;
+  private version: DesignChange | null = null;
   private readonly listeners = new Set<(event: DesignerEvent) => void>();
 
   constructor(readonly themeId: string) {}
+
+  private path(suffix: string): string {
+    return `/admin/themes/${encodeURIComponent(this.themeId)}${suffix}`;
+  }
+
+  private async read<T>(suffix: string): Promise<T | null> {
+    try {
+      const response = await fetch(this.path(suffix), {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok || response.redirected) return null;
+      return (await response.json()) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Without WebSockets, permission, presence and draft changes arrive by polling. */
+  private async refresh(): Promise<void> {
+    const info = await this.read<ConnectionInfo>('/ai');
+    if (info) {
+      this.notification('notifications/haxepress/permissions', {
+        themeId: this.themeId,
+        permissions: info.permissions,
+      });
+      if (info.presence.browsers !== this.presence.browsers)
+        this.notification('notifications/haxepress/presence', info.presence);
+    }
+    const status = await this.read<{ version: number; publishedVersion: number }>('/design/status');
+    if (!status) return;
+    const change = { themeId: this.themeId, ...status };
+    const previous = this.version;
+    this.version = change;
+    if (
+      previous &&
+      (previous.version !== change.version || previous.publishedVersion !== change.publishedVersion)
+    )
+      this.notification('notifications/haxepress/design_changed', change);
+  }
 
   subscribe(listener: (event: DesignerEvent) => void): () => void {
     this.listeners.add(listener);
@@ -185,11 +296,26 @@ export class ThemeDesignerConnection {
     if (this.stopped) throw new Error('The collaboration connection is closed.');
     this.status = 'connecting';
     this.emit({ type: 'state' });
-    const url = new URL(`/admin/themes/${encodeURIComponent(this.themeId)}/ai/ws`, location.origin);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    const transport = new BrowserSocketTransport(url, (method, params) =>
-      this.notification(method, params),
-    );
+    this.pending = this.open().finally(() => {
+      this.pending = null;
+    });
+    return this.pending;
+  }
+
+  private async open(): Promise<Client> {
+    const info = await this.read<ConnectionInfo>('/ai');
+    if (this.stopped) throw new Error('The collaboration connection is closed.');
+    const url = new URL(this.path('/ai/ws'), location.origin);
+    const polling = info?.websocket === false;
+    let transport: BrowserSocketTransport | BrowserHttpTransport;
+    if (polling) {
+      transport = new BrowserHttpTransport(url);
+    } else {
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      transport = new BrowserSocketTransport(url, (method, params) =>
+        this.notification(method, params),
+      );
+    }
     const client = new Client(
       { name: 'haxepress-browser-editor', version: '1.0.0' },
       { versionNegotiation: { mode: { pin: '2026-07-28' } } },
@@ -203,6 +329,8 @@ export class ThemeDesignerConnection {
       this.presence = { browsers: 0 };
       this.status = 'disconnected';
       if (this.heartbeat) clearInterval(this.heartbeat);
+      if (this.poll) clearInterval(this.poll);
+      this.version = null;
       this.emit({ type: 'permissions' });
       this.emit({ type: 'state' });
       if (!this.stopped && transport.closeCode !== 1000 && this.retries < 5) {
@@ -213,27 +341,25 @@ export class ThemeDesignerConnection {
         );
       }
     };
-    this.pending = client
-      .connect(transport)
-      .then(() => {
-        if (this.stopped || this.client !== client)
-          throw new Error('The collaboration connection is closed.');
-        this.status = 'connected';
-        this.retries = 0;
-        this.heartbeat = setInterval(() => {
-          void client.discover().catch(() => client.close());
-        }, 25000);
-        this.emit({ type: 'state' });
-        return client;
-      })
-      .catch(async (error: unknown) => {
-        await client.close();
-        throw error;
-      })
-      .finally(() => {
-        this.pending = null;
-      });
-    return this.pending;
+    try {
+      await client.connect(transport);
+      if (this.stopped || this.client !== client)
+        throw new Error('The collaboration connection is closed.');
+    } catch (error) {
+      await client.close();
+      throw error;
+    }
+    this.status = 'connected';
+    this.retries = 0;
+    this.heartbeat = setInterval(() => {
+      void client.discover().catch(() => client.close());
+    }, 25000);
+    if (polling) {
+      await this.refresh();
+      this.poll = setInterval(() => void this.refresh(), POLL_MS);
+    }
+    this.emit({ type: 'state' });
+    return client;
   }
 
   async listTools(): Promise<DesignerTool[]> {
@@ -261,6 +387,7 @@ export class ThemeDesignerConnection {
     this.stopped = true;
     if (this.retry) clearTimeout(this.retry);
     if (this.heartbeat) clearInterval(this.heartbeat);
+    if (this.poll) clearInterval(this.poll);
     const client = this.client;
     this.client = null;
     await client?.close();

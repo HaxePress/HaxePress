@@ -1,5 +1,8 @@
 import { Client } from '@modelcontextprotocol/client';
-import { BrowserSocketTransport } from '../themes/builder/ThemeDesignerConnection';
+import {
+  BrowserHttpTransport,
+  BrowserSocketTransport,
+} from '../themes/builder/ThemeDesignerConnection';
 import type {} from '../themes/builder/browser-tools';
 
 export type AdminMcpStatus = 'connecting' | 'connected' | 'disconnected';
@@ -14,12 +17,18 @@ export interface AdminMcpBrowserApi {
   ): ReturnType<Client['callTool']>;
 }
 
+/**
+ * Connects the signed-in page to the site's admin MCP tools. Without
+ * WebSockets (`websocket: false`, as on PHP) each message is an HTTP POST to
+ * the same address, and the caller refreshes its state by polling.
+ */
 export function startAdminMcp(
   onStatus: (status: AdminMcpStatus) => void,
   onChange: () => void,
+  websocket = true,
 ): () => void {
   const url = new URL('/admin/ai/ws', location.origin);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (websocket) url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   const context = document.modelContext || navigator.modelContext;
   let stopped = false;
   let client: Client | null = null;
@@ -86,9 +95,11 @@ export function startAdminMcp(
     );
     client = active;
     active.onclose = () => disconnected(active);
-    const transport = new BrowserSocketTransport(url, (method) => {
-      if (method === 'notifications/haxepress/admin_ai_changed') onChange();
-    });
+    const transport = websocket
+      ? new BrowserSocketTransport(url, (method) => {
+          if (method === 'notifications/haxepress/admin_ai_changed') onChange();
+        })
+      : new BrowserHttpTransport(url);
     try {
       await active.connect(transport);
       if (stopped || client !== active) {

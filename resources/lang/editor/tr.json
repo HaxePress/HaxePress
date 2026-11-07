@@ -51,7 +51,6 @@
   "AI permissions could not be saved.": "Yapay zekâ izinleri kaydedilemedi.",
   "External AI connection": "Harici yapay zekâ bağlantısı",
   "WebSocket URL": "WebSocket adresi",
-  "The site collaboration service is unavailable.": "Site düzenleme bağlantısı kullanılamıyor.",
   "Connection key": "Bağlantı anahtarı",
   "Connection key created. It is shown once.": "Bağlantı anahtarı oluşturuldu. Yalnızca bir kez gösterilir.",
   "Copy connection details": "Bağlantı bilgilerini kopyala",
