@@ -90,9 +90,10 @@ class View {
                     maxComponentDepth: maxDepth
                 });
             }
-        } catch (error:Dynamic) {
+        } catch (error:Exception) {
             ViewResponse.discard(writer);
-            trace('Rendering ${target.template} failed: ${error}');
+            // The stack names the helper or writer that failed.
+            trace('Rendering ${target.template} failed: ${error.details()}');
             return
                 new StringResponse('<!doctype html><title>Error</title><p>The page could not be rendered.</p>',
                     500);

@@ -62,6 +62,11 @@ class DesignTemplates {
         "header" => "Header",
         "footer" => "Footer"
     ];
+    // Fonts bundled with the site, by family name, that a design page preloads for its text.
+    static final bundledFonts:Map<String, String> = [
+        "DM Sans" => "fonts/dm-sans.woff2",
+        "DM Serif Display" => "fonts/dm-serif-display.woff2"
+    ];
     static final booleanAttributes = ["required", "disabled", "open", "checked"];
     static final urlAttributes = ["href", "src", "action"];
     static final voidTags = ["input", "br", "hr"];
@@ -91,8 +96,7 @@ class DesignTemplates {
     /** The CSS custom properties of the design tokens, as a record literal for `cssVariables`. **/
     static function tokens(document:Dynamic):String {
         var tokens:Dynamic = document.tokens == null ? {} : document.tokens;
-        var font:String = tokens.font == null ? "" : Std.string(tokens.font);
-        font = font == "serif" ? "'DM Serif Display', Georgia, serif" : font == "sans" ? "'DM Sans', Arial, sans-serif" : font;
+        var font = designFont(document);
         var entries = [
             'designBackground: ${literal(text(tokens.background))}',
             'designText: ${literal(text(tokens.text))}',
@@ -104,11 +108,33 @@ class DesignTemplates {
         return '{ ${entries.join(", ")} }';
     }
 
+    /** The design's font stack; the presets `serif` and `sans` name the bundled fonts. **/
+    static function designFont(document:Dynamic):String {
+        var tokens:Dynamic = document.tokens == null ? {} : document.tokens;
+        var font:String = tokens.font == null ? "" : Std.string(tokens.font);
+        return switch font {
+            case "serif": "'DM Serif Display', Georgia, serif";
+            case "sans": "'DM Sans', Arial, sans-serif";
+            default: font;
+        }
+    }
+
+    /**
+        A preload for the bundled font the design's text is set in, so the
+        first paint does not use a fallback font. Other fonts load as usual.
+    **/
+    static function fontAsset(document:Dynamic):String {
+        var firstFamily = StringTools.trim(designFont(document).split(",")[0]);
+        var family = ~/^(['"])(.*)\1$/.replace(firstFamily, "$2");
+        var file = bundledFonts.get(family);
+        return file == null ? "" : '<Asset font="${file}" />';
+    }
+
     function page(name:String):String {
         scope = name;
         output.add('<props item="ContentItemView?" items="List<ContentItemView> = []" featured="ContentItemView?" related="List<ContentItemView> = []" collection="PublicCollectionView?" pagination="PageLinksView?" query="String = \'\'" category="String = \'\'" archiveUrl="String = \'\'" categories="List<String> = []" fieldFilters="Map<String, String>?" tag="TagView?" count="Int = 0" resultCount="Int = 0" />\n');
         output.add('<Document>\n');
-        output.add('<Asset css="css/site.css" /><Asset css="css/cms.css" /><Asset css="css/themes/builder.css" />\n');
+        output.add('<Asset css="css/site.css" /><Asset css="css/cms.css" /><Asset css="css/themes/builder.css" />${fontAsset(document)}\n');
         output.add('<well:head><link rel="stylesheet" href="{{ designStylesheet() }}" /></well:head>\n');
         output.add('<PageHead :title="${pageTitle(name)}" :description="item.seo_description ? item.seo_description : item.excerpt ? item.excerpt : site.description" />\n');
         output.add('<SiteExtensions />\n');

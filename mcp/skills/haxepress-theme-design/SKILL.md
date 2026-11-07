@@ -89,7 +89,9 @@ Before building, settle these in a few lines (and share them with the person):
   (`system-ui, sans-serif`, `Georgia, serif`, `ui-monospace, monospace`) also
   work. Remote fonts and `@import` are rejected, and fonts such as Avenir or
   Helvetica Neue exist only on some visitors' devices, so don't plan around a
-  typeface the site cannot load.
+  typeface the site cannot load. Pages preload the bundled font that
+  `tokens.font` names first, so text is drawn in it from the first paint; the
+  other bundled font, used only in element styles, loads after the page.
 - **Layout idea:** one sentence per template on what the reader sees first.
 - **One memorable element:** a striking hero, an unusual grid, a typographic
   treatment. Keep everything around it quiet.

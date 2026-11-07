@@ -56,6 +56,15 @@ chmod('.env', 0600);
 echo "Created .env with a new APP_KEY. Keep it private.\\n";
 """
 
+# Vite names built files after their content, so Apache may let browsers keep them for a year.
+BUILT_ASSET_CACHE = """
+<IfModule mod_headers.c>
+    <If "%{REQUEST_URI} =~ m#^/build/assets/#">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+</IfModule>
+"""
+
 PHP_README = """# HaxePress {version} for PHP
 
 HaxePress {cms} (plugin API {api}) built for PHP with HxWell's PHP driver.
@@ -232,8 +241,9 @@ def php_application(version, cms, current, output):
             f"{folder}/public",
             keep=lambda path: path.parent.name != "packages" or path.name in shipped,
         )
-        for name in ("index.php", ".htaccess"):
-            add_file(archive, PHP_APPLICATION / "public" / name, f"{folder}/public/{name}")
+        add_file(archive, PHP_APPLICATION / "public/index.php", f"{folder}/public/index.php")
+        rewrites = (PHP_APPLICATION / "public/.htaccess").read_text()
+        add_text(archive, f"{rewrites.rstrip()}\n{BUILT_ASSET_CACHE}", f"{folder}/public/.htaccess")
         add_tree(archive, ROOT / "database", f"{folder}/database")
         add_file(archive, ROOT / "cms.json", f"{folder}/cms.json")
         add_file(archive, ROOT / ".env.example", f"{folder}/.env.example")

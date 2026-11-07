@@ -1,5 +1,6 @@
 package hx.press.handler;
 
+import haxe.io.Path;
 import hx.press.SiteController;
 import hx.press.content.ContentTypes;
 import hx.well.handler.PublicHandler;
@@ -9,9 +10,19 @@ import hx.well.http.ResponseBuilder;
 
 /** Native routes, including plugin routes, win; stored collection paths resolve at runtime. */
 class SitePublicHandler extends PublicHandler {
+    // Vite names each built file after its content, so a changed file gets a new URL.
+    static inline final BUILT_ASSETS = "/build/assets/";
+
     public override function execute(request:Request):AbstractResponse {
         var response = collection(request, request.path);
-        return response == null ? super.execute(request) : response;
+        if (response != null) {
+            return response;
+        }
+        var file = super.execute(request);
+        if (StringTools.startsWith(Path.normalize(request.path), BUILT_ASSETS)) {
+            file.toResponse().header("Cache-Control", "public, max-age=31536000, immutable");
+        }
+        return file;
     }
 
     public static function collection(request:Request, path:String):Null<AbstractResponse> {

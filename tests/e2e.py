@@ -210,6 +210,25 @@ def run():
             and "frame-ancestors 'none'" in policy,
             f"content security policy: {policy}",
         )
+        # Fonts download with the stylesheets, so text is not first drawn in a fallback font.
+        head = text.split("</head>", 1)[0]
+        font_preloads = re.findall(
+            r'<link rel="preload" href="(/build/assets/[^"]+\.woff2)" as="font" '
+            r'type="font/woff2" crossorigin>',
+            head,
+        )
+        first_stylesheet = head.find('rel="stylesheet"')
+        check(
+            font_preloads and all(head.find(url) < first_stylesheet for url in font_preloads),
+            f"font preloads come before the stylesheets: {font_preloads}",
+        )
+        status, font_headers, _ = public.request(font_preloads[0], binary=True)
+        check(
+            status == 200
+            and font_headers.get("content-type") == "font/woff2"
+            and "immutable" in font_headers.get("cache-control", ""),
+            f"built assets are cached for a year: {font_headers.get('cache-control')!r}",
+        )
         check(
             "set-cookie" not in headers and not public.cookies, "public homepage creates a session"
         )
