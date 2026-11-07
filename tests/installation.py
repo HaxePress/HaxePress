@@ -437,6 +437,22 @@ def run():
                 == 422,
                 "Unreachable MySQL connection was reported as verified",
             )
+            # Ports are 1-65535 in plain digits; anything else fails validation before a connection.
+            for port in ["0", "65536", "99999", "3306a", "+3306", " 3306", "-1", "", "123456"]:
+                status, _, rejected = client.request(
+                    "/admin/install/database",
+                    {
+                        "driver": "mysql",
+                        "host": "127.0.0.1",
+                        "port": port,
+                        "database": "setup",
+                        "username": "setup",
+                    },
+                )
+                check(
+                    status == 422 and "Check the database fields" in rejected["error"],
+                    f"The database port {port!r} was not rejected by validation: {rejected}",
+                )
             status, _, database = client.request(
                 "/admin/install/database", {"driver": "sqlite", "file": "setup.sqlite"}
             )

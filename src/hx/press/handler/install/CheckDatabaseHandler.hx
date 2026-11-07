@@ -5,6 +5,7 @@ import hx.press.AdminController;
 import hx.press.install.InstallationDatabase;
 import hx.press.install.InstallationDatabase.SetupDatabase;
 import hx.press.install.InstallationState;
+import hx.press.validation.Port;
 import hx.press.validation.ValidationResponder;
 import hx.press.view.View;
 import hx.well.handler.AbstractHandler;
@@ -15,6 +16,8 @@ import hx.well.http.ResponseBuilder;
 import hx.well.validator.ValidatorRule;
 
 class CheckDatabaseHandler extends AbstractHandler implements ValidationResponder {
+    static inline final MYSQL_PORT = 3306;
+
     public override function validate():Bool {
         var rules:Map<String,
             Array<ValidatorRule>> = ["driver" => [Required, String, Regex("^(sqlite|mysql)$")]];
@@ -23,7 +26,7 @@ class CheckDatabaseHandler extends AbstractHandler implements ValidationResponde
                 [Required, String, Regex("^[A-Za-z0-9][A-Za-z0-9_.-]{0,74}\\.sqlite$")]);
         } else {
             rules.set("host", [Required, String, Max(253), Regex("^[A-Za-z0-9_.:-]+$")]);
-            rules.set("port", [Required, String, Regex("^[0-9]{1,5}$")]);
+            rules.set("port", [Required, String, Custom("cms.port")]);
             rules.set("database", [Required, String, Regex("^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$")]);
             rules.set("username", [Required, String, Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")]);
             rules.set("password", [String, Max(1000), Regex("^[^\\x00-\\x1f\\x7f]*$")]);
@@ -52,10 +55,8 @@ class CheckDatabaseHandler extends AbstractHandler implements ValidationResponde
     public function execute(request:Request):AbstractResponse {
         var values = request.only("driver", "file", "host", "port", "database", "username",
             "password");
-        var port = Std.parseInt(values.get("port") ?? "3306");
-        if (port == null || port < 1 || port > 65535) {
-            return validationFailed(request);
-        }
+        // SQLite sends no port; MySQL's was checked by cms.port.
+        var port = Port.parse(values.get("port")) ?? MYSQL_PORT;
         var file:String = values.get("file") ?? "cms.sqlite";
         if (file.indexOf("..") >= 0) {
             return validationFailed(request);

@@ -1,12 +1,11 @@
 package hx.press.config;
 
+import hx.press.validation.Port;
 import hx.well.config.ConnectionTypedef;
 import hx.well.config.IConfig;
 import haxe.ds.StringMap;
 import hx.well.facades.Environment;
 import hx.well.facades.Storage;
-
-using Std;
 
 class DatabaseConfig implements IConfig {
     /** The SQLite file when DB_PATH is left out: the data folder, apart from the storage disk. **/
@@ -50,7 +49,7 @@ class DatabaseConfig implements IConfig {
                 "default" => {
                     driver: "mysql",
                     host: Environment.env("DB_HOST", "127.0.0.1"),
-                    port: Environment.env("DB_PORT", "3306").parseInt(),
+                    port: Port.setting("DB_PORT", Environment.env("DB_PORT", "3306")),
                     database: Environment.env("DB_DATABASE", ""),
                     username: Environment.env("DB_USERNAME", ""),
                     password: Environment.env("DB_PASSWORD", "")

@@ -8,6 +8,7 @@ import haxe.crypto.Sha1;
 import haxe.io.Bytes;
 import haxe.io.BytesBuffer;
 import haxe.io.Path;
+import hx.press.validation.Port;
 import hx.well.facades.Environment;
 import hx.well.facades.Storage;
 import hx.well.internal.SecureToken;
@@ -693,7 +694,10 @@ private class DevToolsConnection {
             throw new PreviewFailure(REFUSED);
         }
         var host = pattern.matched(1);
-        var port = Std.parseInt(pattern.matched(2));
+        var port = Port.parse(pattern.matched(2));
+        if (port == null) {
+            throw new PreviewFailure(REFUSED);
+        }
         var path = pattern.matched(3);
         var hostName = StringTools.startsWith(host, "[") ? host.substr(1, host.length - 2) : host;
         var socket = new Socket();

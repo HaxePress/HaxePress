@@ -1,5 +1,6 @@
 package hx.press;
 
+import hx.press.validation.Port;
 import hx.well.facades.Environment;
 
 class ServerSettings {
@@ -13,7 +14,7 @@ class ServerSettings {
         return Environment.env("HOST", "127.0.0.1");
 
     static function get_port():Int
-        return positiveInt("PORT", 3000, 65535);
+        return Port.setting("PORT", Environment.env("PORT", "3000"));
 
     static function get_connections():Int
         return positiveInt("MAX_CONNECTIONS", #if jvm 10000 #else 1000 #end, 100000);
