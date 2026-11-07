@@ -21,7 +21,7 @@ class DesignStyles {
             return "";
         }
         var layers = [new StringBuf(), new StringBuf(), new StringBuf()];
-        var identifier = ~/^[A-Za-z0-9_-]{1,80}$/;
+        var identifier = ~/^[A-Za-z0-9_-]{1,80}(?![\s\S])/;
         var classes:Dynamic = document.classes;
         if (classes != null) {
             for (name in sorted(classes)) {

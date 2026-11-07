@@ -28,6 +28,29 @@ def run():
     )
 
 
+def line_break_variants(design, ending):
+    """Copies of `design` in which one validated value ends in `ending`."""
+    first_block = design["templates"]["Home"][0]["blocks"][0]
+    block_values = {
+        "id": f"{first_block['id']}{ending}",
+        "slot": f"site.footer{ending}",
+        "source": f"page.related{ending}",
+        "styles": {"desktop": {"normal": {f"behavior{ending}": "none"}}},
+    }
+    variants = []
+    for key, value in block_values.items():
+        variant = copy.deepcopy(design)
+        variant["templates"]["Home"][0]["blocks"][0][key] = value
+        variants.append((f"block {key}", variant))
+    font = copy.deepcopy(design)
+    font["tokens"]["font"] = f"Arial{ending}"
+    variants.append(("font stack", font))
+    template = copy.deepcopy(design)
+    template["templates"][f"Landing{ending}"] = []
+    variants.append(("template name", template))
+    return variants
+
+
 def verify(owner, public, fixtures):
     previous = props(public, "/")["theme"]["id"]
     name = f"Visual theme {secrets.token_hex(5)}"
@@ -112,6 +135,17 @@ def verify(owner, public, fixtures):
         invalid["templates"]["Home"][0]["blocks"][0]["href"] = "/safe"
         invalid["templates"]["Home"][0]["blocks"][0]["image"] = "https://example.com/photo.jpg"
         check(save(invalid, 1)[0] == 422, "External blog image accepted")
+        # `$` also matches before a final line break; design JSON is not trimmed.
+        for ending in ["\n", "\r\n", "\u2028"]:
+            for field, invalid in line_break_variants(design, ending):
+                check(
+                    save(invalid, 1)[0] == 422,
+                    f"A design {field} ending in {ending!r} was accepted",
+                )
+            check(
+                save(design, 1, f"save{ending}")[0] == 422,
+                f"A design action ending in {ending!r} was accepted",
+            )
         check(
             post_json(
                 owner, editor_url, {"name": [], "design": "{}", "version": "1", "action": "save"}
@@ -144,6 +178,10 @@ def verify(owner, public, fixtures):
         }
         design["templates"]["Home"][0]["blocks"].append(image_block)
         design["templates"]["Home"][0]["blocks"][0]["text"] = "Published design heading"
+        for ending in ["\n", "\u2028"]:
+            invalid = copy.deepcopy(design)
+            invalid["templates"]["Home"][0]["blocks"][-1]["image"] = f"{image['url']}{ending}"
+            check(save(invalid, 1)[0] == 422, f"A design image ending in {ending!r} was accepted")
         check(save(design, 1)[0] == 200, "Theme draft save failed")
         check(
             props(public, "/")["theme"]["id"] == previous, "Saving a draft changed the active theme"

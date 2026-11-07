@@ -237,6 +237,7 @@ def verify(owner, public, fixtures):
             == fixtures.rows("media_assets", ["title", "alt"], [("id", "=", image_id)], limit=1),
             "Invalid media metadata was persisted",
         )
+        verify_line_terminators(owner, fixtures, owner_id)
         verify_permissions(owner, fixtures)
         owner.request("/admin/plugins/plugin-newsletter/disable", "POST", {})
         check(
@@ -255,6 +256,107 @@ def verify(owner, public, fixtures):
         "PASS Native validation: all write handlers, plugin forwarding, JSON/page-data responses, no writes, byte limits, permissions and 404/409 precedence",
         flush=True,
     )
+
+
+def verify_line_terminators(owner, fixtures, owner_id):
+    """`$` also matches before a final line break; `trim()` keeps the Unicode separators."""
+    home_keys = ["home_mode", "home_type", "home_page", "home_size", "home_template"]
+    stored_settings = fixtures.rows("settings", ["key", "value"], [("key", "in", home_keys)])
+    home_before = {row["key"]: row["value"] for row in stored_settings}
+    home = {
+        "site_name": "Validation site",
+        "home_mode": "collection",
+        "home_type": "entry",
+        "home_page": "0",
+        "home_size": "7",
+        "home_template": "Home",
+        **home_before,
+    }
+    home_error = "Choose valid homepage and presentation settings."
+    draft_key = f"draft-{str(owner_id)}-entry-{'a' * 32}"
+    theme_settings = {"accent": "#2457a6", "paper": "#ffffff", "ink": "#202124", "width": "760"}
+    theme_before = fixtures.rows("cms_packages", ["settings"], [("id", "=", "theme-simple")])
+    entities = ["items", "tags", "roles", "editor_drafts"]
+    counts_before = {entity: fixtures.count(entity) for entity in entities}
+    # Request values that are not trimmed: every line terminator reaches the pattern.
+    for ending in ["\n", "\r\n", "\u2028", "\u0085"]:
+        cases = [
+            (
+                "/admin/settings",
+                {**home, "home_template": f"{home['home_template']}{ending}"},
+                home_error,
+            ),
+            ("/admin/settings", {**home, "home_size": f"{home['home_size']}{ending}"}, home_error),
+            ("/admin/settings", {**home, "home_page": f"{home['home_page']}{ending}"}, home_error),
+            (
+                "/admin/content/save",
+                {"title": "Line terminator", "slug": "line-terminator", "status": f"draft{ending}"},
+                "Check the content fields and their length limits before saving.",
+            ),
+        ]
+        verify_rejections(owner, cases, ending)
+    # Form fields are trimmed, which removes "\n" and "\r" but not the Unicode separators.
+    for ending in ["\u2028", "\u2029", "\u0085"]:
+        cases = [
+            (
+                "/admin/tags/save",
+                {"name": "Line tag", "slug": f"line-tag{ending}"},
+                "Enter a name and a URL slug",
+            ),
+            (
+                "/admin/content/save",
+                {"title": "Line terminator", "slug": f"line-terminator{ending}", "status": "draft"},
+                "single hyphens for the URL slug",
+            ),
+            (
+                "/admin/roles/create",
+                {
+                    "key": f"line_role{ending}",
+                    "name": "Line role",
+                    "enabled": "1",
+                    "capabilities": "[]",
+                },
+                "Use a unique stable role key.",
+            ),
+            (
+                "/admin/content/working-copy",
+                {"title": "Line terminator", "draft_key": f"{draft_key}{ending}"},
+                "Open a new editor before saving this working copy.",
+            ),
+            (
+                "/admin/themes/theme-simple/settings",
+                {**theme_settings, "accent": f"#2457a6{ending}"},
+                "Choose a six-digit color for Link color.",
+            ),
+            (
+                "/admin/themes/theme-simple/settings",
+                {**theme_settings, "width": f"760{ending}"},
+                "Enter a number in the allowed range for Content width.",
+            ),
+        ]
+        verify_rejections(owner, cases, ending)
+    stored_after = fixtures.rows("settings", ["key", "value"], [("key", "in", home_keys)])
+    check(
+        home_before == {row["key"]: row["value"] for row in stored_after},
+        "A homepage setting with a line break was stored",
+    )
+    check(
+        theme_before == fixtures.rows("cms_packages", ["settings"], [("id", "=", "theme-simple")]),
+        "A theme setting with a line break was stored",
+    )
+    check(
+        counts_before == {entity: fixtures.count(entity) for entity in entities},
+        "A value ending in a line break was stored",
+    )
+
+
+def verify_rejections(client, cases, ending):
+    for path, values, message in cases:
+        status, _, body = post_json(client, path, values)
+        check(
+            status == 422 and message in body,
+            f"{path} accepted a value ending in {ending!r}: {str(status)} {body[:160]}",
+        )
 
 
 def verify_permissions(owner, fixtures):

@@ -72,7 +72,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
             "category" => [String, Max(80)],
             "image" => [String, Max(2000)],
             "image_alt" => [String, Max(500)],
-            "status" => [Required, String, Regex("^(draft|published|scheduled)$")],
+            "status" => [Required, String, Regex("^(draft|published|scheduled)\\z")],
             "published_at" => [String, Max(50)],
             "seo_title" => [String, Max(180)],
             "seo_description" => [String, Max(500)],
@@ -146,7 +146,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         var error = "";
         if (form.title.length < type.minimumTitleLength) {
             error = "Check the content fields and their length limits before saving.";
-        } else if (!~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(form.slug)) {
+        } else if (!~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(form.slug)) {
             error = "Use lowercase letters, numbers, and single hyphens for the URL slug.";
         } else if (ContentTypes.supports(type, "excerpt")
             && form.excerpt.length < type.minimumExcerptLength) {

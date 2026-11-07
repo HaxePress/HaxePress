@@ -38,8 +38,8 @@ class ThemeCss {
             || (StringTools.startsWith(url, "'") && StringTools.endsWith(url, "'"))) {
             url = url.substr(1, url.length - 2);
         }
-        var applicationAsset = ~/^\/(build\/assets|fonts|images)\/[A-Za-z0-9_.\/-]+$/.match(url);
-        var localFragment = ~/^#[A-Za-z][A-Za-z0-9_-]{0,79}$/.match(url);
+        var applicationAsset = ~/^\/(build\/assets|fonts|images)\/[A-Za-z0-9_.\/-]+(?![\s\S])/.match(url);
+        var localFragment = ~/^#[A-Za-z][A-Za-z0-9_-]{0,79}(?![\s\S])/.match(url);
         if ((MediaReferences.imageUrl(url)
             || ThemeAssets.imageUrl(url)
             || localFragment

@@ -78,7 +78,7 @@ class PackageManifest {
 
     public static function validPluginId(id:Null<String>):Bool {
         return id != null
-            && ~/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.match(id);
+            && ~/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\s\S])/.match(id);
     }
 
     public static final events = [
@@ -113,7 +113,7 @@ class PackageManifest {
     }
 
     public static function safePath(path:String):Bool {
-        if (path == "" || path.length > 240 || !~/^[A-Za-z0-9_.\/-]+$/.match(path)) {
+        if (path == "" || path.length > 240 || !~/^[A-Za-z0-9_.\/-]+(?![\s\S])/.match(path)) {
             return false;
         }
         var segments = path.split("/");
@@ -150,10 +150,11 @@ class PackageManifest {
         }
         var slug = text(input, "slug", 64, true);
         var version = text(input, "version", 40, true);
-        if (!["plugin", "theme"].contains(kind) || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(slug)) {
+        if (!["plugin", "theme"].contains(kind)
+            || !~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(slug)) {
             throw new Exception("Choose a valid plugin or theme package.");
         }
-        if (!~/^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$/.match(version)) {
+        if (!~/^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(?![\s\S])/.match(version)) {
             throw new Exception("Package versions must use the major.minor.patch format.");
         }
         var hooks:Array<String> = [];
@@ -342,7 +343,7 @@ class PackageManifest {
             var key = text(entry, "key", 40, true);
             var name = text(entry, "name", 100, true);
             var maximum:Dynamic = entry.maxLinks ?? 12;
-            if (!~/^[a-z][a-z0-9_-]{0,39}$/.match(key)
+            if (!~/^[a-z][a-z0-9_-]{0,39}(?![\s\S])/.match(key)
                 || seen.exists(key)
                 || !Std.isOfType(maximum, Int)
                 || maximum < 1
@@ -484,7 +485,7 @@ class PackageManifest {
         for (field in values) {
             var key = text(field, "key", 64, true);
             var kind = text(field, "kind", 20, true);
-            if (!~/^[a-z][a-z0-9_]*$/.match(key)
+            if (!~/^[a-z][a-z0-9_]*(?![\s\S])/.match(key)
                 || keys.contains(key)
                 || !["text", "textarea", "boolean", "number", "color", "select", "secret"].contains(kind)) {
                 throw new Exception("The package contains an invalid or duplicate setting.");

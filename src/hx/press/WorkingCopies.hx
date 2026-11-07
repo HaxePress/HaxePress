@@ -14,7 +14,7 @@ class WorkingCopies {
         var prefix = 'draft-${userId}-${kind}-';
         return ContentTypes.validKey(kind)
             && StringTools.startsWith(value, prefix)
-            && ~/^[A-Za-z0-9_-]{32}$/.match(value.substr(prefix.length));
+            && ~/^[A-Za-z0-9_-]{32}(?![\s\S])/.match(value.substr(prefix.length));
     }
 
     public static function key(userId:Int, kind:String, documentId:Int):String {

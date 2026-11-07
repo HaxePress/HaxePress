@@ -60,7 +60,7 @@ class PackageFieldViews {
 
     /** The color picker's value: the setting, else its default, as the toggle restores it. **/
     static function colorValue(value:String, defaultValue:String):String {
-        var hexColor = ~/^#[0-9a-f]{6}$/i;
+        var hexColor = ~/^#[0-9a-f]{6}(?![\s\S])/i;
         if (hexColor.match(value)) {
             return value;
         }

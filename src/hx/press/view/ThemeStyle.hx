@@ -25,7 +25,7 @@ class ThemeStyle {
     public static function variables(theme:Dynamic):Map<String, String> {
         var result:Map<String, String> = [];
         var settings:Dynamic = theme == null ? null : theme.settings;
-        var color = ~/^#[0-9a-fA-F]{6}$/;
+        var color = ~/^#[0-9a-fA-F]{6}(?![\s\S])/;
         for (pair in colorSettings) {
             var value = settings == null ? null : Values.toText(Values.field(settings, pair[0]));
             if (value != null && color.match(value)) {
@@ -47,7 +47,7 @@ class ThemeStyle {
     }
 
     static function safeValuePattern():EReg {
-        return ~/^(?:#[0-9a-fA-F]{6}|-?[0-9]+(?:\.[0-9]+)?(?:px|rem|em|%)?)$/;
+        return ~/^(?:#[0-9a-fA-F]{6}|-?[0-9]+(?:\.[0-9]+)?(?:px|rem|em|%)?)(?![\s\S])/;
     }
 
     /** A clamped pixel length from a numeric setting, such as a content width. **/
@@ -74,7 +74,7 @@ class ThemeStyle {
         var wordBoundary = ~/([a-z0-9])([A-Z])/g;
         var variableName = variableNamePattern();
         var safeValue = safeValuePattern();
-        var fontStack = ~/^(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})(?:, ?(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})){0,5}$/;
+        var fontStack = ~/^(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})(?:, ?(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})){0,5}(?![\s\S])/;
         for (field in Reflect.fields(input)) {
             var value = Values.toText(Reflect.field(input, field));
             if (value == null || value == "") {

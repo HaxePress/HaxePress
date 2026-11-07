@@ -58,12 +58,12 @@ class PackageSettings {
                     throw new Exception('Choose a valid value for ${field.label}.');
                 }
             case "color":
-                if (!~/^#[0-9A-Fa-f]{6}$/.match(value)) {
+                if (!~/^#[0-9A-Fa-f]{6}(?![\s\S])/.match(value)) {
                     throw new Exception('Choose a six-digit color for ${field.label}.');
                 }
             case "number":
                 var number = Std.parseFloat(value);
-                if (!~/^-?[0-9]+(\.[0-9]+)?$/.match(value)
+                if (!~/^-?[0-9]+(\.[0-9]+)?(?![\s\S])/.match(value)
                     || !Math.isFinite(number)
                     || number < field.minimum
                     || number > field.maximum) {

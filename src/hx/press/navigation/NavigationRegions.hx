@@ -40,7 +40,7 @@ class NavigationRegions {
     }
 
     public static function validKey(key:String):Bool {
-        return key != null && ~/^[a-z][a-z0-9_-]{0,39}$/.match(key);
+        return key != null && ~/^[a-z][a-z0-9_-]{0,39}(?![\s\S])/.match(key);
     }
 
     public static function find(key:String):Null<NavigationRegionRecord> {

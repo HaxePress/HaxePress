@@ -43,7 +43,7 @@ class Roles {
     }
 
     public static function validKey(key:String):Bool {
-        return key != null && ~/^[a-z][a-z0-9_]{0,31}$/.match(key);
+        return key != null && ~/^[a-z][a-z0-9_]{0,31}(?![\s\S])/.match(key);
     }
 
     static function byKey(key:String, activeOnly:Bool):QueryBuilder<Role> {

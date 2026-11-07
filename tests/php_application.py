@@ -78,6 +78,12 @@ def run(app, url):
     email = "php-owner@example.test"
     setup = SetupClient(url)
     check(setup.request("/admin/install", data=True)[0] == 200, "the installer opens")
+    for fields in [
+        {"driver": "sqlite", "file": "cms.sqlite\n"},
+        {"driver": "sqlite\n", "file": "cms.sqlite"},
+    ]:
+        status = setup.request("/admin/install/database", fields)[0]
+        check(status == 422, f"a database setting ending in a line break is refused: {fields}")
     status, _, result = setup.request(
         "/admin/install/database", {"driver": "sqlite", "file": "cms.sqlite"}
     )
@@ -119,6 +125,13 @@ def run(app, url):
     check(status == 303, "the owner signs in")
     for path in ["/admin", "/admin/content", "/admin/media", "/admin/themes", "/admin/plugins"]:
         check(admin.request(path)[0] == 200, f"{path} renders")
+    status, _, body = admin.request(
+        "/admin/settings", "POST", {"site_name": "PHP HaxePress", "home_template": "Home\n"}
+    )
+    check(
+        status == 422 and "Choose valid homepage and presentation settings." in body,
+        "a homepage template ending in a line break is refused",
+    )
     article = {
         "id": "",
         "title": "Escaping on PHP",
@@ -166,6 +179,8 @@ def check_mcp(admin, url):
 
     status, _, body = admin.request("/admin/ai")
     check(status == 200 and json.loads(body)["websocket"] is False, "browsers reach MCP over HTTP")
+    status, _, _ = post_json(admin, "/admin/ai/sessions", {"profile": "claude\n"})
+    check(status == 422, "an MCP profile ending in a line break is refused")
     status, _, body = post_json(admin, "/admin/ai/sessions", {"profile": "claude"})
     check(status == 201, "an MCP link is generated")
     link = json.loads(body)
@@ -223,6 +238,15 @@ def check_mcp(admin, url):
         and result["structuredContent"]["status"] == 200
         and "escaping-on-php" in json.dumps(result["structuredContent"]),
         "the list_content tool reads content through the admin routes",
+    )
+    call["params"]["arguments"]["collection"] = "entry\n"
+    status, reply = rpc(call)
+    result = reply["result"]
+    check(
+        status == 200
+        and result.get("isError")
+        and "must match pattern" in result["content"][0]["text"],
+        "an MCP argument ending in a line break fails its schema pattern",
     )
     meta = {"io.modelcontextprotocol/protocolVersion": MODERN}
     discover = {"jsonrpc": "2.0", "id": 4, "method": "server/discover", "params": {"_meta": meta}}

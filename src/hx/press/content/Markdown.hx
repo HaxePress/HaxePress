@@ -618,7 +618,7 @@ class Markdown {
     }
 
     public static function allowedImage(url:String):Bool {
-        var mediaImage = ~/^\/media\/[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)$/;
+        var mediaImage = ~/^\/media\/[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)(?![\s\S])/;
         return mediaImage.match(url);
     }
 
@@ -791,7 +791,7 @@ private class InlineParser {
                         continue;
                     }
                     if (close > 0
-                        && ~/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.match(inner)) {
+                        && ~/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?![\s\S])/.match(inner)) {
                         flush();
                         pieces.push(anchor('mailto:${inner}', null, Markdown.escape(inner)));
                         index = close + 1;

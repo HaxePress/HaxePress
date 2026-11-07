@@ -422,6 +422,22 @@ def run():
                 == 422,
                 "Unsafe SQLite path accepted",
             )
+            # `$` also matches before a final line break, which would name a file or driver.
+            for ending in ["\n", "\r\n", "\u2028"]:
+                for fields in [
+                    {"driver": "sqlite", "file": f"setup.sqlite{ending}"},
+                    {"driver": f"sqlite{ending}", "file": "setup.sqlite"},
+                ]:
+                    check(
+                        client.request("/admin/install/database", fields)[0] == 422,
+                        f"A database setting ending in {ending!r} was accepted",
+                    )
+            data = server.work / "data"
+            names = [entry.name for entry in data.iterdir()] if data.exists() else []
+            check(
+                all(name.isprintable() for name in names),
+                "A database file was named with a line break",
+            )
             check(
                 client.request(
                     "/admin/install/database",
@@ -462,6 +478,22 @@ def run():
                 client.request("/admin/install/finish", inputs)[0] == 422,
                 "Mismatched administrator passwords were accepted",
             )
+            for ending in ["\n", "\r\n"]:
+                line_email = {
+                    **inputs,
+                    "admin_email": f"{inputs['admin_email']}{ending}",
+                    "confirm_password": password,
+                }
+                line_password = {
+                    **inputs,
+                    "admin_password": f"{password}{ending}",
+                    "confirm_password": f"{password}{ending}",
+                }
+                for changed in [line_email, line_password]:
+                    check(
+                        client.request("/admin/install/finish", changed)[0] == 422,
+                        f"An administrator email or password ending in {ending!r} was accepted",
+                    )
             inputs["confirm_password"] = password
             environment = server.work / ".env"
             original_environment = environment.read_bytes()

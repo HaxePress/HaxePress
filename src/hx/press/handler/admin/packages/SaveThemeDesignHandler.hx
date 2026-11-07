@@ -34,7 +34,7 @@ class SaveThemeDesignHandler extends AbstractHandler implements ValidationRespon
         } else {
             rules.set("design", [Required, String, Max(ThemeDesignSchema.MAX_BYTES)]);
             rules.set("version", [Required, String, Regex("^[1-9][0-9]{0,8}$")]);
-            rules.set("action", [Required, String, Regex("^(save|publish|launch)$")]);
+            rules.set("action", [Required, String, Regex("^(save|publish|launch)\\z")]);
         }
         return request().validate(rules);
     }

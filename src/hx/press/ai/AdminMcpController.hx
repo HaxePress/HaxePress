@@ -23,7 +23,7 @@ class AdminMcpController {
             "profile" => [
                 Required,
                 String,
-                Regex("^(chatgpt|claude|codex|gemini|cursor|copilot|grok|http)$")
+                Regex("^(chatgpt|claude|codex|gemini|cursor|copilot|grok|http)\\z")
             ],
             "hours" => [Int]
         ])) {
