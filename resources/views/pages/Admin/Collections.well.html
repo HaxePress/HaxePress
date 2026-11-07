@@ -11,7 +11,7 @@
       <h1>{{ t('All collections') }}</h1>
     </div>
     <a :if="canManage" class="button" href="/admin/content-types/new"
-      >{{ icon('plus') }} {{ t('New collection') }}</a
+      >{!! icon('plus') !!} {{ t('New collection') }}</a
     >
   </div>
   <Alert
@@ -21,7 +21,7 @@
     <div class="admin-card-heading">
       <h2>{{ t('Content types') }}</h2>
       <form class="admin-search" action="/admin/collections" method="get">
-        {{ icon('search') }}
+        {!! icon('search') !!}
         <label class="sr-only" for="collection-search">{{ t('Search collections') }}</label>
         <input
           id="collection-search"
@@ -48,7 +48,7 @@
           <tr :for="type in collections">
             <td>
               <div class="table-content">
-                <span class="table-image-placeholder">{{ icon(type.icon) }}</span
+                <span class="table-image-placeholder">{!! icon(type.icon) !!}</span
                 ><span
                   ><strong
                     ><a :if="type.active" href="/admin/{{ type.admin_path }}">{{ t(type.name) }}</a
@@ -80,7 +80,7 @@
                   class="icon-button"
                   href="/admin/content-types/{{ type.key }}/edit"
                   aria-label="{{ t('Configure {name}', name: type.name) }}"
-                  >{{ icon('settings') }}</a
+                  >{!! icon('settings') !!}</a
                 >
               </div>
             </td>
@@ -89,7 +89,7 @@
       </table>
     </div>
     <div :if="not collections" class="empty-state">
-      {{ icon('layers') }}
+      {!! icon('layers') !!}
       <h2>{{ t('No matching collections') }}</h2>
       <p>{{ t('Try another name or create a content type for your site.') }}</p>
     </div>

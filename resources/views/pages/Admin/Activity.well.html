@@ -30,13 +30,13 @@
     </div>
     <ol :if="entries" class="activity-list">
       <li :for="entry in entries">
-        <span class="activity-marker">{{ icon('clock') }}</span>
+        <span class="activity-marker">{!! icon('clock') !!}</span>
         <div>
           <p>
             <strong>{{ entry.actor }}</strong> {{ t(entry.actionKey) }}
             <span class="activity-kind">{{ t(entry.entity) }}</span>
             <span :if="entry.mcp" class="featured-text"
-              >{{ icon('sparkles') }} {{ t('Via MCP') }}</span
+              >{!! icon('sparkles') !!} {{ t('Via MCP') }}</span
             >
           </p>
           <span>{{ entry.label ? entry.label : t('Untitled') }}</span>
@@ -45,7 +45,7 @@
       </li>
     </ol>
     <div :else class="empty-state">
-      {{ icon('clock') }}
+      {!! icon('clock') !!}
       <h2>{{ t('No activity') }}</h2>
       <p>{{ t('Changes will appear here as your team works.') }}</p>
     </div>

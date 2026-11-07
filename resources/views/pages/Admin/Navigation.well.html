@@ -62,7 +62,7 @@
               class="icon-button"
               aria-label="{{ t('Edit {title}', title: link.label) }}"
               href="{{ url('/admin/navigation', location: location, region_query: regionQuery, edit: link.id) }}#menu-label"
-              >{{ icon('edit') }}</a
+              >{!! icon('edit') !!}</a
             >
             <form action="/admin/navigation/{{ link.id }}/delete" method="post">
               <button
@@ -71,14 +71,14 @@
                 aria-label="{{ t('Remove {title}', title: link.label) }}"
                 data-well-confirm="{{ t('Remove this navigation link?') }}"
               >
-                {{ icon('trash') }}
+                {!! icon('trash') !!}
               </button>
             </form>
           </div>
         </li>
       </ol>
       <div :else class="empty-state">
-        {{ icon('menu') }}
+        {!! icon('menu') !!}
         <h2>{{ t('Make a path.') }}</h2>
         <p>{{ t('Add your first link to this menu.') }}</p>
       </div>
@@ -204,7 +204,7 @@
             ></label
           >
           <button class="button" type="submit" data-well-busy="{{ t('Save link') }}">
-            {{ icon('check') }} {{ t('Save link') }}
+            {!! icon('check') !!} {{ t('Save link') }}
           </button>
         </form>
       </Island>
@@ -222,7 +222,7 @@
             name="key"
             required
             maxlength="40"
-            pattern="[a-z][a-z0-9_-]{0,39}"
+            pattern="[a-z][a-z0-9_\-]{0,39}"
             value="{{ regionForm.key }}"
           />
         </div>

@@ -19,7 +19,7 @@
         aria-label="{{ t('Close navigation') }}"
         data-well-close
       >
-        {{ icon('x') }}
+        {!! icon('x') !!}
       </button>
       <AdminSidebar />
     </dialog>
@@ -34,14 +34,14 @@
             aria-expanded="false"
             data-well-open="admin-mobile-navigation"
           >
-            {{ icon('menu') }}
+            {!! icon('menu') !!}
           </button>
           <nav class="admin-breadcrumbs" aria-label="{{ t('Breadcrumb') }}">
-            <span>{{ adminLocation.group }}</span>{{ icon('chevron-right') }}<template
+            <span>{{ adminLocation.group }}</span>{!! icon('chevron-right') !!}<template
               :if="adminLocation.parentHref"
               ><span
                 ><a href="{{ adminLocation.parentHref }}">{{ adminLocation.parentLabel }}</a></span
-              >{{ icon('chevron-right') }}</template
+              >{!! icon('chevron-right') !!}</template
             ><strong>{{ adminLocation.current }}</strong>
           </nav>
         </div>
@@ -63,12 +63,12 @@
               aria-label="{{ t('Connect AI') }}"
               aria-haspopup="dialog"
             >
-              {{ icon('sparkles') }}<span>{{ t('Connect AI') }}</span>
+              {!! icon('sparkles') !!}<span>{{ t('Connect AI') }}</span>
             </button></Island
           >
           <LanguageSwitcher />
           <a href="/" class="button button-outline admin-website-link"
-            >{{ t('View website') }} {{ icon('external') }}</a
+            >{{ t('View website') }} {!! icon('external') !!}</a
           >
         </div>
       </header>

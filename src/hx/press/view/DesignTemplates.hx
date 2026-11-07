@@ -320,7 +320,7 @@ class DesignTemplates {
             case "content-image":
                 output.add('<figure${common(node, "hp-design-image-node")}><img :if="item.image" class="hp-design-image" src="{{ item.image }}" alt="{{ item.image_alt }}" /></figure>');
             case "content-body":
-                output.add('<div${common(node, "hp-design-prose")}><ExtensionSlot name="content.before" />{{ markdown(item.content ?? \'\') }}<FieldValues :definitions="item.fieldDefinitions" :values="item.fields" /><ExtensionSlot name="content.after" /></div>');
+                output.add('<div${common(node, "hp-design-prose")}><ExtensionSlot name="content.before" />{!! markdown(item.content ?? \'\') !!}<FieldValues :definitions="item.fieldDefinitions" :values="item.fields" /><ExtensionSlot name="content.after" /></div>');
             case "repeat":
                 output.add('<div${common(node, "hp-design-repeater")}><template :for="item in ${rows(node.source)}">');
                 children();

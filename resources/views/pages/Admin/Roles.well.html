@@ -9,14 +9,14 @@
     <div>
       <h1>{{ t('Roles') }}</h1>
     </div>
-    <a class="button" href="/admin/roles/new">{{ icon('plus') }} {{ t('New role') }}</a>
+    <a class="button" href="/admin/roles/new">{!! icon('plus') !!} {{ t('New role') }}</a>
   </div>
   <Alert :message="noticeMessage" />
   <section class="admin-card">
     <div class="admin-card-heading">
       <h2>{{ t('Access roles') }}</h2>
       <form class="admin-search" method="get" action="/admin/roles">
-        {{ icon('search') }}
+        {!! icon('search') !!}
         <label class="sr-only" for="role-search">{{ t('Search roles') }}</label>
         <input
           id="role-search"
@@ -54,7 +54,7 @@
                 class="icon-button"
                 href="/admin/roles/{{ role.key }}/edit"
                 aria-label="{{ t('Edit {name}', name: role.name) }}"
-                >{{ icon('edit') }}</a
+                >{!! icon('edit') !!}</a
               >
             </td>
           </tr>

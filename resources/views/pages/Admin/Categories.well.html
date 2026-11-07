@@ -55,7 +55,7 @@
               class="icon-button"
               aria-label="Rename {{ category.name }}"
               href="{{ url('/admin/categories', q: query, edit: category.id) }}#category-name"
-              >{{ icon('edit') }}</a
+              >{!! icon('edit') !!}</a
             >
             <form action="/admin/categories/{{ category.id }}/delete" method="post">
               <button
@@ -66,14 +66,14 @@
                 :title="category.items > 0 ? t('Move these content to another category before deleting.') : t('Delete category')"
                 data-well-confirm="{{ t('Delete “{name}”? This category has no content.', name: category.name) }}"
               >
-                {{ icon('trash') }}
+                {!! icon('trash') !!}
               </button>
             </form>
           </div>
         </li>
       </ul>
       <div :else class="empty-state">
-        {{ icon('grid') }}
+        {!! icon('grid') !!}
         <h2>{{ t('No categories') }}</h2>
         <p>{{ t('Add your first category to start organizing content.') }}</p>
       </div>
@@ -102,7 +102,7 @@
         <p class="field-help">{{ t('Choose a distinct name, up to 80 characters.') }}</p>
         <div class="category-form-actions">
           <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
-            {{ icon(categoryForm.id ? 'check' : 'plus') }}{{ categoryForm.id ? t('Save changes') :
+            {!! icon(categoryForm.id ? 'check' : 'plus') !!}{{ categoryForm.id ? t('Save changes') :
             t('Add category') }}
           </button>
           <a :if="categoryForm.id" class="button button-outline" href="/admin/categories"

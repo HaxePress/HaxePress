@@ -33,10 +33,10 @@
           data-well-open="site-search"
           data-well-hotkey="k"
         >
-          {{ icon('search') }}
+          {!! icon('search') !!}
         </button>
         <a :for="link in pluginNavigation.header" class="button button-small" href="{{ link.href }}"
-          >{{ link.label }}{{ icon(link.icon) }}</a
+          >{{ link.label }}{!! icon(link.icon) !!}</a
         >
         <button
           class="icon-button menu-toggle"
@@ -46,7 +46,7 @@
           data-well-show-label="{{ t('Open navigation') }}"
           data-well-hide-label="{{ t('Close navigation') }}"
         >
-          {{ icon('menu') }}
+          {!! icon('menu') !!}
         </button>
       </div>
     </header>
@@ -71,8 +71,8 @@
           <SiteNavigation :links="navigation['footer'] ?? defaultNavigation()" /><a
             :for="link in pluginNavigation.footer"
             href="{{ link.href }}"
-            >{{ link.label }}{{ icon(link.icon) }}</a
-          ><a href="/admin/login">{{ t('Admin') }} {{ icon('arrow-up-right') }}</a>
+            >{{ link.label }}{!! icon(link.icon) !!}</a
+          ><a href="/admin/login">{{ t('Admin') }} {!! icon('arrow-up-right') !!}</a>
         </nav>
         <p>© {{ year() }} {{ site.site_name }}</p>
       </div>
@@ -88,12 +88,12 @@
             aria-label="{{ t('Close search') }}"
             data-well-close
           >
-            {{ icon('x') }}
+            {!! icon('x') !!}
           </button>
         </div>
         <label for="global-search">{{ t('Search content') }}</label>
         <div class="search-input">
-          {{ icon('search') }}<input
+          {!! icon('search') !!}<input
             id="global-search"
             name="q"
             type="search"

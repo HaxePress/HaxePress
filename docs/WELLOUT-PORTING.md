@@ -46,6 +46,8 @@ Helpers: `t(key, name: value…)`, `can(capability)`, `icon(name)`, `markdown(te
 
 Filters: `truncate(n)`, `lower`, `upper`, `default(value)`, `number`, `date`, `color`, `length`, `encode` (like `encodeURIComponent`), `string` (any value as text), `replace(a, b)`, `json`.
 
+`{{ }}` always escapes its value. HTML that trusted code produced, such as `icon('…')` and `markdown(…)`, which return `SafeHtml`, is written with `{!! … !!}`; that form accepts only `SafeHtml` and only in element text, and `{{ }}` on a `SafeHtml` value escapes it with an `escaped-html` warning.
+
 There is no string concatenation: compose text with interpolation (`href="/admin/tags/{{ tag.id }}/edit"`) or `url(...)`. To compare an `Int` with a `String`, use `(value | string)`.
 
 ### Forms and actions

@@ -25,7 +25,7 @@
               :else
               class="table-image-placeholder"
               aria-hidden="true"
-              >{{ icon('image') }}</span
+              >{!! icon('image') !!}</span
             ><span
               ><strong
                 ><template :if="item.status == 'trash'">{{ item.title }}</template
@@ -36,7 +36,7 @@
                 >{{ item.url ? item.url : t('Private content') }}<span
                   :if="item.featured"
                   class="featured-text"
-                  >{{ icon('sparkles') }} {{ t('Featured') }}</span
+                  >{!! icon('sparkles') !!} {{ t('Featured') }}</span
                 ></small
               ></span
             >
@@ -60,14 +60,14 @@
               class="icon-button"
               href="{{ item.adminBase }}/{{ item.id }}/edit"
               aria-label="{{ t('Edit {title}', title: item.title) }}"
-              >{{ icon('edit') }}</a
+              >{!! icon('edit') !!}</a
             >
             <a
               :if="item.status == 'published' and item.url"
               class="icon-button"
               href="{{ item.url }}"
               aria-label="{{ t('Read {title}', title: item.title) }}"
-              >{{ icon('external') }}</a
+              >{!! icon('external') !!}</a
             >
             <form
               :if="can('publish') or item.status == 'draft' or item.status == 'trash'"
@@ -80,7 +80,7 @@
                 aria-label="{{ t('Delete {title}', title: item.title) }}"
                 data-well-confirm="{{ item.status == 'trash' ? t('Delete this content permanently? This action cannot be undone.') : t('Move this content to the trash? You can restore it later.') }}"
               >
-                {{ icon('trash') }}
+                {!! icon('trash') !!}
               </button>
             </form>
             <form

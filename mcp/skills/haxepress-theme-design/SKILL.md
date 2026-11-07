@@ -132,6 +132,11 @@ Key rules (details in `references/document-model.md`):
 - Links must be internal paths (`/about`), `https://`, `mailto:` or `tel:`.
   Forms must submit to a CMS route. Scripts, iframes and event attributes do
   not exist here.
+- Text is always text. Every `text`, heading, button label, `alt` value and
+  bound value is escaped when the page renders, so tags or entities you type
+  appear literally. Write plain text and build structure with blocks. Only
+  trusted HTML renders as HTML: the article body in `content-body`, which the
+  site renders from Markdown, and the site's icons.
 - Images must be managed: from the media library, from the theme's own assets
   or uploaded with `upload_theme_image` then `verify_theme_image`. Remote image
   URLs are rejected. Write real `alt` text for every meaningful image.

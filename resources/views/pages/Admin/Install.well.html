@@ -11,7 +11,7 @@
   <div class="setup-body">
     <main class="setup-shell">
       <aside class="setup-sidebar">
-        <div class="setup-wordmark">{{ icon('layers') }}HaxePress</div>
+        <div class="setup-wordmark">{!! icon('layers') !!}HaxePress</div>
         <p class="setup-sidebar-title">Installation</p>
         <ol class="setup-steps" aria-label="Installation progress">
           <li
@@ -21,20 +21,20 @@
           >
             <span class="setup-step-number"
               ><template :if="not install.blocked and install.step > loop.index"
-                >{{ icon('check') }}</template
+                >{!! icon('check') !!}</template
               ><template :else>{{ loop.number }}</template></span
             ><span>{{ label }}</span>
           </li>
         </ol>
         <div class="setup-access">
-          {{ icon('lock') }}<span
+          {!! icon('lock') !!}<span
             >{{ install.blocked ? 'Setup locked' : 'Trusted connection' }}</span
           >
         </div>
       </aside>
       <section class="setup-content" aria-busy="false" fragment="setup">
         <template :if="install.blocked">
-          <div class="setup-lock-symbol">{{ icon('lock') }}</div>
+          <div class="setup-lock-symbol">{!! icon('lock') !!}</div>
           <h1>Setup is locked</h1>
           <p class="setup-intro">{{ install.message }}</p>
           <div class="setup-notice">
@@ -63,7 +63,7 @@
             </p>
           </div>
           <div class="setup-error" role="alert" :hidden="not error('setup')" data-setup-error>
-            {{ icon('alert') }}<span>{{ error('setup') }}</span>
+            {!! icon('alert') !!}<span>{{ error('setup') }}</span>
           </div>
           <template :if="install.step == 0">
             <form id="setup-driver" method="get" action="/admin/install" swap="setup">
@@ -112,7 +112,7 @@
                     value="{{ install.file }}"
                     maxlength="81"
                     required
-                    pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,74}\.sqlite"
+                    pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{0,74}\.sqlite"
                   />
                   <p>The file is created in the data folder, apart from uploaded files.</p>
                 </div>
@@ -183,7 +183,7 @@
               </fieldset>
             </form>
           </template>
-          <template :for="panel in install.panels">{{ panel }}</template>
+          <template :for="panel in install.panels">{!! panel !!}</template>
           <form
             :if="install.step == 1"
             class="setup-form"
@@ -192,7 +192,7 @@
           >
             <fieldset>
               <div class="setup-verified">
-                {{ icon('check') }}<span>{{ install.verifiedLabel }} · Connection verified</span>
+                {!! icon('check') !!}<span>{{ install.verifiedLabel }} · Connection verified</span>
               </div>
               <div class="setup-field">
                 <label for="setup-site-name">Site name</label>
@@ -248,8 +248,8 @@
                     data-well-show-label="Show password"
                     data-well-hide-label="Hide password"
                   >
-                    <span data-well-pressed="false">{{ icon('eye') }}</span
-                    ><span data-well-pressed="true" hidden>{{ icon('eye-off') }}</span>
+                    <span data-well-pressed="false">{!! icon('eye') !!}</span
+                    ><span data-well-pressed="true" hidden>{!! icon('eye-off') !!}</span>
                   </button>
                 </div>
                 <p>Use 12–72 bytes. The password is saved in your private .env file.</p>

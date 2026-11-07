@@ -4,5 +4,5 @@
   class="alert {{ error ? 'error' : 'success' }}"
   :role="error ? 'alert' : 'status'"
 >
-  {{ icon(error ? 'alert' : 'check') }}{{ t(message) }}
+  {!! icon(error ? 'alert' : 'check') !!}{{ t(message) }}
 </div>

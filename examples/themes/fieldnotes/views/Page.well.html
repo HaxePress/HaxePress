@@ -13,7 +13,7 @@
     <img :if="item.image" class="content-cover" src="{{ item.image }}" alt="{{ item.image_alt }}" />
     <div class="content-prose">
       <ExtensionSlot name="content.before" />
-      {{ markdown(item.content ?? '') }}
+      {!! markdown(item.content ?? '') !!}
       <FieldValues :definitions="item.fieldDefinitions" :values="item.fields" />
       <ExtensionSlot name="content.after" />
     </div>

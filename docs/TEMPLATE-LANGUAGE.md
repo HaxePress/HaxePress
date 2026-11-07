@@ -145,7 +145,7 @@ Code themes and builder blocks use one set of server-rendered components:
 | `ContentFilters`                                                       | `<ContentFilters :collection="collection" />` as a GET form                    |
 | `Pagination`                                                           | `<Pagination :page="pagination" />`, with `swap` support                       |
 | `LanguageSwitcher`                                                     | `<LanguageSwitcher />` as a form posting to `/locale`                          |
-| `Markdown`                                                             | `{{ item.content }}` as `SafeHtml` from the server's CommonMark renderer       |
+| `Markdown`                                                             | `{!! markdown(item.content) !!}`: `SafeHtml` from the server's renderer        |
 | Builder `brand`, `site-description`                                    | `<Brand />`, `{{ site.description }}`                                          |
 | Builder `content-title`, `-excerpt`, `-image`, `-body`, `content-list` | Bindings on `item` and `<ContentList :items="items" />`                        |
 

@@ -30,7 +30,7 @@
         <h1>{{ t('Media library') }}</h1>
       </div>
       <label class="button package-upload-button"
-        >{{ icon('upload') }}{{ t('Upload image') }}<input
+        >{!! icon('upload') !!}{{ t('Upload image') }}<input
           type="file"
           accept="{{ join(mediaRules.mimeTypes, ',') }}"
       /></label>
@@ -41,7 +41,7 @@
   <nav class="status-tabs media-tabs" aria-label="{{ t('Image library sections') }}">
     <a :class="not trashed ? 'selected'" href="/admin/media">{{ t('Library') }}</a>
     <a :class="trashed ? 'selected'" href="/admin/media?status=trash"
-      >{{ icon('trash') }} {{ t('Trash') }} <span>{{ trashCount }}</span></a
+      >{!! icon('trash') !!} {{ t('Trash') }} <span>{{ trashCount }}</span></a
     >
   </nav>
   <form class="category-search-form extension-search" action="/admin/media" method="get">
@@ -87,7 +87,7 @@
               class="button button-outline"
               data-media-references="{{ image.id }}"
             >
-              {{ icon('link') }} {{ t('References') }}
+              {!! icon('link') !!} {{ t('References') }}
             </button>
             <button
               :else-if="trashed"
@@ -106,18 +106,18 @@
               :title="not image.references_verified ? t('References could not be verified') : not image.can_delete ? t('Image in use') : trashed ? t('Delete permanently') : t('Move to trash')"
               :aria-label="not image.can_delete ? t('Deletion locked for {name}', name: image.title) : trashed ? t('Delete {name} permanently', name: image.title) : t('Move {name} to the trash', name: image.title)"
             >
-              {{ icon(image.can_delete ? 'trash' : 'lock') }}
+              {!! icon(image.can_delete ? 'trash' : 'lock') !!}
             </button>
           </div>
         </article>
       </div>
       <section :if="not images and trashed" class="admin-card empty-state">
-        {{ icon('trash') }}
+        {!! icon('trash') !!}
         <h2>{{ t('The trash is empty') }}</h2>
         <p>{{ t('Images you move to the trash stay here for {count} days.', count: trashDays) }}</p>
       </section>
       <section :else-if="not images" class="admin-card empty-state">
-        {{ icon('image') }}
+        {!! icon('image') !!}
         <h2>{{ t('No images') }}</h2>
         <p>{{ t('Upload JPEG, PNG or GIF images up to 5 MB and 20 megapixels.') }}</p>
       </section>

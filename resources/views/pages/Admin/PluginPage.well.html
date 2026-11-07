@@ -8,9 +8,9 @@
     <div>
       <template :for="action in pluginPage.actions"
         ><a :if="action.download" class="button button-outline" href="{{ action.href }}" download
-          >{{ icon('download') }}{{ translate(pluginPage.namespace ?? 'cms', action.label) }}</a
+          >{!! icon('download') !!}{{ translate(pluginPage.namespace ?? 'cms', action.label) }}</a
         ><a :else class="button button-outline" href="{{ action.href }}"
-          >{{ icon('download') }}{{ translate(pluginPage.namespace ?? 'cms', action.label) }}</a
+          >{!! icon('download') !!}{{ translate(pluginPage.namespace ?? 'cms', action.label) }}</a
         ></template
       >
     </div>
@@ -50,7 +50,7 @@
                   aria-label="{{ translate(pluginPage.namespace ?? 'cms', pluginPage.rowAction.label) }} {{ row[pluginPage.columns[0].key ?? 'id'] | string }}"
                   data-well-confirm="{{ translate(pluginPage.namespace ?? 'cms', pluginPage.rowAction.confirm) }}"
                 >
-                  {{ icon('trash') }}
+                  {!! icon('trash') !!}
                 </button>
               </form>
             </td>
@@ -59,7 +59,7 @@
       </table>
     </div>
     <div :else class="empty-state">
-      {{ icon('users') }}
+      {!! icon('users') !!}
       <h2>
         {{ t('No {items} yet.', items: translate(pluginPage.namespace ?? 'cms', pluginPage.noun)) }}
       </h2>

@@ -61,8 +61,15 @@ class CsvExportInput extends Input {
         finished = true;
     }
 
+    /**
+        A quoted CSV field. A value that starts like a formula (=, +, -, @,
+        tab or carriage return) gets a leading apostrophe, so spreadsheets
+        open it as text instead of evaluating it.
+    **/
     static function quote(value:String):String {
-        var escaped = StringTools.replace(value, '"', '""');
+        var text = value.length > 0
+            && "=+-@\t\r".indexOf(value.charAt(0)) >= 0 ? '\'${value}' : value;
+        var escaped = StringTools.replace(text, '"', '""');
         return '"${escaped}"';
     }
 }

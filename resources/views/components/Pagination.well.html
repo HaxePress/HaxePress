@@ -6,11 +6,11 @@
   >
   <div>
     <a :if="links.previous" class="button button-outline" href="{{ links.previous }}"
-      >{{ icon('arrow-left') }} {{ t('Previous') }}</a
+      >{!! icon('arrow-left') !!} {{ t('Previous') }}</a
     >
     <span :else></span>
     <a :if="links.next" class="button button-outline" href="{{ links.next }}"
-      >{{ t('Next') }} {{ icon('arrow-right') }}</a
+      >{{ t('Next') }} {!! icon('arrow-right') !!}</a
     >
   </div>
 </nav>

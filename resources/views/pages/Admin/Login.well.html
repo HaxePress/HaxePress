@@ -6,7 +6,7 @@
   <div class="login-body">
     <PageHead :title="t('Sign in')" admin />
     <main class="login-panel">
-      <a class="back-link" href="/">{{ icon('arrow-left') }} {{ t('Back to website') }}</a>
+      <a class="back-link" href="/">{!! icon('arrow-left') !!} {{ t('Back to website') }}</a>
       <div class="login-form-wrap">
         <p class="login-context">{{ site.site_name }}</p>
         <h1>{{ t('Sign in') }}</h1>
@@ -42,8 +42,8 @@
               data-well-show-label="{{ t('Show password') }}"
               data-well-hide-label="{{ t('Hide password') }}"
             >
-              <span data-well-pressed="false">{{ icon('eye') }}</span
-              ><span data-well-pressed="true" hidden>{{ icon('eye-off') }}</span>
+              <span data-well-pressed="false">{!! icon('eye') !!}</span
+              ><span data-well-pressed="true" hidden>{!! icon('eye-off') !!}</span>
             </button>
           </div>
           <button type="submit" class="button login-submit" data-well-busy="{{ t('Signing in…') }}">

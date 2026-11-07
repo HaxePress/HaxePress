@@ -16,12 +16,12 @@
     <div class="admin-page-heading">
       <div>
         <a class="back-link" href="/admin/collections"
-          >{{ icon('arrow-left') }} {{ t('All collections') }}</a
+          >{!! icon('arrow-left') !!} {{ t('All collections') }}</a
         >
         <h1>{{ isNew ? t('New collection') : typeForm.heading }}</h1>
       </div>
       <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
-        {{ icon('check') }} {{ t('Save collection') }}
+        {!! icon('check') !!} {{ t('Save collection') }}
       </button>
     </div>
     <Alert error :message="error('structure')" />
@@ -100,7 +100,7 @@
               formnovalidate
               :disabled="not typeForm.canAddField"
             >
-              {{ icon('plus') }} {{ t('Add field') }}
+              {!! icon('plus') !!} {{ t('Add field') }}
             </button>
           </div>
           <p :if="not typeForm.fields" class="field-help">
@@ -125,7 +125,7 @@
                 :disabled="loop.first"
                 aria-label="{{ t('Move field up') }}"
               >
-                {{ icon('arrow-up') }}
+                {!! icon('arrow-up') !!}
               </button>
               <button
                 class="icon-button"
@@ -136,7 +136,7 @@
                 :disabled="loop.last"
                 aria-label="{{ t('Move field down') }}"
               >
-                {{ icon('arrow-down') }}
+                {!! icon('arrow-down') !!}
               </button>
               <button
                 class="icon-button"
@@ -146,7 +146,7 @@
                 formnovalidate
                 aria-label="{{ t('Remove field') }}"
               >
-                {{ icon('trash') }}
+                {!! icon('trash') !!}
               </button>
             </div>
             <div class="structure-field-grid">

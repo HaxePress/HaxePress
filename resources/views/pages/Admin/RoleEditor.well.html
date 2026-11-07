@@ -22,11 +22,11 @@
     /></template>
     <div class="admin-page-heading">
       <div>
-        <a class="back-link" href="/admin/roles">{{ icon('arrow-left') }} {{ t('Roles') }}</a>
+        <a class="back-link" href="/admin/roles">{!! icon('arrow-left') !!} {{ t('Roles') }}</a>
         <h1>{{ isNew ? t('New role') : t(heading) }}</h1>
       </div>
       <button type="submit" class="button" data-well-busy="{{ t('Saving…') }}">
-        {{ icon('check') }} {{ t('Save role') }}
+        {!! icon('check') !!} {{ t('Save role') }}
       </button>
     </div>
     <div id="role-capability-error"></div>

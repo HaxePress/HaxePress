@@ -7,7 +7,7 @@
   />
   <article class="content-page wrap">
     <a class="back-link" href="{{ item.archiveUrl }}"
-      >{{ icon('arrow-left') }} {{ t('Back to content') }}</a
+      >{!! icon('arrow-left') !!} {{ t('Back to content') }}</a
     >
     <header class="content-header">
       <a class="category-pill" href="{{ url(item.archiveUrl, category: item.category) }}"
@@ -23,10 +23,10 @@
       </nav>
       <div class="content-byline">
         <FieldnotesAuthor :published="item.publishedLabel" /><span
-          >{{ icon('clock') }} {{ item.readMinutes }} {{ t('min read') }}</span
+          >{!! icon('clock') !!} {{ item.readMinutes }} {{ t('min read') }}</span
         ><Island name="share" :props="{ title: item.title, toast: true }" load="idle"
           ><button class="icon-button share-button" aria-label="{{ t('Share this content item') }}">
-            {{ icon('share') }}
+            {!! icon('share') !!}
           </button></Island
         >
       </div>
@@ -34,13 +34,13 @@
     <img :if="item.image" class="content-cover" src="{{ item.image }}" alt="{{ item.image_alt }}" />
     <div class="content-prose">
       <ExtensionSlot name="content.before" />
-      {{ markdown(item.content ?? '') }}
+      {!! markdown(item.content ?? '') !!}
       <FieldValues :definitions="item.fieldDefinitions" :values="item.fields" />
       <ExtensionSlot name="content.after" />
       <div class="content-end">
         <Island name="share" :props="{ title: item.title, toast: true }" load="idle"
           ><button class="button button-outline">
-            {{ icon('share') }} {{ t('Share this content item') }}
+            {!! icon('share') !!} {{ t('Share this content item') }}
           </button></Island
         >
       </div>
@@ -52,7 +52,7 @@
         <h2>{{ t('Related content') }}</h2>
       </div>
       <a class="text-link" href="{{ item.archiveUrl }}"
-        >{{ t('All content') }} {{ icon('arrow-right') }}</a
+        >{{ t('All content') }} {!! icon('arrow-right') !!}</a
       >
     </div>
     <div class="content-grid">

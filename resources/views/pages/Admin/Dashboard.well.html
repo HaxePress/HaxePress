@@ -15,31 +15,31 @@
     </div>
     <div class="package-actions">
       <a :if="can('extensions')" class="button button-outline" href="/admin/themes/create"
-        >{{ icon('palette') }}{{ t('Build your website') }}</a
+        >{!! icon('palette') !!}{{ t('Build your website') }}</a
       >
       <a
         :if="collectionCards[0]"
         class="button"
         href="/admin/{{ collectionCards[0].admin_path }}/new"
-        >{{ icon('plus') }} {{ t('Create {type}', type: t(collectionCards[0].singular)) }}</a
+        >{!! icon('plus') !!} {{ t('Create {type}', type: t(collectionCards[0].singular)) }}</a
       >
     </div>
   </div>
   <section class="publication-summary" aria-label="{{ t('Site summary') }}">
     <div class="site-stat site-stat-published">
-      <span class="publication-stat-label">{{ icon('file') }} {{ t('Published content') }}</span
+      <span class="publication-stat-label">{!! icon('file') !!} {{ t('Published content') }}</span
       ><strong>{{ published }}</strong>
     </div>
     <div class="site-stat site-stat-draft">
-      <span class="publication-stat-label">{{ icon('edit') }} {{ t('Drafts') }}</span
+      <span class="publication-stat-label">{!! icon('edit') !!} {{ t('Drafts') }}</span
       ><strong>{{ drafts }}</strong>
     </div>
     <div class="site-stat site-stat-pages">
-      <span class="publication-stat-label">{{ icon('layers') }} {{ t('Collections') }}</span
+      <span class="publication-stat-label">{!! icon('layers') !!} {{ t('Collections') }}</span
       ><strong>{{ collections }}</strong>
     </div>
     <div class="site-stat site-stat-scheduled">
-      <span class="publication-stat-label">{{ icon('clock') }} {{ t('Scheduled content') }}</span
+      <span class="publication-stat-label">{!! icon('clock') !!} {{ t('Scheduled content') }}</span
       ><strong>{{ scheduled }}</strong>
     </div>
   </section>
@@ -50,15 +50,15 @@
         <p>{{ t('Each collection uses its own fields and editor features.') }}</p>
       </div>
       <a href="/admin/collections" class="text-link"
-        >{{ t('All collections') }} {{ icon('arrow-right') }}</a
+        >{{ t('All collections') }} {!! icon('arrow-right') !!}</a
       >
     </div>
     <div class="collection-shortcuts">
       <a :for="card in collectionCards" href="/admin/{{ card.admin_path }}"
-        >{{ icon(card.icon) }}<span
+        >{!! icon(card.icon) !!}<span
           ><strong>{{ t(card.name) }}</strong
           ><small>{{ t('Content count', count: card.items) }}</small></span
-        >{{ icon('chevron-right') }}</a
+        >{!! icon('chevron-right') !!}</a
       >
     </div>
   </section>
@@ -72,7 +72,7 @@
       </div>
       <ContentTable :if="items" :items="items" compact />
       <div :else class="empty-state">
-        {{ icon('file') }}
+        {!! icon('file') !!}
         <h2>{{ t('No content') }}</h2>
         <p>{{ t('Choose a collection to create your first content item.') }}</p>
       </div>
@@ -81,7 +81,7 @@
       <div class="admin-card-heading">
         <h2>{{ t('Recent activity') }}</h2>
         <a href="/admin/activity" class="text-link"
-          >{{ t('View all') }} {{ icon('arrow-right') }}</a
+          >{{ t('View all') }} {!! icon('arrow-right') !!}</a
         >
       </div>
       <div class="dashboard-activity">
@@ -90,7 +90,7 @@
           <p>
             {{ t(entry.action) }} · {{ entry.label }}
             <span :if="entry.mcp" class="featured-text"
-              >{{ icon('sparkles') }} {{ t('Via MCP') }}</span
+              >{!! icon('sparkles') !!} {{ t('Via MCP') }}</span
             >
           </p>
           <small>{{ entry.created_at }}</small>
@@ -100,6 +100,6 @@
     </section>
   </div>
   <div :if="widgets" class="dashboard-widgets">
-    <section :for="widget in widgets" class="admin-card">{{ markdown(widget.content) }}</section>
+    <section :for="widget in widgets" class="admin-card">{!! markdown(widget.content) !!}</section>
   </div>
 </AdminLayout>

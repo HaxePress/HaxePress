@@ -6,7 +6,7 @@
 >
   <template :for="block in extensions.blocks"
     ><div :if="block.slot == name" class="extension-block">
-      {{ markdown(block.content) }}
+      {!! markdown(block.content) !!}
     </div></template
   >
 </div>

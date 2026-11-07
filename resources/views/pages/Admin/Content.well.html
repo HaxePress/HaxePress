@@ -22,7 +22,7 @@
       <p :else-if="contentType.description">{{ t(contentType.description) }}</p>
     </div>
     <a class="button" href="{{ contentType.adminBase }}/new"
-      >{{ icon('plus') }}
+      >{!! icon('plus') !!}
       <template :if="contentType.labels.create">{{ t(contentType.labels.create) }}</template
       ><template :else>{{ t('Create {type}', type: contentType.singular) }}</template></a
     >
@@ -64,7 +64,7 @@
         >
       </nav>
       <form class="admin-search" action="{{ contentType.adminBase }}" method="get">
-        {{ icon('search') }}
+        {!! icon('search') !!}
         <label class="sr-only" for="content-search"
           >{{ t('Search your {items}', items: t(contentType.name)) }}</label
         >
@@ -87,7 +87,7 @@
       :fields="listFields"
     />
     <div :else class="empty-state">
-      {{ icon('file') }}
+      {!! icon('file') !!}
       <h2>{{ t('No content') }}</h2>
       <!-- prettier-ignore -->
       <p>{{ t('No {items} match this view. Clear your search or begin something new.', items: t(contentType.name)) }}</p>

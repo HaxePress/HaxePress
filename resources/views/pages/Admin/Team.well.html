@@ -49,7 +49,7 @@
             class="icon-button"
             aria-label="Edit {{ member.name }}"
             href="{{ url('/admin/team', q: query, cursor: query('cursor'), edit: member.id) }}#member-name"
-            >{{ icon('edit') }}</a
+            >{!! icon('edit') !!}</a
           >
         </li>
       </ul>

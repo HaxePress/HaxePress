@@ -21,7 +21,7 @@
             data-width="100%"
             aria-pressed="true"
           >
-            {{ icon('desktop') }}<span>{{ t('Desktop') }}</span>
+            {!! icon('desktop') !!}<span>{{ t('Desktop') }}</span>
           </button>
           <button
             type="button"
@@ -30,7 +30,7 @@
             data-width="768px"
             aria-pressed="false"
           >
-            {{ icon('tablet') }}<span>{{ t('Tablet') }}</span>
+            {!! icon('tablet') !!}<span>{{ t('Tablet') }}</span>
           </button>
           <button
             type="button"
@@ -39,7 +39,7 @@
             data-width="390px"
             aria-pressed="false"
           >
-            {{ icon('mobile') }}<span>{{ t('Mobile') }}</span>
+            {!! icon('mobile') !!}<span>{{ t('Mobile') }}</span>
           </button>
         </div>
         <div class="theme-preview-actions">
@@ -60,7 +60,7 @@
               aria-label="{{ t('Connect AI') }}"
               aria-haspopup="dialog"
             >
-              {{ icon('sparkles') }}<span>{{ t('Connect AI') }}</span>
+              {!! icon('sparkles') !!}<span>{{ t('Connect AI') }}</span>
             </button></Island
           >
           <button
@@ -71,7 +71,7 @@
             aria-controls="theme-customizer-panel"
             data-customizer-toggle
           >
-            {{ icon('palette') }}<span>{{ t('Customize') }}</span>
+            {!! icon('palette') !!}<span>{{ t('Customize') }}</span>
           </button>
           <a href="/admin/themes">{{ t('Back to themes') }}</a>
           <button
@@ -112,7 +112,7 @@
                 aria-label="{{ t('Close customization') }}"
                 data-customizer-close
               >
-                {{ icon('x') }}
+                {!! icon('x') !!}
               </button>
             </header>
             <div class="theme-customizer-messages">

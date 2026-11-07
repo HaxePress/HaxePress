@@ -52,7 +52,7 @@
               class="icon-button"
               aria-label="Edit {{ tag.name }}"
               href="{{ url('/admin/tags', q: query, cursor: query('cursor'), edit: tag.id) }}#tag-name"
-              >{{ icon('edit') }}</a
+              >{!! icon('edit') !!}</a
             >
             <form action="/admin/tags/{{ tag.id }}/delete" method="post">
               <button
@@ -61,14 +61,14 @@
                 aria-label="Delete {{ tag.name }}"
                 data-well-confirm="{{ t('Delete “{name}”? Its content assignments will be removed. Your content will be kept.', name: tag.name) }}"
               >
-                {{ icon('trash') }}
+                {!! icon('trash') !!}
               </button>
             </form>
           </div>
         </li>
       </ul>
       <div :else class="empty-state">
-        {{ icon('grid') }}
+        {!! icon('grid') !!}
         <h2>{{ t('Ideas that belong together.') }}</h2>
         <p>{{ t('Create a tag, then add it to content in the editor.') }}</p>
       </div>

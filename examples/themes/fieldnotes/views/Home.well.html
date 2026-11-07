@@ -16,7 +16,7 @@
           alt="{{ featured.image_alt }}"
           fetchpriority="high"
         /><span :else class="content-image-placeholder" aria-hidden="true">✳</span
-        ><span class="featured-badge">{{ icon('sparkles') }} {{ t('In the spotlight') }}</span></a
+        ><span class="featured-badge">{!! icon('sparkles') !!} {{ t('In the spotlight') }}</span></a
       >
       <div class="featured-copy">
         <div class="featured-topline">
@@ -24,7 +24,9 @@
             class="category-pill living"
             href="{{ url(featured.archiveUrl, category: featured.category) }}"
             >{{ featured.category }}</a
-          ><span>{{ icon('clock') }} {{ t('{count} min read', count: featured.readMinutes) }}</span>
+          ><span
+            >{!! icon('clock') !!} {{ t('{count} min read', count: featured.readMinutes) }}</span
+          >
         </div>
         <h2><a href="{{ featured.url }}">{{ featured.title }}</a></h2>
         <p>{{ featured.excerpt }}</p>
@@ -33,7 +35,7 @@
             class="round-link"
             href="{{ featured.url }}"
             aria-label="{{ t('Read {title}', title: featured.title) }}"
-            >{{ icon('arrow-up-right') }}</a
+            >{!! icon('arrow-up-right') !!}</a
           >
         </div>
       </div>
@@ -46,7 +48,7 @@
         <a
           class="text-link"
           href="{{ collection and collection.hasArchive ? collection.publicBase : '/' }}"
-          >{{ t('Explore content') }} {{ icon('arrow-right') }}</a
+          >{{ t('Explore content') }} {!! icon('arrow-right') !!}</a
         >
       </div>
       <nav class="category-bar" aria-label="{{ t('Content item categories') }}">
@@ -63,7 +65,7 @@
           class="category-search"
           href="{{ collection and collection.hasArchive ? collection.publicBase : '/' }}"
           aria-label="{{ t('Search content') }}"
-          >{{ icon('search') }}</a
+          >{!! icon('search') !!}</a
         >
       </nav>
       <div class="content-grid">
@@ -73,7 +75,7 @@
         <a
           class="button button-outline"
           href="{{ collection and collection.hasArchive ? collection.publicBase : '/' }}"
-          >{{ t('All content') }} {{ icon('arrow-down') }}</a
+          >{{ t('All content') }} {!! icon('arrow-down') !!}</a
         >
       </div>
     </section>
@@ -83,7 +85,7 @@
         <p>{{ site.about_site }}</p>
       </div>
       <a class="round-link" href="/about" aria-label="{{ t('About this site') }}"
-        >{{ icon('arrow-up-right') }}</a
+        >{!! icon('arrow-up-right') !!}</a
       >
     </section>
   </div>

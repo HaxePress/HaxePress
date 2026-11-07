@@ -270,10 +270,12 @@ def verify(fixtures):
         and 'class="theme-preview-banner"' not in frame_html,
         "inactive theme content was not isolated from its toolbar",
     )
+    frame_policy = frame_headers["content-security-policy"]
     check(
         frame_headers["x-frame-options"] == "SAMEORIGIN"
-        and frame_headers["content-security-policy"] == "frame-ancestors 'self'",
-        "preview iframe policy",
+        and "frame-ancestors 'self'" in frame_policy
+        and "script-src 'self' 'nonce-" in frame_policy,
+        f"preview iframe policy: {frame_policy}",
     )
     frame_base = content["theme"]["previewBase"]
     check(

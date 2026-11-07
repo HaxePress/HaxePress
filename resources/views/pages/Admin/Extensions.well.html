@@ -22,14 +22,14 @@
     <div class="package-actions">
       <template :if="githubAvailable">
         <button :if="uploadDisabled" class="button button-outline" type="button" disabled>
-          {{ icon('download') }}{{ t('Install from GitHub') }}
+          {!! icon('download') !!}{{ t('Install from GitHub') }}
         </button>
         <a :else class="button button-outline" href="{{ base }}?github=1"
-          >{{ icon('download') }}{{ t('Install from GitHub') }}</a
+          >{!! icon('download') !!}{{ t('Install from GitHub') }}</a
         >
       </template>
       <a :if="kind == 'theme'" class="button button-outline" href="/admin/themes/create"
-        >{{ icon('plus') }}{{ t('Create website design') }}</a
+        >{!! icon('plus') !!}{{ t('Create website design') }}</a
       >
       <Island
         name="package-upload"
@@ -46,10 +46,8 @@
         load="idle"
       >
         <label class="button package-upload-button"
-          >{{ icon('upload') }}{{ kind == 'theme' ? t('Upload theme') : t('Upload plugin') }}<input
-            type="file"
-            accept=".zip,application/zip"
-            :disabled="uploadDisabled"
+          >{!! icon('upload') !!}{{ kind == 'theme' ? t('Upload theme') : t('Upload plugin')
+          }}<input type="file" accept=".zip,application/zip" :disabled="uploadDisabled"
         /></label>
       </Island>
     </div>
@@ -64,7 +62,7 @@
   >
     <div class="extension-card-title">
       <h2 id="github-plugin-title">{{ t('Install from GitHub') }}</h2>
-      <a class="icon-button" href="{{ base }}" aria-label="{{ t('Close') }}">{{ icon('x') }}</a>
+      <a class="icon-button" href="{{ base }}" aria-label="{{ t('Close') }}">{!! icon('x') !!}</a>
     </div>
     <Alert error :message="github.error ? github.error : error('github')" />
     <form class="github-plugin-form" method="get" action="{{ base }}">
@@ -186,7 +184,7 @@
             <span class="theme-thumbnail-status" role="status">{{ t('Loading preview…') }}</span>
           </div></Island
         ><span class="theme-thumbnail-open" aria-hidden="true"
-          >{{ icon('eye') }} {{ t('Preview') }}</span
+          >{!! icon('eye') !!} {{ t('Preview') }}</span
         ></a
       >
       <div class="extension-card-body">
@@ -205,12 +203,12 @@
           author') }}
         </p>
         <p :if="item.unpublished" class="unpublished-theme-note">
-          {{ icon('alert') }}<span
+          {!! icon('alert') !!}<span
             >{{ t('Unpublished changes. Visitors see the last published design.') }}</span
           >
         </p>
         <p :if="item.built_in" class="built-in-theme-note">
-          {{ icon('lock') }} {{ kind == 'theme' ? t('Built-in theme') : t('Bundled plugin') }}
+          {!! icon('lock') !!} {{ kind == 'theme' ? t('Built-in theme') : t('Bundled plugin') }}
         </p>
         <Alert error :message="item.last_error" />
         <Alert
@@ -221,12 +219,12 @@
         <form class="package-actions" method="post" action="{{ base }}/{{ item.id }}/enable">
           <template :if="item.designed"
             ><a class="button button-outline" href="{{ base }}/{{ item.id }}/design"
-              >{{ icon('edit') }}{{ t('Edit design') }}</a
+              >{!! icon('edit') !!}{{ t('Edit design') }}</a
             ><a
               class="button button-outline"
               href="{{ base }}/{{ item.id }}/export"
               title="{{ t('Export saved design') }}"
-              >{{ icon('download') }}{{ t('Export theme') }}</a
+              >{!! icon('download') !!}{{ t('Export theme') }}</a
             ></template
           >
           <a
@@ -266,14 +264,14 @@
             :disabled="kind == 'theme' and item.enabled == 1"
             data-well-confirm="Uninstall “{{ item.localizedName }}”? Its files and settings will be removed."
           >
-            {{ icon('trash') }}
+            {!! icon('trash') !!}
           </button>
         </form>
       </div>
     </section>
   </div>
   <section :if="not packages" class="admin-card empty-state">
-    {{ icon(kind == 'theme' ? 'layout' : 'grid') }}
+    {!! icon(kind == 'theme' ? 'layout' : 'grid') !!}
     <h2>{{ query ? t('No packages match this search.') : t('No packages installed') }}</h2>
     <p>{{ t('Upload a CMS') }} {{ kind }} {{ t('ZIP to inspect it before installation.') }}</p>
   </section>

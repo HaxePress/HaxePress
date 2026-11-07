@@ -195,6 +195,21 @@ def run():
         check(status == 200 and "The latest content" in text, "home page")
         check("::" not in text, "unresolved Haxe template data")
         check(headers.get("x-content-type-options") == "nosniff", "security headers")
+        # Scripts run only from the site or with this response's nonce, so injected markup cannot run.
+        policy = headers.get("content-security-policy", "")
+        scripts = next(
+            (part.strip() for part in policy.split(";") if part.strip().startswith("script-src")),
+            "",
+        )
+        nonce = re.search(r"'nonce-([A-Za-z0-9_-]+)'", scripts)
+        check(
+            nonce is not None
+            and "'unsafe-inline'" not in scripts
+            and f'nonce="{nonce.group(1)}"' in text
+            and "object-src 'none'" in policy
+            and "frame-ancestors 'none'" in policy,
+            f"content security policy: {policy}",
+        )
         check(
             "set-cookie" not in headers and not public.cookies, "public homepage creates a session"
         )
@@ -866,6 +881,14 @@ def run():
             sum(1 for row in csv.reader(io.StringIO(text)) if row and row[0] == email) == 1,
             "CSV export content",
         )
+        formula = f"+csv-{suffix}@example.test"
+        check(
+            public.request("/subscribe", "POST", {"email": formula}, csrf=False)[0] == 200,
+            "a subscription that starts like a formula",
+        )
+        _, _, text = admin.request("/admin/subscribers/export")
+        exported = [row[0] for row in csv.reader(io.StringIO(text)) if row and formula in row[0]]
+        check(exported == [f"'{formula}"], f"CSV export kept a formula as a formula: {exported}")
         mark("Persistent Eloquent newsletter signup, deduplication, management and CSV export")
         _, _, payload = admin.request("/admin/settings", extra_headers=DATA_HEADERS)
         original_settings = json.loads(payload)["props"]["site"]

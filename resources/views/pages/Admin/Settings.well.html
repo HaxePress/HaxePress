@@ -47,7 +47,7 @@
               </div>
               <div class="site-logo-actions">
                 <label class="button button-outline package-upload-button"
-                  >{{ icon('upload') }}{{ t('Upload logo') }}<input
+                  >{!! icon('upload') !!}{{ t('Upload logo') }}<input
                     type="file"
                     accept="{{ join(logoRules.mimeTypes, ',') }}"
                 /></label>
@@ -196,13 +196,13 @@
             :disabled="settingsForm.home_mode == 'page'"
           />
           <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
-            {{ icon('check') }}{{ t('Save your changes') }}
+            {!! icon('check') !!}{{ t('Save your changes') }}
           </button>
         </form>
       </Island>
     </section>
     <section class="admin-card settings-card password-card">
-      <div class="login-icon">{{ icon('lock') }}</div>
+      <div class="login-icon">{!! icon('lock') !!}</div>
       <h2>{{ t('Account password') }}</h2>
       <Alert error :message="error('password')" />
       <form action="/admin/password" method="post">
