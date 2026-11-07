@@ -4,7 +4,7 @@
 
 HaxePress is a general-purpose content management system built with **HxWell**, its native ORM/Schema/Cache/Storage APIs, **hxwell-crossbyte** and **[Wellout](https://github.com/hxwell/wellout)**. The JVM renders the public site, themes, plugin pages and administration from type-checked Wellout templates (`*.well.html`). Browsers receive HTML; small client islands built with TypeScript and Vite add interactive parts such as the content editor and the theme builder. English is the default language; Turkish is included.
 
-The current release is **2.16.0**, with **plugin/theme API 4**. The application runs on **JVM** with **SQLite or MySQL**. Native extension packages include JVM JAR, C++ CPPIA and PHP modules in one version-specific ZIP.
+The current release is **2.16.0**, with **plugin/theme API 4**. The application runs on **JVM** or **PHP** with **SQLite or MySQL**. Native extension packages include JVM JAR, C++ CPPIA and PHP modules in one version-specific ZIP.
 
 ## Run locally
 
@@ -27,9 +27,9 @@ make build
 make run
 ```
 
-Open [the installation wizard](http://127.0.0.1:3000/admin/install). Choose SQLite or MySQL, verify an empty writable database, set your site and administrator details, then finish. SQLite creates its file under the configured storage disk. MySQL requires an existing empty database and a user with schema permissions. Sample content is optional.
+Open [the installation wizard](http://127.0.0.1:3000/admin/install). Choose SQLite or MySQL, verify an empty writable database, set your site and administrator details, then finish. SQLite creates its file in the `data/` folder (`DATA_PATH`), apart from the uploaded files and caches in `storage/`. MySQL requires an existing empty database and a user with schema permissions. Sample content is optional.
 
-The wizard saves database settings and the chosen initial administrator password in `.env` with private file permissions, stores only a password hash in the database, and disables itself after completion. Keep the real `.env`, databases and `storage/` data outside Git. Existing installations with administrator records are detected and preserved. See [installation](docs/INSTALLATION.md).
+The wizard saves the database settings in `.env` with private file permissions, creates the administrator in the database with only a hash of the password, and disables itself after completion. `.env` keeps no administrator credentials; startup clears any that earlier versions left there. Keep the real `.env`, `data/` and `storage/` outside Git. Existing installations with administrator records are detected and preserved. See [installation](docs/INSTALLATION.md).
 
 After setup, open [the site](http://127.0.0.1:3000/) or [administration](http://127.0.0.1:3000/admin). Later administrator changes live in the database; changing the initial bootstrap variables does not reset existing accounts.
 
@@ -40,7 +40,7 @@ python3 scripts/hxwell.py build jvm
 python3 scripts/run.py
 ```
 
-The launcher starts the JVM HTTP application, which renders every page itself; no Node.js process takes part in rendering. The JVM also manages the private Node.js MCP SDK host for admin and theme tools. Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `STORAGE_PATH`, `CACHE_PATH` and `SESSION_PATH` in `.env`. The default database is `storage/cms.sqlite`. [MCP setup](docs/THEME-MCP.md)
+The launcher starts the JVM HTTP application, which renders every page itself; no Node.js process takes part in rendering. The JVM also manages the private Node.js MCP SDK host for admin and theme tools. Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `DATA_PATH`, `STORAGE_PATH`, `CACHE_PATH` and `SESSION_PATH` in `.env`. The default database is `data/cms.sqlite`; `storage/` holds uploaded files, caches and sessions. [MCP setup](docs/THEME-MCP.md)
 
 ## Definition-driven CMS
 
@@ -106,21 +106,41 @@ The source is organized as follows:
 | `examples/`              | Native plugin and theme sources                          |
 | `tests/`                 | Isolated JVM/CPPIA/PHP checks and ORM fixtures           |
 
+## Run on PHP
+
+`make build` also builds the application for PHP into `Export/php` (`python3 scripts/hxwell.py build php --hxml=php.hxml`). `global.hxml` (JVM, with the Crossbyte server) and `php.hxml` share `common.hxml`; on PHP, HxWell's PHP driver serves each request through `public/index.php`. The PHP build also includes the types PHP plugins link to (`plugin-host.hxml`). To try it, put a `.env` beside `hxwell.boot.php`, then serve `public/` from that folder:
+
+```sh
+cd Export/php/public
+php -S 127.0.0.1:3010 index.php
+```
+
+PHP starts the application for each request, so the PHP build:
+
+- runs migrations once per build and records it in the database;
+- keeps compiled Wellout templates in `storage/cache/views` with Wellout's `PhpTemplateStore`, as PHP files that opcache serves; each file returns the template's operation tree as a PHP array, never code from a template, and output is still escaped by the same renderer;
+- writes output with native PHP string functions;
+- runs due scheduled tasks after responses and from `php hxwell.boot.php schedule:run`, which cron can call every minute;
+- sends errors to PHP's error log.
+
+The site MCP server and live theme collaboration need a long-running process and WebSockets, so they are available only in the JVM build. `python3 tests/php_application.py` checks the packaged PHP build.
+
 ## Releases
 
 Publishing a release on GitHub runs the Release workflow (`.github/workflows/release.yml`). It builds the release's tag with `make build`, packages it with `scripts/release.py`, starts the packaged application to check that it serves the installer, and attaches the files to the release. Those files are:
 
 - `haxepress-<version>-jvm.zip`, the application for Java 21+, with `start.sh`, which creates `.env` with a new `APP_KEY` on first run;
+- `haxepress-<version>-php.zip`, the application for PHP 8.1+, with `setup.php`, which creates `.env` with a new `APP_KEY`, and a README for web servers and cron;
 - the plugin, theme and SDK packages of that build, where each plugin contains its JVM, CPPIA and PHP builds;
 - `SHA256SUMS.txt`.
 
-The application itself has no PHP build, because its HTTP server needs a threaded target. The release tag names the download; the CMS and plugin API versions inside come from `cms.json`. To rebuild a release's files, run the workflow by hand with its tag.
+The workflow checks that each installation of either archive creates its own private `APP_KEY` (`tests/release_keys.py`) and serves both packaged applications before it attaches them. The release tag names the download; the CMS and plugin API versions inside come from `cms.json`. To rebuild a release's files, run the workflow by hand with its tag.
 
 ## Upgrading an existing installation
 
 Back up `.env`, the database and managed `storage/` data before upgrading. The legacy naming migration renames the old content/tag tables and reference column through Schema APIs, preserves IDs/content/relationships, normalizes the old content type, working-copy keys and revision snapshots, and updates factory defaults only when they still match the original values. Existing custom site text is retained. The structure migration replaces the global slug constraint with `(content_type, slug)`, renames menu references to `content_id`, and adds registry/value/grant tables. Old public URLs redirect to canonical routes.
 
-Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Third-party native plugins must be rebuilt for the exact CMS 2.16.0 / API 4 release. Themes provide Wellout views. Browser renderer themes are no longer supported: they are rejected on upload and removed on startup, and the shipped example themes are replaced with their Wellout builds. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. Keep custom `DB_PATH` values; the local project's original default filename is migrated to `storage/cms.sqlite` during deployment.
+Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Third-party native plugins must be rebuilt for the exact CMS 2.16.0 / API 4 release. Themes provide Wellout views. Browser renderer themes are no longer supported: they are rejected on upload and removed on startup, and the shipped example themes are replaced with their Wellout builds. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. Keep custom `DB_PATH` values. New installations keep SQLite in `data/`; an installation that left `DB_PATH` out with its database at the earlier default, `storage/cms.sqlite`, keeps using that file. To move it, stop the site, move the database file and any `-wal` and `-shm` files beside it into `data/`, and set `DB_PATH`.
 
 ## Verification
 
@@ -131,7 +151,7 @@ make test-php
 PATH="$PWD/.tools/haxe:$PATH" npm run format:check
 ```
 
-The [CI workflow](.github/workflows/ci.yml) runs setup, formatting, the application and extension build, and the JVM integration suite on Ubuntu for pushes and pull requests to `main`. It uses Haxe 4.3.7 and Java 21.
+The [CI workflow](.github/workflows/ci.yml) runs setup, formatting, the application and extension build, the packaged PHP application check and the JVM integration suite on Ubuntu for pushes and pull requests to `main`. It uses Haxe 4.3.7 and Java 21.
 
 The JVM suite uses temporary databases, actual Crossbyte processes and a test-only ORM fixture process. It exercises permissions, uploads, caches/projections, cursor pagination, revision/scheduling flows, package replacement, migrations and languages. Native C++ and PHP hosts load real extension modules and run the same persistence contract checks. An existing-installation rehearsal verifies preserved data, relationships, working copies, revision snapshots, package state, redirects and repeat startup.
 

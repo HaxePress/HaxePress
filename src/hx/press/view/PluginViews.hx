@@ -141,7 +141,8 @@ class PluginViews {
             library.add(name, source);
         }
         return {
-            set: new TemplateSet(contract, ViewEngine.runtime, library),
+            set: new TemplateSet(contract, ViewEngine.runtime, library,
+                ViewEngine.store('plugin:${folder}:${assetBase}')),
             islands: islands,
             assetBase: assetBase
         };

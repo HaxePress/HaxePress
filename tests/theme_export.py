@@ -154,7 +154,7 @@ def verify(fixtures):
     identifier = props(owner, editor_url)["studio"]["id"]
     packages.append(identifier)
     url = f"/admin/themes/{identifier}/export"
-    exports = Path(os.environ["TEST_DB_PATH"]).parent / "exports"
+    exports = Path(os.environ["TEST_STORAGE_PATH"]) / "exports"
     try:
         check(public.request(url)[0] == 303, "Public request exported a private theme")
         check(

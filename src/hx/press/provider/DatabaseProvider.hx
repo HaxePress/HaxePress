@@ -2,6 +2,8 @@ package hx.press.provider;
 
 import hx.well.provider.AbstractProvider;
 import hx.press.database.InitialSchema;
+import hx.press.database.MigrationState;
+import hx.press.install.InstallationEnv;
 import hx.press.install.InstallationState;
 import hx.press.SiteSettingsStore;
 import hx.press.database.ManagedContentImages;
@@ -27,7 +29,12 @@ class DatabaseProvider extends AbstractProvider {
         if (InstallationState.pending) {
             return;
         }
-        migrate();
+        MigrationState.ensure(migrate);
+        try {
+            InstallationEnv.forgetAdministrator();
+        } catch (error:Dynamic) {
+            trace('The administrator settings could not be cleared from .env: ${Std.string(error)}');
+        }
     }
 
     public static function migrate():Void {

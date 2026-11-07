@@ -24,7 +24,7 @@ import hx.well.thread.MutexPool;
 import hx.well.facades.Storage;
 import hx.press.model.ThemeDesign;
 import hx.press.media.MediaDependencies;
-#if jvm
+#if (jvm || (php && !cms_plugin))
 import hx.press.themes.ThemeDesignPackage;
 #end
 import hx.press.model.ThemeAiConnection;
@@ -182,13 +182,13 @@ class PackageManager {
                 throw new Exception("Restart the server before replacing this plugin.");
             }
             if (manifest.layout == "builder") {
-                #if jvm
+                #if (jvm || (php && !cms_plugin))
                 var installed = ThemeDesignPackage.install(upload, manifest, previous, userId,
                     name);
                 writes.release("packages");
                 return installed;
                 #else
-                throw new Exception("Visual theme package installation requires the JVM host.");
+                throw new Exception("Visual theme package installation requires the HaxePress application.");
                 #end
             }
             if (ThemeDesign.query.where("id", id).exists()) {

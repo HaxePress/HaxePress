@@ -1,0 +1,3 @@
+# The PHP build: the shared settings and the types PHP plugins link to; HxWell's PHP driver serves each request.
+common.hxml
+plugin-host.hxml

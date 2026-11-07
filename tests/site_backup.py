@@ -546,7 +546,7 @@ def reject_wrong_key(content):
             )
             check(
                 (work / ".env").read_bytes() == environment
-                and not list((work / "storage").glob("restored-*.sqlite")),
+                and not list((work / "data").glob("restored-*.sqlite")),
                 "A wrong-key restore modified the target installation",
             )
         finally:
@@ -671,7 +671,7 @@ def restore(
                 )
                 reject_corruption(client, content, damaged)
                 check(
-                    not list((work / "storage").glob("restored-*.sqlite")),
+                    not list((work / "data").glob("restored-*.sqlite")),
                     "Failed restore published a database",
                 )
             status, _, result = upload_backup(client, path, content)

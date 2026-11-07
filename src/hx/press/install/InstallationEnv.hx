@@ -1,6 +1,7 @@
 package hx.press.install;
 
 import haxe.Exception;
+import hx.well.facades.Environment;
 import hx.well.facades.Storage;
 import hx.well.internal.SecureToken;
 
@@ -51,6 +52,46 @@ class InstallationEnv {
         var path = '.env.install-${SecureToken.generate(16)}';
         disk.put(path, '${lines.join("\n")}\n', "private");
         return path;
+    }
+
+    /** The settings that create the first administrator when no account exists yet. **/
+    public static final ADMINISTRATOR = ["ADMIN_NAME", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
+
+    /**
+        Clears the first administrator's name, e-mail and password from .env
+        once the account exists. The database holds the account and the
+        only, hashed copy of its password; earlier installers also left them
+        in .env. Nothing is read when the loaded settings hold none of them.
+    **/
+    public static function forgetAdministrator():Void {
+        var present = ADMINISTRATOR.filter(key -> Environment.env(key, "") != "");
+        if (present.length == 0) {
+            return;
+        }
+        for (key in ADMINISTRATOR) {
+            Environment.set(key, "");
+        }
+        var disk = Storage.disk("configuration");
+        if (!disk.fileExists(".env")) {
+            return;
+        }
+        var setting = ~/^\s*(ADMIN_NAME|ADMIN_EMAIL|ADMIN_PASSWORD)\s*=\s*(.*?)\s*$/;
+        var changed = false;
+        var lines = [];
+        for (line in disk.get(".env").split("\n")) {
+            if (setting.match(line) && !["", "''", '""'].contains(setting.matched(2))) {
+                lines.push('${setting.matched(1)}=${quoted("")}');
+                changed = true;
+            } else {
+                lines.push(line);
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        var path = '.env.install-${SecureToken.generate(16)}';
+        disk.put(path, lines.join("\n"), "private");
+        disk.move(path, ".env");
     }
 
     public static function commit(path:String):Void {

@@ -152,6 +152,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
         port = reservation.getsockname()[1]
     for folder in ("sessions", "cache"):
         (work / "storage" / folder).mkdir(parents=True, exist_ok=True)
+    (work / "data").mkdir()
     for folder in ("public", "database"):
         source = PUBLIC_ROOT if folder == "public" else ROOT / folder
         (work / folder).symlink_to(source, target_is_directory=True)
@@ -168,7 +169,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
         "MAX_CONNECTIONS": "10000",
         "WORKERS": "16",
         "DB_DRIVER": "sqlite",
-        "DB_PATH": str(work / "storage/cms.sqlite"),
+        "DB_PATH": str(work / "data/cms.sqlite"),
         "SESSION_PATH": str(work / "storage/sessions"),
         "CACHE_PATH": str(work / "storage/cache"),
         "ADMIN_EMAIL": "integration-admin@example.com",
@@ -194,6 +195,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                 TEST_ADMIN_PASSWORD=password,
                 TEST_DB_PATH=values["DB_PATH"],
                 TEST_CACHE_PATH=str(work / "storage/cache"),
+                TEST_STORAGE_PATH=str(work / "storage"),
             )
             suites = (
                 [arguments.only]

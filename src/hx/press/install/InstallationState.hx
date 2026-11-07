@@ -1,6 +1,7 @@
 package hx.press.install;
 
 import haxe.io.Path;
+import hx.press.config.DatabaseConfig;
 import hx.press.model.Admin;
 import hx.well.database.Connection;
 import hx.well.facades.Environment;
@@ -29,7 +30,7 @@ class InstallationState {
         }
         var driver = Environment.env("DB_DRIVER", "sqlite");
         if (driver == "sqlite") {
-            var filename = Environment.env("DB_PATH", "storage/cms.sqlite");
+            var filename = DatabaseConfig.sqlitePath();
             var parent = Path.directory(filename);
             var disk = Storage.build({
                 driver: "local",

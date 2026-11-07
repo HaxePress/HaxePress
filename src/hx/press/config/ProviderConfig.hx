@@ -2,6 +2,9 @@ package hx.press.config;
 
 import hx.well.config.IConfig;
 #if !cms_plugin
+#if php
+import hx.press.provider.PhpLogProvider;
+#end
 import hx.press.provider.BootProvider;
 import hx.press.provider.DatabaseProvider;
 import hx.press.provider.ResponseEncodingProvider;
@@ -19,6 +22,9 @@ class ProviderConfig implements IConfig {
         return [];
         #else
         return [
+            #if php
+            PhpLogProvider,
+            #end
             #if cms_tests
             TestProvider,
             #end

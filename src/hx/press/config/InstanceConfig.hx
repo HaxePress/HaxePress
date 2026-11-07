@@ -4,7 +4,9 @@ import hx.well.config.IConfig;
 import hx.well.server.instance.IInstance;
 import hx.press.ServerSettings;
 import hx.press.themes.ThemeMcpHost;
-#if !cms_plugin
+#if (!cms_plugin && php)
+import hx.well.http.driver.php.PHPInstance;
+#elseif !cms_plugin
 import hx.press.http.BodyLimits;
 import hx.well.http.driver.crossbyte.CrossbyteInstance;
 #end
@@ -15,6 +17,9 @@ class InstanceConfig implements IConfig {
     public function get():Array<IInstance> {
         #if cms_plugin
         return [];
+        #elseif php
+        // The web server runs index.php for each request; HxWell's PHP driver handles it.
+        return [PHPInstance.builder().build()];
         #else
         return [
             CrossbyteInstance.builder()

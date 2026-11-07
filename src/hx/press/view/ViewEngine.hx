@@ -5,6 +5,12 @@ import wellout.check.ComponentLibrary;
 import wellout.check.HostContract;
 import wellout.render.Runtime;
 import wellout.render.TemplateSet;
+import wellout.render.TemplateStore;
+#if php
+import hx.press.BuildIdentity;
+import hx.well.facades.Storage;
+import wellout.render.PhpTemplateStore;
+#end
 
 /** Where a page is rendered from: a template set, the template name and its host settings. */
 class ViewTarget {
@@ -41,7 +47,35 @@ class ViewEngine {
     public static final contract:HostContract = ViewContract.build();
     public static final runtime:Runtime = ViewHelpers.runtime();
     public static final library:ComponentLibrary = applicationLibrary();
-    public static final application:TemplateSet = new TemplateSet(contract, runtime, library);
+    public static final application:TemplateSet = new TemplateSet(contract, runtime, library,
+        store("application"));
+
+    /**
+        Where a set keeps its compiled templates between processes: Wellout's
+        PHP files in `storage/cache/views` on PHP, which starts the
+        application for each request; none on the JVM, which compiles each
+        template once per process. `version` names the set and the sources
+        of its templates; this build is part of it.
+    **/
+    public static function store(version:String):Null<TemplateStore> {
+        #if php
+        return new PhpTemplateStore(cacheRoot(), '${BuildIdentity.id}\n${version}');
+        #else
+        return null;
+        #end
+    }
+
+    #if php
+    static var templateCache:Null<String> = null;
+
+    /** The template cache folder, resolved through the local disk once per request. **/
+    static function cacheRoot():String {
+        if (templateCache == null) {
+            templateCache = Storage.disk("local").path("cache/views");
+        }
+        return templateCache;
+    }
+    #end
 
     static function applicationLibrary():ComponentLibrary {
         var templates = new ComponentLibrary(contract);

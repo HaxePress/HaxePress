@@ -81,7 +81,7 @@ class Installation {
             InstallationState.locks.release("installation");
             abort(404);
         }
-        var local = Storage.disk("local");
+        var data = Storage.disk("data");
         var prepared:Null<String> = null;
         var ownedDatabase:Null<String> = null;
         var committed = false;
@@ -114,7 +114,7 @@ class Installation {
             ];
             prepared = InstallationEnv.prepareRestore(values, appKey);
             if (generated) {
-                local.put(database.file, Bytes.alloc(0), "private");
+                data.put(database.file, Bytes.alloc(0), "private");
                 ownedDatabase = database.file;
             }
             var commit = () -> {
@@ -144,7 +144,7 @@ class Installation {
                 try {
                     InstallationEnv.discard(prepared);
                     if (ownedDatabase != null) {
-                        local.delete(ownedDatabase);
+                        data.delete(ownedDatabase);
                     }
                 } catch (_:Dynamic) {
                     trace("Could not remove the prepared installation.");

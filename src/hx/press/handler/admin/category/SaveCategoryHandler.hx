@@ -18,8 +18,10 @@ import hx.press.model.ContentItem;
 import hx.well.validator.ValidatorRule;
 import hx.well.http.RequestStatic.request;
 import hx.press.validation.ValidationResponder;
+#if jvm
 import org.sqlite.SQLiteException;
 import org.sqlite.SQLiteErrorCode;
+#end
 
 class SaveCategoryHandler extends AbstractHandler implements ValidationResponder {
     public override function validate():Bool {
@@ -91,6 +93,7 @@ class SaveCategoryHandler extends AbstractHandler implements ValidationResponder
                 });
             }
         } catch (error:Exception) {
+            #if jvm
             var native:Dynamic = error.native;
             if (!Std.isOfType(native, SQLiteException)) {
                 throw error;
@@ -99,6 +102,12 @@ class SaveCategoryHandler extends AbstractHandler implements ValidationResponder
             if (constraint.getResultCode() != SQLiteErrorCode.SQLITE_CONSTRAINT_UNIQUE) {
                 throw error;
             }
+            #else
+            // PHP's SQLite3 reports the constraint only in its message.
+            if (error.message.indexOf("UNIQUE constraint failed") < 0) {
+                throw error;
+            }
+            #end
             return AdminController.categoryList(request,
                 "A category with this name already exists.", 422, form);
         }

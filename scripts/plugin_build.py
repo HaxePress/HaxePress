@@ -2,40 +2,13 @@
 
 import os
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
-HOST_API_TYPES = [
-    "Xml",
-    "hx.press.plugins.PluginEntrypoint",
-    "hx.press.plugins.PluginHost",
-    "hx.press.plugins.PluginDatabase",
-    "hx.press.plugins.PluginMigration",
-    "hx.press.content.ContentTypes",
-    "hx.press.content.ContentFields",
-    "hx.press.media.MediaReferences",
-    "hx.press.media.MediaDependencies",
-    "hx.press.media.MediaUsage",
-    "hx.press.access.Roles",
-    "hx.press.navigation.NavigationRegions",
-    "hx.press.NavigationData",
-    "hx.well.model.BaseModel",
-    "hx.well.model.BaseModelQuery",
-    "hx.well.route.Route",
-    "hx.well.tools.RouteElementTools",
-    "hx.press.view.Pages",
-    "hx.well.facades.Schema",
-    "hx.well.facades.Storage",
-    "hx.well.http.ResponseBuilder",
-    "hx.well.internal.SecureToken",
-    "hx.press.model.ContentItem",
-    "hx.press.model.Subscriber",
-    "hx.press.ContentCache",
-    "hx.press.SiteSettingsStore",
-    "hx.press.Pagination",
-    "hx.press.CmsVersion",
-    "hx.press.i18n.I18n",
-    "hx.press.validation.ValidationResponder",
-]
+# The application types plugins link to, shared with the PHP application build.
+HOST_API_TYPES = re.findall(
+    r'Context\.getType\("([^"]+)"\)', (ROOT / "plugin-host.hxml").read_text()
+)
 
 
 def host_exports():
@@ -73,7 +46,7 @@ def host_options():
         "-D",
         "scriptable",
     ]
-    for line in (ROOT / "global.hxml").read_text().splitlines():
+    for line in (ROOT / "common.hxml").read_text().splitlines():
         if not line.startswith("-resource "):
             continue
         argument = line.split(None, 1)[1]

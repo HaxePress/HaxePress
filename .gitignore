@@ -26,6 +26,7 @@
 Export/
 storage/*
 !storage/.gitkeep
+data/
 .DS_Store
 *.n
 node_modules/

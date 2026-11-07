@@ -15,7 +15,7 @@ import hx.well.thread.FakeMutex as Mutex;
 import hx.well.cache.FileSystemCacheStore;
 import hx.well.facades.Cache;
 import sys.FileSystem;
-import hx.well.facades.Environment;
+import hx.press.config.DatabaseConfig;
 import hx.well.facades.Storage;
 import hx.well.http.RequestStatic;
 import hx.well.internal.SecureToken;
@@ -89,7 +89,7 @@ class ContentCache {
     }
 
     static function currentPrefix():String {
-        return databasePrefix(Environment.env("DB_PATH", "storage/cms.sqlite"));
+        return databasePrefix(DatabaseConfig.sqlitePath());
     }
 
     static function prefix(domain:String):String {

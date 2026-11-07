@@ -57,13 +57,21 @@ class DesignViews {
             return found;
         }
         var library = new ComponentLibrary(ViewEngine.contract, ViewEngine.library, false);
-        for (name => source in DesignTemplates.generate(document)) {
+        var templates = DesignTemplates.generate(document);
+        var names = [for (name in templates.keys()) name];
+        names.sort(Reflect.compare);
+        var sources = new StringBuf();
+        for (name in names) {
+            var source = templates.get(name);
             library.add(name, source);
+            sources.add('${name}\n${source.length}\n${source}');
         }
+        // Stored templates are keyed by the generated sources, so every edit gets its own.
+        var version = 'design:${themeId}:${Md5.encode(sources.toString())}';
         var css = DesignStyles.css(document);
         var file = '${themeId}-${Md5.encode(css).substr(0, 16)}.css';
         var design = new CompiledDesign(new TemplateSet(ViewEngine.contract, ViewEngine.runtime,
-            library),
+            library, ViewEngine.store(version)),
             '/theme-design/${file}', css);
         #if (target.threaded)
         lock.acquire();

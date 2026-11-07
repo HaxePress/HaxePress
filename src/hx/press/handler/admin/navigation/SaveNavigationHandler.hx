@@ -22,7 +22,9 @@ import hx.well.http.Request;
 import hx.well.http.RequestStatic.request;
 import hx.well.http.ResponseBuilder;
 import hx.well.validator.ValidatorRule;
+#if jvm
 import java.net.URI;
+#end
 
 class SaveNavigationHandler extends AbstractHandler implements ValidationResponder {
     public override function validate():Bool {
@@ -133,6 +135,7 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
         if (StringTools.startsWith(value, "/") && !StringTools.startsWith(value, "//")) {
             return value.indexOf("\\") < 0 && !~/[\x00-\x20]/.match(value);
         }
+        #if jvm
         try {
             var uri = new URI(value);
             return ["https", "http"].contains(uri.getScheme()) && uri.getHost() != null
@@ -140,5 +143,14 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
         } catch (invalid:Dynamic) {
             return false;
         }
+        #else
+        // The rules java.net.URI applies on the JVM: an http or https address
+        // with a host name or IP address, no user information and no spaces.
+        return absoluteUrl.match(value);
+        #end
     }
+
+    #if !jvm
+    static final absoluteUrl = ~/^https?:\/\/(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.?|\[[0-9A-Fa-f:.]+\])(?::[0-9]*)?(?:[\/?#][^\x00-\x20"<>\\^`{|}]*)?$/;
+    #end
 }

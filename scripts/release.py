@@ -2,10 +2,9 @@
 """Package a built HaxePress for a GitHub release.
 
 Run `make build` first, then `python3 scripts/release.py <tag> <output folder>`.
-The output holds the JVM application as one archive, the extension packages
-of this build (each plugin carries its JVM, CPPIA and PHP builds) and a
-SHA256SUMS.txt file. The application itself runs on the JVM only: its HTTP
-server needs a threaded target, so there is no PHP build of the application.
+The output holds the application built for the JVM and for PHP, one archive
+each, the extension packages of this build (each plugin carries its JVM,
+CPPIA and PHP builds) and a SHA256SUMS.txt file.
 """
 
 import argparse
@@ -19,6 +18,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 APPLICATION = ROOT / "Export/jvm"
+PHP_APPLICATION = ROOT / "Export/php"
 TAG = re.compile(r"^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)$")
 
 START = """#!/bin/sh
@@ -35,6 +35,67 @@ if [ ! -f .env ]; then
   echo "Open http://127.0.0.1:3000/admin/install on this computer to install HaxePress."
 fi
 exec java --enable-native-access=ALL-UNNAMED -jar hxwell.jar start
+"""
+
+SETUP_PHP = """<?php
+// Creates .env from .env.example with a new random APP_KEY. Run once: php setup.php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+chdir(__DIR__);
+if (file_exists('.env')) {
+    echo ".env already exists and was kept.\\n";
+    exit(0);
+}
+$key = base64_encode(random_bytes(32));
+$settings = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=' . $key, file_get_contents('.env.example'));
+umask(077);
+file_put_contents('.env', $settings);
+chmod('.env', 0600);
+echo "Created .env with a new APP_KEY. Keep it private.\\n";
+"""
+
+PHP_README = """# HaxePress {version} for PHP
+
+HaxePress {cms} (plugin API {api}) built for PHP with HxWell's PHP driver.
+
+## Requirements
+
+- PHP 8.1 or later with the `mbstring` and `sqlite3` extensions (`mysqli`
+  for MySQL), and opcache for speed.
+- A web server whose document root is the `public/` folder and which sends
+  every request that is not a file to `public/index.php`. Apache uses the
+  included `.htaccess`. Keep the other folders outside the document root.
+
+## Install
+
+1. Unpack this archive and run `php setup.php` in its folder. It creates
+   `.env` from `.env.example` with a new `APP_KEY`; keep that file private.
+2. Make `data/` and `storage/` (both created on first use) and `.env` writable
+   by PHP.
+3. The installer accepts direct connections from 127.0.0.1 only. On a
+   remote server, add your IP address to `INSTALL_TRUSTED_IPS` in `.env`.
+4. Open `/admin/install` on your site and follow the installer.
+5. Run due scheduled tasks, such as scheduled publishing, every minute:
+   `* * * * * cd /path/to/haxepress && php hxwell.boot.php schedule:run`.
+   Without cron they also run after page requests.
+
+The database lives in `data/` and uploaded files in `storage/`. Keep `.env`,
+`data/` and `storage/` when you upgrade; replace everything else. Compiled
+templates are kept in `storage/cache/views` as PHP files.
+
+## What needs the JVM build
+
+The site MCP server (AI connections) and live theme collaboration need a
+long-running process and WebSockets, which the PHP build does not have.
+Use the JVM build for them.
+
+## Extension packages
+
+The `.zip` packages published next to this archive install through Themes and
+Plugins in the administration panel. Each plugin package contains its JVM,
+CPPIA and PHP builds.
 """
 
 README = """# HaxePress {version}
@@ -59,8 +120,9 @@ HaxePress {cms} (plugin API {api}) built for the JVM.
 3. Open http://127.0.0.1:3000/admin/install on the same computer and follow
    the installer. Other addresses need `INSTALL_TRUSTED_IPS` in `.env`.
 
-Site data lives in `storage/`, which the site creates. Keep `.env` and
-`storage/` when you upgrade; replace everything else.
+The database lives in `data/` and uploaded files in `storage/`; the site
+creates both. Keep `.env`, `data/` and `storage/` when you upgrade; replace
+everything else.
 
 ## Extension packages
 
@@ -150,6 +212,38 @@ def application(version, cms, current, output):
     return target
 
 
+def php_application(version, cms, current, output):
+    boot = PHP_APPLICATION / "hxwell.boot.php"
+    if not boot.is_file():
+        raise SystemExit("Run make build first; Export/php/hxwell.boot.php is missing.")
+    folder = f"haxepress-{version}"
+    target = output / f"{folder}-php.zip"
+    shipped = set(current)
+    with ZipFile(target, "w") as archive:
+        add_file(archive, boot, f"{folder}/hxwell.boot.php")
+        add_tree(archive, PHP_APPLICATION / "lib", f"{folder}/lib")
+        add_tree(archive, PHP_APPLICATION / "res", f"{folder}/res")
+        # The same site assets as the JVM build, served through PHP's front controller.
+        add_tree(
+            archive,
+            APPLICATION / "public",
+            f"{folder}/public",
+            keep=lambda path: path.parent.name != "packages" or path.name in shipped,
+        )
+        for name in ("index.php", ".htaccess"):
+            add_file(archive, PHP_APPLICATION / "public" / name, f"{folder}/public/{name}")
+        add_tree(archive, ROOT / "database", f"{folder}/database")
+        add_file(archive, ROOT / "cms.json", f"{folder}/cms.json")
+        add_file(archive, ROOT / ".env.example", f"{folder}/.env.example")
+        add_text(archive, SETUP_PHP, f"{folder}/setup.php")
+        readme = PHP_README.format(version=version, cms=cms["version"], api=cms["pluginApiVersion"])
+        add_text(archive, readme, f"{folder}/README.md")
+        names = archive.namelist()
+    if any(name.endswith("/.env") for name in names):
+        raise SystemExit("The application archive must not contain an .env file.")
+    return target
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("tag", help="the release tag, such as 0.0.1 or v0.0.1")
@@ -162,7 +256,10 @@ def main():
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
-    files = [application(version, cms, current, output)]
+    files = [
+        application(version, cms, current, output),
+        php_application(version, cms, current, output),
+    ]
     for name in current:
         files.append(Path(shutil.copy2(ROOT / "Export/packages" / name, output / name)))
     sums = []

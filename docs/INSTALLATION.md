@@ -14,7 +14,7 @@ The wizard is at `/admin/install`, so setup sessions keep the existing `/admin` 
 
 ## Database
 
-SQLite accepts a local `.sqlite` filename inside the configured storage disk, not an arbitrary filesystem path. MySQL accepts host, port, an existing empty database and credentials; the JVM runtime includes a pinned Connector/J driver. The native Schema API lists tables, then creates and drops a bounded probe table to verify DDL permissions. Nonempty databases are rejected rather than overwritten.
+SQLite accepts a local `.sqlite` filename inside the `data` disk (`DATA_PATH`, by default `data/`), not an arbitrary filesystem path. The database stays apart from `storage/`, which holds uploaded files, caches and sessions. MySQL accepts host, port, an existing empty database and credentials; the JVM runtime includes a pinned Connector/J driver. The native Schema API lists tables, then creates and drops a bounded probe table to verify DDL permissions. Nonempty databases are rejected rather than overwritten.
 
 A successful check stores its configuration in the server-side setup session for ten minutes. Database passwords are never returned in page props or JSON summaries. The final step verifies the connection again; a browser-provided “verified” field has no effect.
 
@@ -22,11 +22,11 @@ The JVM MySQL compatibility patch uses the current JDBC driver name and finite c
 
 ## Administrator and configuration
 
-Choose a site name, administrator name/email and matching password of 12–72 bytes. Optional sample content is off by default. The native database initializer creates the schema and stores a password hash. Configuration output includes `APP_INSTALLED=true`, the selected database settings, site details and the requested initial administrator password.
+Choose a site name, administrator name/email and matching password of 12–72 bytes. Optional sample content is off by default. The native database initializer creates the schema and stores a password hash. Configuration output includes `APP_INSTALLED=true`, the selected database settings and site details. The administrator's name, e-mail and password are not written to `.env`: the account, with a hash of the password, lives only in the database.
 
 The environment file is prepared with private visibility before initialization and atomically replaces `.env` after successful initialization. The web installer requires the existing environment file and cannot replace `APP_KEY`; that secret belongs to the HxWell project bootstrap. Other settings and comments are retained. Single-quoted values are literal, including `$`, `#`, quotes and backslashes, so credentials survive reload. The installer does not return these secrets to the browser or log credential values. The server-side database-check session record is removed on completion.
 
-The first administrator is signed in with the explicit `admin` guard. Application services start without requiring a manual restart. On later requests and restarts the installation endpoints return 404. Changing `ADMIN_PASSWORD` afterward does not reset the database account; use account management for that.
+The first administrator is signed in with the explicit `admin` guard. Application services start without requiring a manual restart. On later requests and restarts the installation endpoints return 404. `ADMIN_NAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` only create the first account of an installation made without the wizard; once an account exists, startup clears them from `.env`, including values earlier versions of the wizard left there. Use account management to change a password.
 
 If initialization fails, the main environment file is not replaced. Use an empty writable database before retrying; partial tables from a failed external database initialization may require operator cleanup. The wizard does not delete an existing database automatically.
 

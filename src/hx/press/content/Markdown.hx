@@ -69,8 +69,11 @@ class Markdown {
 
     final definitions:Map<String, LinkDefinition> = [];
     final slugs:Map<String, Int> = [];
+    final images:Null<Array<String>>;
 
-    function new() {}
+    function new(?images:Array<String>) {
+        this.images = images;
+    }
 
     public static function render(source:Null<String>):SafeHtml {
         if (source == null || source == "") {
@@ -84,6 +87,14 @@ class Markdown {
         var html = markdown.document(source);
         store(source, html);
         return SafeHtml.trust(html);
+    }
+
+    /** The destinations of every image in `source`, including the ones the renderer leaves out. **/
+    public static function imageUrls(source:String):Array<String> {
+        var urls:Array<String> = [];
+        var markdown = new Markdown(urls);
+        markdown.document(source);
+        return urls;
     }
 
     static function cachedHtml(source:String):Null<String> {
@@ -597,7 +608,7 @@ class Markdown {
     }
 
     function inlineHtml(text:String):String {
-        var parser = new InlineParser(text, definitions);
+        var parser = new InlineParser(text, definitions, images);
         return parser.parse();
     }
 
@@ -663,12 +674,15 @@ private class InlineParser {
 
     final text:String;
     final definitions:Map<String, LinkDefinition>;
+    final images:Null<Array<String>>;
     final pieces:Array<String> = [];
     final delimiters:Array<Delimiter> = [];
 
-    public function new(text:String, definitions:Map<String, LinkDefinition>) {
+    public function new(text:String, definitions:Map<String, LinkDefinition>,
+            ?images:Array<String>) {
         this.text = text;
         this.definitions = definitions;
+        this.images = images;
     }
 
     public function parse():String {
@@ -750,6 +764,9 @@ private class InlineParser {
                     }
                     flush();
                     var url = link.url.trim();
+                    if (images != null) {
+                        images.push(url);
+                    }
                     if (Markdown.allowedImage(url)) {
                         var alt = StringTools.htmlUnescape(~/<[^>]*>/g.replace(link.label, ""));
                         pieces.push('<img src="${Markdown.escape(url)}" alt="${Markdown.escape(alt)}" loading="lazy">');
@@ -907,7 +924,7 @@ private class InlineParser {
             return null;
         }
         var labelSource = text.substring(start + 1, close);
-        var label = new InlineParser(labelSource, definitions).parse();
+        var label = new InlineParser(labelSource, definitions, images).parse();
         var next = close + 1;
         if (next < text.length && text.charAt(next) == "(") {
             var destination = parseDestination(next + 1);

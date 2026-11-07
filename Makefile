@@ -6,6 +6,7 @@ build:
 	npm run typecheck
 	npm run build
 	python3 scripts/hxwell.py build jvm
+	python3 scripts/hxwell.py build php --hxml=php.hxml
 	python3 scripts/build_packages.py
 run:
 	python3 scripts/run.py

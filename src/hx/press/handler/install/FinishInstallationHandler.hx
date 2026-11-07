@@ -118,6 +118,11 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
         InstallationState.locks.acquire("installation");
         var prepared:Null<String> = null;
         var previous:Map<String, String> = [];
+        var administrator:Map<String, String> = [
+            "ADMIN_NAME" => adminName,
+            "ADMIN_EMAIL" => CategoryData.key(inputs.get("admin_email")),
+            "ADMIN_PASSWORD" => inputs.get("admin_password")
+        ];
         var phase = "database verification";
         try {
             if (!InstallationState.pending || !InstallationState.allowed(request)) {
@@ -135,9 +140,10 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
                 "DB_USERNAME" => database.username,
                 "DB_PASSWORD" => database.password,
                 "SITE_NAME" => siteName,
-                "ADMIN_NAME" => adminName,
-                "ADMIN_EMAIL" => CategoryData.key(inputs.get("admin_email")),
-                "ADMIN_PASSWORD" => inputs.get("admin_password"),
+                // The database keeps the administrator, with a hashed password; .env keeps none of it.
+                "ADMIN_NAME" => "",
+                "ADMIN_EMAIL" => "",
+                "ADMIN_PASSWORD" => "",
                 "CMS_SEED_DEMO" => inputs.get("sample_content") == "1" ? "true" : "false"
             ];
             phase = "configuration permissions";
@@ -146,10 +152,15 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
                 previous.set(key, Environment.env(key, ""));
                 Environment.set(key, value);
             }
+            // Only this process sees the account details, while the schema setup creates the account.
+            for (key => value in administrator) {
+                Environment.set(key, value);
+            }
             Config.set("database.connections", DatabaseConfig.definitions());
             Connection.create("default", native);
             phase = "database initialization";
             DatabaseProvider.migrate();
+            forgetAdministrator(administrator);
             phase = "configuration commit";
             InstallationEnv.commit(prepared);
             prepared = null;
@@ -162,7 +173,9 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
             #end
             SiteRuntime.start();
             phase = "administrator sign-in";
-            var admin = Admin.query.where("email", values.get("ADMIN_EMAIL")).limit(1).first();
+            var admin = Admin.query.where("email", administrator.get("ADMIN_EMAIL"))
+                .limit(1)
+                .first();
             auth("admin").login(admin);
             request.session.put("auth_version", admin.password);
             InstallationState.locks.release("installation");
@@ -173,6 +186,7 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
             return ResponseBuilder.asJson({installed: true, redirect: "/admin"})
                 .header("Cache-Control", "private, no-store");
         } catch (failure:Dynamic) {
+            forgetAdministrator(administrator);
             trace('Installation did not complete during ${phase}.');
             Connection.free();
             try {
@@ -194,6 +208,12 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
             return failed(request,
                 "Setup could not be completed. Check configuration-file permissions and use an empty, writable database before retrying.",
                 422, "review");
+        }
+    }
+
+    static function forgetAdministrator(administrator:Map<String, String>):Void {
+        for (key in administrator.keys()) {
+            Environment.set(key, "");
         }
     }
 }

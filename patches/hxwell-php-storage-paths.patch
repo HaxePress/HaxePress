@@ -1,0 +1,165 @@
+diff --git a/src/hx/well/storage/LocalStorageAdapter.hx b/src/hx/well/storage/LocalStorageAdapter.hx
+--- a/src/hx/well/storage/LocalStorageAdapter.hx
++++ b/src/hx/well/storage/LocalStorageAdapter.hx
+@@ -5,6 +5,10 @@
+ import hx.well.internal.SecureToken;
+ import sys.FileSystem;
+ import sys.io.File;
++#if php
++import php.Global;
++import php.Syntax;
++#end
+ 
+ /** Local disk. Symlinks below the configured root (including dangling links)
+     are rejected. The root and its parents must be controlled by the application. */
+@@ -18,6 +22,20 @@
+             throw new haxe.Exception("A local storage disk requires a nonempty root.");
+         defaultVisibility = StoragePath.visibility(config.visibility == null ? "private" : config.visibility);
+         directoryVisibility = StoragePath.visibility(config.directory_visibility == null ? "private" : config.directory_visibility);
++        #if php
++        if (posix()) {
++            // An existing root written without "." segments resolves with one
++            // realpath; Path.normalize is slow on PHP.
++            var written = Path.isAbsolute(config.root) ? config.root : '${Sys.getCwd()}${config.root}';
++            if (written.indexOf("/.") < 0 && written.indexOf("//") < 0 && Global.is_dir(written)) {
++                var resolved:Dynamic = Global.realpath(written);
++                if (Std.isOfType(resolved, String)) {
++                    root = resolved;
++                    return;
++                }
++            }
++        }
++        #end
+         var absolute = Path.normalize(FileSystem.absolutePath(config.root));
+         var ancestor = absolute;
+         var suffix:Array<String> = [];
+@@ -37,6 +55,13 @@
+     /** Check every existing component, not only the final file. This also covers
+         writes into nonexistent descendants and links that point back into root. */
+     function checked(absolute:String):String {
++        #if php
++        if (posix()) {
++            if (entryKind(absolute) != null && Global.realpath(absolute) != absolute)
++                throw new InvalidStoragePath(absolute);
++            return absolute;
++        }
++        #end
+         var parent = Path.directory(absolute);
+         if (FileSystem.exists(absolute)) {
+             var canonical = FileSystem.fullPath(absolute);
+@@ -54,9 +79,70 @@
+             throw new InvalidStoragePath(absolute);
+         }
+         return absolute;
++    }
++
++    #if php
++    /** PHP's paths below a canonical root are checked with lstat, which sees
++        links themselves; Windows keeps the realpath checks above. */
++    static inline function posix():Bool {
++        return Syntax.code("\\PHP_OS_FAMILY !== 'Windows'");
++    }
++
++    /** The kind of one entry from an uncached lstat: "file", "dir", or null when
++        it is missing. `filetype` reports any link, including a dangling one, as
++        "link"; links and special files are invalid. */
++    static function entryKind(absolute:String):Null<String> {
++        Global.clearstatcache(true, absolute);
++        var kind:Dynamic = Syntax.code("@\\filetype({0})", absolute);
++        if (Syntax.strictEqual(kind, false)) return null;
++        if (kind != "file" && kind != "dir") throw new InvalidStoragePath(absolute);
++        return kind;
++    }
++
++    /** The absolute path of a normalized path below the root. */
++    function located(normalized:String):String {
++        if (normalized == "") return root;
++        return root == "/" ? '/${normalized}' : '${root}/${normalized}';
++    }
++
++    /** Walks a normalized path from the root down with one lstat per entry. With
++        no link below a canonical root the whole path is canonical, so this keeps
++        the guarantees of `checked` without resolving every prefix or listing the
++        parent of a missing entry. Returns the kind of the final entry, or null
++        when it is missing: nothing below a missing entry exists. */
++    function inspect(normalized:String):Null<String> {
++        var kind = entryKind(root);
++        if (kind == null) {
++            // A removed root may have a substituted parent; its first existing
++            // ancestor must still be canonical before anything is created under it.
++            var ancestor = root;
++            while (entryKind(ancestor) == null) {
++                var parent = Path.directory(ancestor);
++                if (parent == ancestor || parent == "") throw new InvalidStoragePath(normalized);
++                ancestor = parent;
++            }
++            if (Global.realpath(ancestor) != ancestor) throw new InvalidStoragePath(normalized);
++            return null;
++        }
++        if (Global.realpath(root) != root) throw new InvalidStoragePath(root);
++        var current = root == "/" ? "" : root;
++        if (normalized != "") for (part in normalized.split("/")) {
++            current = '${current}/${part}';
++            kind = entryKind(current);
++            if (kind == null) return null;
++        }
++        return kind;
+     }
++    #end
+ 
+     public function path(path:String):String {
++        #if php
++        if (posix()) {
++            var normalized = StoragePath.normalize(path);
++            inspect(normalized);
++            return located(normalized);
++        }
++        #end
+         checked(root);
+         // A removed root may have a substituted parent; validate the first
+         // existing ancestor as well before creating anything under it.
+@@ -78,6 +164,13 @@
+     }
+ 
+     function requireFile(path:String):String {
++        #if php
++        if (posix()) {
++            var normalized = StoragePath.file(path);
++            if (inspect(normalized) != "file") throw new StorageException("read file", path);
++            return located(normalized);
++        }
++        #end
+         var absolute = this.path(StoragePath.file(path));
+         if (!FileSystem.exists(absolute) || FileSystem.isDirectory(absolute))
+             throw new StorageException("read file", path);
+@@ -103,11 +196,17 @@
+     }
+ 
+     public function fileExists(path:String):Bool {
++        #if php
++        if (posix()) return inspect(StoragePath.normalize(path)) == "file";
++        #end
+         var absolute = this.path(path);
+         return FileSystem.exists(absolute) && !FileSystem.isDirectory(absolute);
+     }
+ 
+     public function directoryExists(path:String):Bool {
++        #if php
++        if (posix()) return inspect(StoragePath.normalize(path)) == "dir";
++        #end
+         var absolute = this.path(path);
+         return FileSystem.exists(absolute) && FileSystem.isDirectory(absolute);
+     }
+@@ -173,7 +272,12 @@
+     }
+ 
+     public function size(path:String):Int {
++        #if php
++        // The size alone, without the dates FileSystem.stat builds.
++        var size:Int = Syntax.code("\\filesize({0})", requireFile(path));
++        #else
+         var size = FileSystem.stat(requireFile(path)).size;
++        #end
+         if (size < 0) throw new StorageException("read file size outside the target Int range", path);
+         return size;
+     }

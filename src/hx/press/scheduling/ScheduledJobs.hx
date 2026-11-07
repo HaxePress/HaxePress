@@ -2,8 +2,15 @@ package hx.press.scheduling;
 
 import haxe.Exception;
 import haxe.Json;
+#if php
+import haxe.MainLoop;
+import php.Const;
+import php.Global;
+import php.Syntax;
+#else
 import hx.concurrent.executor.Executor;
 import hx.concurrent.executor.Schedule;
+#end
 import hx.press.model.InstalledPackage;
 import hx.press.model.ScheduledJob;
 import hx.press.packages.PackageData;
@@ -12,12 +19,21 @@ import hx.press.plugins.PluginRuntime;
 import hx.well.database.Connection;
 import hx.well.internal.SecureToken;
 
-/** Persistent schedules share one bounded worker independent of request handling. */
+/**
+    Persistent schedules share one bounded worker independent of request
+    handling. PHP serves each request in a new process that cannot keep a
+    timer, so there due jobs run after a response and from `schedule:run`,
+    which cron can call every minute. Leases keep each run to one process.
+**/
 class ScheduledJobs {
     public static inline var MAX_INTERVAL = 365 * 24 * 60 * 60;
     static inline var LEASE_MS = 60 * 60 * 1000;
     static final core:Map<String, Void->Void> = [];
+    #if php
+    static var queued = false;
+    #else
     static var worker:Null<Executor>;
+    #end
 
     public static function id(pluginId:Null<String>, key:String):String {
         var owner = pluginId ?? "core";
@@ -121,28 +137,51 @@ class ScheduledJobs {
     }
 
     public static function start():Void {
+        #if php
+        if (queued || Const.PHP_SAPI == "cli") {
+            return;
+        }
+        queued = true;
+        // Runs once the request has been answered.
+        MainLoop.runInMainThread(() -> {
+            if (Global.function_exists("fastcgi_finish_request")) {
+                Syntax.code("fastcgi_finish_request()");
+            }
+            runPending();
+        });
+        #else
         if (worker != null) {
             return;
         }
         worker = Executor.create(1);
         worker.submit(() -> {
-            try {
-                runDue();
-            } catch (failure:Dynamic) {
-                trace('Scheduled job lookup failed: ${Std.string(failure)}');
-            }
-            Connection.free();
+            runPending();
             return true;
         }, Schedule.FIXED_DELAY(3000, 1000));
+        #end
     }
 
     public static function stop():Void {
+        #if !php
         if (worker != null) {
             worker.stop();
         }
+        #end
     }
 
-    static function runDue():Void {
+    /** Runs the jobs that are due now and returns how many it started. **/
+    public static function runPending():Int {
+        var count = 0;
+        try {
+            count = runDue();
+        } catch (failure:Dynamic) {
+            trace('Scheduled job lookup failed: ${Std.string(failure)}');
+        }
+        Connection.free();
+        return count;
+    }
+
+    static function runDue():Int {
         var now = Date.now().getTime();
         var coreIds:Array<Dynamic> = [for (key in core.keys()) key];
         var activePlugins = InstalledPackage.query.select(["plugin_id"])
@@ -164,6 +203,7 @@ class ScheduledJobs {
         for (job in jobs) {
             run(job);
         }
+        return jobs.length;
     }
 
     static function run(job:ScheduledJob):Void {

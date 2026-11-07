@@ -1,19 +1,3 @@
--cp src
--resource cms.json@hx.press.version
--resource resources/lang/en.json@lang.en
--resource resources/lang/tr.json@lang.tr
--resource resources/lang/editor/en.json@lang.editor.en
--resource resources/lang/editor/tr.json@lang.editor.tr
--resource resources/lang/packages/en.json@lang.packages.en
--resource resources/lang/packages/tr.json@lang.packages.tr
--resource resources/themes/simple/cms-package.json@hx.press.theme.simple
--resource resources/themes/simple/lang/en.json@hx.press.theme.simple.lang.en
--resource resources/themes/simple/lang/tr.json@hx.press.theme.simple.lang.tr
-# JVM plugins load the standard library from the application, so its classes stay whole.
--dce no
--D analyzer-optimize
--D scriptable
--D env_file=.env
--D hxwell_config_package=hx.press.config
+# The JVM build: the shared settings and the Crossbyte HTTP server.
+common.hxml
 -lib hxwell-crossbyte
--lib wellout

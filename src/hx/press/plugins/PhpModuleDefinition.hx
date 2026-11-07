@@ -3,6 +3,7 @@ package hx.press.plugins;
 import haxe.Exception;
 import haxe.io.Path;
 import hx.well.storage.StorageDisk;
+import hx.well.storage.StorageException;
 import hx.press.packages.PackageManifest;
 
 typedef PhpModuleData = {
@@ -14,7 +15,8 @@ typedef PhpModuleData = {
 /** Inspect the class map without evaluating uploaded PHP code. */
 class PhpModuleDefinition {
     public static function inspect(disk:StorageDisk, path:String, entrypoint:String):PhpModuleData {
-        if (!disk.fileExists(path) || disk.size(path) > 65536) {
+        var mapSize = fileSize(disk, path);
+        if (mapSize < 0 || mapSize > 65536) {
             throw new Exception("The PHP module requires a class map smaller than 64 KB.");
         }
         var input:Dynamic = disk.json(path);
@@ -47,9 +49,10 @@ class PhpModuleDefinition {
                 || seen.exists(name.toLowerCase())) {
                 throw new Exception("The PHP module contains an invalid or duplicate class mapping.");
             }
-            var modulePath = Path.join([directory, file]);
-            if (!disk.fileExists(modulePath) || disk.size(modulePath) < 5
-                || disk.size(modulePath) > 16 * 1024 * 1024) {
+            // `safePath` admits no empty, "." or ".." segment, so the path needs no normalizing.
+            var modulePath = directory == "" ? file : '${directory}/${file}';
+            var moduleSize = fileSize(disk, modulePath);
+            if (moduleSize < 5 || moduleSize > 16 * 1024 * 1024) {
                 throw new Exception("The PHP module is missing a declared class file.");
             }
             seen.set(name.toLowerCase(), true);
@@ -61,5 +64,10 @@ class PhpModuleDefinition {
             throw new Exception("The PHP module is missing its entrypoint class.");
         }
         return {namespace: namespace, entrypoint: nativeEntrypoint, classes: classes};
+    }
+
+    /** The size of a file, or -1 when it is missing or not a file: one Storage check per file. */
+    static function fileSize(disk:StorageDisk, path:String):Int {
+        return try disk.size(path) catch (_:StorageException) -1;
     }
 }

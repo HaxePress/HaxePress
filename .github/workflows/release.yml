@@ -1,8 +1,9 @@
 name: Release
 
-# Publishing a release builds its tag and attaches the JVM application, the
-# extension packages (each plugin with its JVM, CPPIA and PHP builds) and
-# their checksums to that release. Run it by hand to rebuild a release's files.
+# Publishing a release builds its tag and attaches the application for the
+# JVM and for PHP, the extension packages (each plugin with its JVM, CPPIA and
+# PHP builds) and their checksums to that release. Run it by hand to rebuild a
+# release's files.
 on:
   release:
     types: [published]
@@ -59,13 +60,16 @@ jobs:
       - name: Install project dependencies
         run: make setup
 
-      - name: Build the JVM application and the extension packages
+      - name: Build the JVM and PHP applications and the extension packages
         run: make build
+
+      - name: Check that every installation gets its own APP_KEY
+        run: python3 tests/release_keys.py
 
       - name: Package the release files
         run: python3 scripts/release.py "$TAG" dist
 
-      - name: Check that the packaged application starts
+      - name: Check that the packaged JVM application starts
         run: |
           smoke="$RUNNER_TEMP/smoke"
           mkdir -p "$smoke"
@@ -77,6 +81,30 @@ jobs:
           for attempt in $(seq 1 90); do
             if curl -fsS -o /dev/null http://127.0.0.1:3000/admin/install; then
               echo "The packaged application serves the installer."
+              kill "$server"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat server.log
+          exit 1
+
+      - name: Check that the packaged PHP application serves the installer
+        run: |
+          smoke="$RUNNER_TEMP/smoke-php"
+          mkdir -p "$smoke"
+          unzip -q dist/haxepress-*-php.zip -d "$smoke"
+          cd "$smoke"/haxepress-*/
+          if [ -f .env ]; then echo "The archive contains an .env file."; exit 1; fi
+          php setup.php
+          # The PHP front controller runs from public/, as a web server runs it.
+          cd public
+          php -S 127.0.0.1:3001 index.php > ../server.log 2>&1 &
+          server=$!
+          cd ..
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/admin/install | grep -q "Install HaxePress"; then
+              echo "The packaged PHP application serves the installer."
               kill "$server"
               exit 0
             fi

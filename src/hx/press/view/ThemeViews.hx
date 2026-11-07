@@ -13,6 +13,12 @@ import hx.well.http.Request;
 import hx.well.storage.StorageDisk;
 import wellout.check.ComponentLibrary;
 import wellout.render.TemplateSet;
+#if php
+import haxe.crypto.Sha256;
+import hx.press.BuildIdentity;
+import hx.press.PhpDataFile;
+import php.Lib;
+#end
 #if (target.threaded)
 import sys.thread.Mutex;
 #end
@@ -100,14 +106,40 @@ class ThemeViews {
             return cached;
         }
         var disk = Storage.disk("extensions");
-        var sources = load(disk, 'installed/${record.directory}/${manifest.views}');
+        var folder = 'installed/${record.directory}/${manifest.views}';
+        var sources = installed('theme:${key}', disk, folder);
         var library = new ComponentLibrary(ViewEngine.contract, ViewEngine.library, false);
         for (name => source in sources) {
             library.add(name, source);
         }
-        var set = new TemplateSet(ViewEngine.contract, ViewEngine.runtime, library);
+        var set = new TemplateSet(ViewEngine.contract, ViewEngine.runtime, library,
+            ViewEngine.store('theme:${key}'));
         storeSet(key, set);
         return set;
+    }
+
+    /**
+        The templates of an installed package's views folder. PHP keeps them
+        per build in one data file, so a request does not list and read every
+        template again. `version` must name sources that never change in
+        place, such as an installed folder, which is new for each installation.
+    **/
+    public static function installed(version:String, disk:StorageDisk,
+            folder:String):Map<String, String> {
+        #if php
+        var key = Sha256.encode('${BuildIdentity.id}\n${version}').substr(0, 40);
+        var path = 'cache/sources/${key}.php';
+        var stored:Dynamic = PhpDataFile.read(Storage.disk("local").path(path));
+        if (stored != null) {
+            return Lib.hashOfAssociativeArray(stored);
+        }
+        var sources = load(disk, folder);
+        PhpDataFile.write(path, Lib.associativeArrayOfHash(sources),
+            "Template sources of an installed package");
+        return sources;
+        #else
+        return load(disk, folder);
+        #end
     }
 
     /** Reads every template of a package's views folder, keyed by file name without `.well.html`. **/

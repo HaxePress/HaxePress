@@ -319,7 +319,7 @@ def upload_trashed(admin, original):
 def verify_media_trash(admin, public, fixtures, image, original):
     media_id = str(image["id"])
     filename = image["url"].rsplit("/", 1)[1]
-    storage = Path(os.environ["TEST_DB_PATH"]).parent / "media"
+    storage = Path(os.environ["TEST_STORAGE_PATH"]) / "media"
     check(
         admin.request(f"/admin/media/{media_id}/permanent-delete", "POST", {})[0] == 422,
         "an image was deleted permanently without passing through the trash",

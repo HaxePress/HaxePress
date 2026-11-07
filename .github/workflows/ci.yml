@@ -61,6 +61,12 @@ jobs:
       - name: Build application and extension packages
         run: make build
 
+      - name: Check that the PHP build serves pages
+        run: python3 tests/php_application.py
+
+      - name: Check that every installation gets its own APP_KEY
+        run: python3 tests/release_keys.py
+
       - name: Run JVM integration tests
         env:
           # The theme preview tool drives the runner's Chrome, whose sandbox the runner may not allow.

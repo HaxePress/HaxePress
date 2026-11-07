@@ -2,7 +2,7 @@
 """Exercise the running HxWell/Crossbyte app through real HTTP requests.
 
 Creates and removes only uniquely named test content, categories, and subscribers.
-Uses ADMIN_EMAIL / ADMIN_PASSWORD from .env unless overridden in the environment.
+Signs in with TEST_ADMIN_EMAIL / TEST_ADMIN_PASSWORD; .env keeps no administrator credentials.
 """
 
 import csv
@@ -352,8 +352,8 @@ def run():
             "/admin/login",
             "POST",
             {
-                "email": os.environ.get("TEST_ADMIN_EMAIL", ENV["ADMIN_EMAIL"]),
-                "password": os.environ.get("TEST_ADMIN_PASSWORD", ENV["ADMIN_PASSWORD"]),
+                "email": os.environ["TEST_ADMIN_EMAIL"],
+                "password": os.environ["TEST_ADMIN_PASSWORD"],
             },
         )
         check(status == 303 and headers.get("location") == "/admin", "admin login")
@@ -517,8 +517,8 @@ def run():
             "/admin/login",
             "POST",
             {
-                "email": os.environ.get("TEST_ADMIN_EMAIL", ENV["ADMIN_EMAIL"]),
-                "password": os.environ.get("TEST_ADMIN_PASSWORD", ENV["ADMIN_PASSWORD"]),
+                "email": os.environ["TEST_ADMIN_EMAIL"],
+                "password": os.environ["TEST_ADMIN_PASSWORD"],
             },
         )
         check(status == 303 and headers.get("location") == "/admin", "Second admin login")

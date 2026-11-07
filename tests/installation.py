@@ -350,7 +350,8 @@ def run():
                     "A body/header bypassed installation trust",
                 )
                 check(
-                    not list((server.work / "storage").glob("*.sqlite")),
+                    not list((server.work / "storage").glob("*.sqlite"))
+                    and not list((server.work / "data").glob("*.sqlite")),
                     "An untrusted request created a database",
                 )
                 status, headers, _ = client.request("/")
@@ -481,10 +482,18 @@ def run():
             )
             config = (server.work / ".env").read_text()
             check(
-                "APP_INSTALLED='true'" in config
-                and "ADMIN_PASSWORD=" in config
-                and "UNRELATED_SETTING=preserved" in config,
+                "APP_INSTALLED='true'" in config and "UNRELATED_SETTING=preserved" in config,
                 "Private configuration was not persisted",
+            )
+            check(
+                password not in config and inputs["admin_email"] not in config,
+                "The installer kept administrator credentials in .env",
+            )
+            check(
+                (server.work / "data/setup.sqlite").is_file()
+                and str(server.work / "data/setup.sqlite") in config
+                and not list((server.work / "storage").rglob("*.sqlite")),
+                "The installer did not keep the database in the data folder, apart from storage",
             )
             check(
                 server.application_key_line in config.splitlines(),
@@ -543,7 +552,44 @@ def run():
                     "/admin/login", {"email": inputs["admin_email"], "password": password}
                 )[0]
                 == 303,
-                "Literal password changed after .env reload",
+                "The administrator could not sign in after a restart",
+            )
+            # Earlier installers left the first administrator in .env; startup clears it.
+            SetupServer.stop(server.process)
+            environment = server.work / ".env"
+            legacy = [
+                line
+                for line in environment.read_text().splitlines()
+                if not line.startswith(("ADMIN_NAME=", "ADMIN_EMAIL=", "ADMIN_PASSWORD="))
+            ]
+            legacy += [
+                "ADMIN_NAME='Setup Owner'",
+                f"ADMIN_EMAIL='{inputs['admin_email']}'",
+                "ADMIN_PASSWORD='" + password.replace("\\", "\\\\").replace("'", "\\'") + "'",
+            ]
+            environment.write_text("\n".join(legacy) + "\n")
+            environment.chmod(0o600)
+            server.start()
+            config = environment.read_text()
+            check(
+                password not in config
+                and inputs["admin_email"] not in config
+                and "ADMIN_PASSWORD=''" in config
+                and "UNRELATED_SETTING=preserved" in config,
+                "Startup kept administrator credentials from an earlier installer in .env",
+            )
+            check(
+                stat.S_IMODE(environment.stat().st_mode) == 0o600,
+                "Clearing administrator credentials made .env readable",
+            )
+            cleared = SetupClient(server.url)
+            cleared.request("/admin/login")
+            check(
+                cleared.request(
+                    "/admin/login", {"email": inputs["admin_email"], "password": password}
+                )[0]
+                == 303,
+                "The administrator could not sign in after .env was cleared",
             )
             text = (server.work / "runtime.log").read_text()
             check(

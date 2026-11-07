@@ -1,14 +1,22 @@
 package hx.press;
 
+#if jvm
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import java.io.ByteArrayInputStream;
-import haxe.io.Bytes;
-import hx.well.facades.Storage;
-import hx.well.internal.SecureToken;
 import org.commonmark.parser.Parser as MarkdownParser;
 import org.commonmark.node.Node as MarkdownNode;
 import org.commonmark.node.Image as MarkdownImage;
+#else
+import hx.press.content.Markdown;
+#end
+#if php
+import php.NativeArray;
+import php.Syntax;
+#end
+import haxe.io.Bytes;
+import hx.well.facades.Storage;
+import hx.well.internal.SecureToken;
 import hx.press.MediaCatalog;
 import hx.press.media.MediaReferences;
 
@@ -27,10 +35,24 @@ typedef StoredImage = {
 };
 
 class MediaStorage {
+    #if jvm
     static final markdown = MarkdownParser.builder().build();
+    #end
     public static inline var MAX_PIXELS = 20000000;
 
     public static function contentUsesStoredImages(content:String):Bool {
+        #if !jvm
+        var urls = try Markdown.imageUrls(content) catch (error:Dynamic) null;
+        if (urls == null) {
+            return false;
+        }
+        for (url in urls) {
+            if (!MediaReferences.storedImage(url)) {
+                return false;
+            }
+        }
+        return true;
+        #else
         try {
             var node:MarkdownNode = markdown.parse(content);
             while (node != null) {
@@ -55,6 +77,7 @@ class MediaStorage {
             return false;
         }
         return true;
+        #end
     }
 
     public static function format(bytes:Bytes):Null<ImageFormat> {
@@ -68,6 +91,22 @@ class MediaStorage {
     }
 
     public static function dimensions(bytes:Bytes):Null<{width:Int, height:Int}> {
+        #if php
+        var size:Dynamic = Syntax.code("@getimagesizefromstring({0})",
+            bytes.getData().toNativeString());
+        if (!Syntax.code("is_array({0})", size)) {
+            return null;
+        }
+        var info:NativeArray = size;
+        var width:Int = info[0];
+        var height:Int = info[1];
+        var fits = width > 0
+            && height > 0
+            && width <= 10000
+            && height <= 10000
+            && width * 1.0 * height <= MAX_PIXELS;
+        return fits ? {width: width, height: height} : null;
+        #else
         var input = ImageIO.createImageInputStream(cast new ByteArrayInputStream(bytes.getData()));
         if (input == null)
             return null;
@@ -95,6 +134,7 @@ class MediaStorage {
             reader.dispose();
         input.close();
         return result;
+        #end
     }
 
     public static function save(bytes:Bytes, format:ImageFormat,

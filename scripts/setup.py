@@ -222,6 +222,7 @@ def main():
         ("hxwell", "hxwell-plugin-routes.patch"),
         ("hxwell", "hxwell-response-slices.patch"),
         ("hxwell", "hxwell-request-allocations.patch"),
+        ("hxwell", "hxwell-php-storage-paths.patch"),
         ("hxwell-crossbyte", "hxwell-crossbyte-sessions.patch"),
         ("hxwell-crossbyte", "hxwell-crossbyte-response-slices.patch"),
         ("haxe-concurrent", "haxe-concurrent-cppia.patch"),

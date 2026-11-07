@@ -25,6 +25,13 @@ class StorageConfig extends FilesystemsConfig {
                 visibility: "private",
                 throw_errors: true
             },
+            // SQLite databases the installer creates live here, apart from the files in storage.
+            "data" => {
+                driver: "local",
+                root: Environment.env("DATA_PATH", "data"),
+                visibility: "private",
+                throw_errors: true
+            },
             "media" => {
                 driver: "local",
                 root: '${storage}/media',

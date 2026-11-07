@@ -104,6 +104,7 @@ class PhpHost {
             throw_errors: true
         });
         var work = Storage.build({driver: "local", root: Sys.getCwd(), throw_errors: true});
+        StorageLinkChecks.run(work);
         check(PackageManifest.serverTarget() == "php", "PHP runtime selection");
         var inspected = SafePackageArchive.extract(packages.getBytes("reading-companion-2.16.0.zip"),
             "reading", work);

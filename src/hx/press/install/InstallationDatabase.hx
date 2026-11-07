@@ -24,7 +24,7 @@ class InstallationDatabase {
 
     public static function configuration(database:SetupDatabase):Dynamic {
         if (database.driver == "sqlite") {
-            var disk = Storage.disk("local");
+            var disk = Storage.disk("data");
             disk.makeDirectory("");
             return {path: disk.path(database.file)};
         }

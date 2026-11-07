@@ -11,8 +11,13 @@ import hx.press.scheduling.ScheduledJobs;
 import hx.press.themes.ThemeMcpHost;
 import hx.well.database.Connection;
 import hx.well.facades.Cache;
-import hx.well.facades.Schedule;
 import hx.well.facades.Storage;
+#if php
+import hx.press.scheduling.RunScheduleCommand;
+import hx.well.console.CommandExecutor;
+#else
+import hx.well.facades.Schedule;
+#end
 #if jvm
 import hx.press.plugins.JvmPluginShutdown;
 import java.lang.Runtime as JavaRuntime;
@@ -38,6 +43,13 @@ class SiteRuntime {
         ScheduledJobs.registerCore("media-trash", 3600, () -> {
             MediaCatalog.purgeTrash();
         });
+        #if php
+        // Each PHP request is a new process, so publishing runs as a leased job.
+        ScheduledJobs.registerCore("scheduled-publishing", 60, () -> {
+            ContentWorkflow.publishDue();
+        });
+        CommandExecutor.register(cast RunScheduleCommand);
+        #else
         Schedule.get().fixedDelay(_ -> {
             try {
                 ContentWorkflow.publishDue();
@@ -48,6 +60,7 @@ class SiteRuntime {
             }
             return true;
         }, 5000, 5000);
+        #end
         PluginRuntime.boot();
         ScheduledJobs.start();
         ThemeMcpHost.start();

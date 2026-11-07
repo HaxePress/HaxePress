@@ -9,7 +9,11 @@ import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
 import hx.well.internal.SecureToken;
+#if (target.threaded)
 import sys.thread.Mutex;
+#else
+import hx.well.thread.FakeMutex as Mutex;
+#end
 
 class ImageUploads {
     static inline var LIFETIME = 10 * 60 * 1000;

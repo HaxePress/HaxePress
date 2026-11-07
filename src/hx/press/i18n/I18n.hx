@@ -8,6 +8,15 @@ import hx.press.packages.BuiltInTheme;
 import haxe.Resource;
 import hx.well.facades.Storage;
 import hx.well.http.RequestStatic;
+#if php
+import haxe.crypto.Sha256;
+import hx.press.BuildIdentity;
+import hx.press.PhpDataFile;
+import php.Global;
+import php.Lib;
+import php.NativeAssocArray;
+import php.Syntax;
+#end
 #if (target.threaded)
 import sys.thread.Mutex;
 #else
@@ -37,6 +46,14 @@ class I18n {
     static final core:Map<String, Map<String, Dynamic>> = loadCore();
 
     static function loadCore():Map<String, Map<String, Dynamic>> {
+        #if php
+        return storedCore();
+        #else
+        return parseCore();
+        #end
+    }
+
+    static function parseCore():Map<String, Map<String, Dynamic>> {
         var catalogues:Map<String, Map<String, Dynamic>> = [];
         for (choice in locales) {
             var source = Resource.getString('lang.${choice.code}');
@@ -53,6 +70,47 @@ class I18n {
         }
         return catalogues;
     }
+
+    #if php
+    /**
+        PHP starts the application for each request. The core catalogues are
+        part of the build, so they are parsed once per build and then read
+        from a data file: a few plural forms become objects again, and every
+        other message stays the stored native string.
+    **/
+    static function storedCore():Map<String, Map<String, Dynamic>> {
+        var path = 'cache/i18n/${Sha256.encode(BuildIdentity.id).substr(0, 40)}.php';
+        var stored:Dynamic = PhpDataFile.read(Storage.disk("local").path(path));
+        if (stored != null) {
+            var catalogues:Map<String, Map<String, Dynamic>> = [];
+            Syntax.foreach(stored, (locale:String, messages:NativeAssocArray<Dynamic>) -> {
+                Syntax.foreach(messages, (key:String, message:Dynamic) -> {
+                    if (Global.is_array(message)) {
+                        messages[key] = Lib.objectOfAssociativeArray(message);
+                    }
+                });
+                catalogues.set(locale, Lib.hashOfAssociativeArray(messages));
+            });
+            return catalogues;
+        }
+        var catalogues = parseCore();
+        var exported = new NativeAssocArray<NativeAssocArray<Dynamic>>();
+        for (locale => messages in catalogues) {
+            var native = new NativeAssocArray<Dynamic>();
+            for (key => message in messages) {
+                // A plural form is an object, which the data file keeps as an array.
+                if (Std.isOfType(message, String)) {
+                    native[key] = message;
+                } else {
+                    native[key] = Lib.associativeArrayOfObject(message);
+                }
+            }
+            exported[locale] = native;
+        }
+        PhpDataFile.write(path, exported, "Core translation catalogues of this build");
+        return catalogues;
+    }
+    #end
 
     public static function supported(locale:String):Bool {
         for (choice in locales) {

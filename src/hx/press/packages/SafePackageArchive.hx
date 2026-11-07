@@ -9,7 +9,7 @@ import haxe.io.Eof;
 import hx.press.packages.PackageEntryInput.ArchiveBudget;
 import hx.press.i18n.TranslationCatalogue;
 import hx.press.plugins.PhpModuleDefinition;
-#if jvm
+#if (jvm || (php && !cms_plugin))
 import hx.press.themes.ThemeDesignPackage;
 import hx.press.view.PluginViews;
 import hx.press.view.ThemeViews;
@@ -149,23 +149,23 @@ class SafePackageArchive {
             throw new Exception(PackageManifest.RENDERER_UNSUPPORTED);
         }
         if (manifest.views != "") {
-            #if jvm
+            // The JVM and PHP applications include Wellout; plugin test hosts do not.
+            #if (jvm || (php && !cms_plugin))
             if (manifest.kind == "theme") {
                 ThemeViews.inspectPackage(disk, '${root}/${manifest.views}');
             } else {
                 PluginViews.inspectPackage(disk, '${root}/${manifest.views}');
             }
             #else
-            // Templates are checked with Wellout, which only the JVM application includes.
-            throw new Exception("Packages with Wellout templates require the JVM host.");
+            throw new Exception("Packages with Wellout templates require the HaxePress application.");
             #end
         }
         PackageManifest.serverArtifact(manifest);
         if (manifest.layout == "builder") {
-            #if jvm
+            #if (jvm || (php && !cms_plugin))
             ThemeDesignPackage.inspect(root, manifest);
             #else
-            throw new Exception("Visual theme package installation requires the JVM host.");
+            throw new Exception("Visual theme package installation requires the HaxePress application.");
             #end
         }
         for (locale => catalogue in manifest.translations) {
