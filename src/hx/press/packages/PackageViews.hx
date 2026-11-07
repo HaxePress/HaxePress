@@ -20,9 +20,6 @@ import hx.well.database.Connection;
     release picker, which the React page used to keep in browser state.
 **/
 class PackageViews {
-    static final uploadKey = ~/^[A-Za-z0-9_-]{32}$/;
-    static final releasePage = ~/^(?:[1-9][0-9]{0,2}|1000)$/;
-
     /** The listed packages with their names and summaries in the current locale. **/
     public static function packages(items:Array<Dynamic>, translations:TranslationProps,
             kind:String, snapshot:String):Array<Dynamic> {
@@ -76,6 +73,7 @@ class PackageViews {
     public static function inspection(request:Request, kind:String):Null<Dynamic> {
         var key = request.query("inspect", "");
         var admin = CmsAccess.current();
+        var uploadKey = ~/^[A-Za-z0-9_-]{32}$/;
         if (admin == null || !uploadKey.match(key)) {
             return null;
         }
@@ -139,6 +137,7 @@ class PackageViews {
         }
         var input = StringTools.trim(request.query("repository", "")).substr(0, 180);
         var requested = request.query("release_page", "1");
+        var releasePage = ~/^(?:[1-9][0-9]{0,2}|1000)$/;
         var number = releasePage.match(requested) ? Std.parseInt(requested) : 1;
         var picker:Dynamic = {
             repository: input,

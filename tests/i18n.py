@@ -82,14 +82,34 @@ def run():
         )
 
         def render(locale):
+            """What went wrong with a concurrent request for `locale`, or None."""
             status, headers, html = Client().request(f"/?lang={locale}")
+            if status != 200:
+                return f"{locale}: status {str(status)}"
             expected = "Son içerikler" if locale == "tr" else "The latest content"
-            return status == 200 and expected in html and headers["content-language"] == locale
+            language = headers.get("content-language")
+            if expected not in html or language != locale:
+                return f"{locale}: rendered in {str(language)}"
+            return None
 
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            check(
-                all(executor.map(render, ["tr", "en"] * 8)), "concurrent requests shared a language"
-            )
+        # When request threads shared regular expressions, about one render
+        # in 400 failed with status 500; 2,000 renders failed about 5 times.
+        requests = ["tr", "en"] * 1000
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            failures = [failure for failure in executor.map(render, requests) if failure]
+        first_failures = ", ".join(failures[:5])
+        check(
+            not failures,
+            f"{str(len(failures))} of {str(len(requests))} concurrent requests failed: {first_failures}",
+        )
+        # The same validation on eight threads inside the server, which shows a
+        # shared regular expression on every run rather than now and then.
+        status, _, body = Client().request("/__fixtures/concurrent-matches")
+        thread_failures = (
+            json.loads(body)["failures"] if status == 200 else [f"status {str(status)}"]
+        )
+        thread_summary = "; ".join(thread_failures)
+        check(not thread_failures, f"threads shared regular expressions: {thread_summary}")
         check(
             public.request("/locale", "POST", {"locale": "tr", "return_to": "/content"})[0] == 303,
             "language preference",

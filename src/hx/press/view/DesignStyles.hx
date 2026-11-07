@@ -15,13 +15,13 @@ package hx.press.view;
 class DesignStyles {
     static final breakpoints = ["desktop", "tablet", "mobile"];
     static final interactions = ["normal", "hover", "focus"];
-    static final identifier = ~/^[A-Za-z0-9_-]{1,80}$/;
 
     public static function css(document:Dynamic):String {
         if (document == null) {
             return "";
         }
         var layers = [new StringBuf(), new StringBuf(), new StringBuf()];
+        var identifier = ~/^[A-Za-z0-9_-]{1,80}$/;
         var classes:Dynamic = document.classes;
         if (classes != null) {
             for (name in sorted(classes)) {

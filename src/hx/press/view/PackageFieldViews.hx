@@ -12,8 +12,6 @@ import hx.press.view.types.admin.SystemViews.ExtensionSettingOptionView;
     and the attributes each control needs.
 **/
 class PackageFieldViews {
-    static final hexColor = ~/^#[0-9a-f]{6}$/i;
-
     public static inline final DEFAULT_COLOR = "#2457a6";
 
     public static function prepare(packageId:String, fields:Array<PackageField>,
@@ -62,6 +60,7 @@ class PackageFieldViews {
 
     /** The color picker's value: the setting, else its default, as the toggle restores it. **/
     static function colorValue(value:String, defaultValue:String):String {
+        var hexColor = ~/^#[0-9a-f]{6}$/i;
         if (hexColor.match(value)) {
             return value;
         }

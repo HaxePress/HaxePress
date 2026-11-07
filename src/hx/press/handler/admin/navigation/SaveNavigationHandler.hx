@@ -146,11 +146,8 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
         #else
         // The rules java.net.URI applies on the JVM: an http or https address
         // with a host name or IP address, no user information and no spaces.
+        var absoluteUrl = ~/^https?:\/\/(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.?|\[[0-9A-Fa-f:.]+\])(?::[0-9]*)?(?:[\/?#][^\x00-\x20"<>\\^`{|}]*)?$/;
         return absoluteUrl.match(value);
         #end
     }
-
-    #if !jvm
-    static final absoluteUrl = ~/^https?:\/\/(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.?|\[[0-9A-Fa-f:.]+\])(?::[0-9]*)?(?:[\/?#][^\x00-\x20"<>\\^`{|}]*)?$/;
-    #end
 }
