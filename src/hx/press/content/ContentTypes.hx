@@ -86,7 +86,7 @@ class ContentTypes {
     ];
 
     public static function validKey(key:String):Bool {
-        return key != null && ~/^[a-z][a-z0-9_]{0,31}$/.match(key);
+        return key != null && ~/^[a-z][a-z0-9_]{0,31}(?![\s\S])/.match(key);
     }
 
     public static function available(query:QueryBuilder<ContentType>):QueryBuilder<ContentType> {
@@ -486,9 +486,9 @@ class ContentTypes {
         var icon = text(input, "icon", 40, "file");
         if (name == ""
             || singular == ""
-            || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(path)
+            || !~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(path)
             || reservedPaths.contains(path)
-            || !~/^[a-z][a-z0-9-]*$/.match(icon)) {
+            || !~/^[a-z][a-z0-9-]*(?![\s\S])/.match(icon)) {
             throw new Exception("Enter collection labels and a public path that is not reserved by the CMS.");
         }
         if (ContentType.query.where("public_path", path).where("key", "!=", key).exists()) {
@@ -504,7 +504,7 @@ class ContentTypes {
             throw new Exception("Choose a template for the matching detail or archive view.");
         }
         for (name in [template, archiveTemplate]) {
-            if (!~/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.match(name)) {
+            if (!~/^[A-Za-z][A-Za-z0-9_-]{0,79}(?![\s\S])/.match(name)) {
                 throw new Exception("Use a public theme template name without path separators.");
             }
         }

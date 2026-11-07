@@ -23,7 +23,6 @@ class PreviewLinks {
         "extension-assets",
         "locale"
     ];
-    static final publicPath = ~/^\/[a-z0-9-]+(?:\/[a-z0-9-]+)?$/;
 
     public static function mapper(theme:Dynamic, request:Null<Request>):Null<String->String> {
         if (theme == null) {
@@ -55,6 +54,7 @@ class PreviewLinks {
         var path = queryIndex < 0 ? withoutHash : withoutHash.substr(0, queryIndex);
         var search = queryIndex < 0 ? "" : withoutHash.substr(queryIndex + 1);
         var first = path.split("/")[1];
+        var publicPath = ~/^\/[a-z0-9-]+(?:\/[a-z0-9-]+)?$/;
         var isPublic = path == "/" || (publicPath.match(path) && reserved.indexOf(first) < 0);
         if (!isPublic) {
             return href;

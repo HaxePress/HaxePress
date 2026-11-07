@@ -62,7 +62,7 @@ class SaveTagHandler extends AbstractHandler implements ValidationResponder {
         var name = CategoryData.normalize(AdminController.input(request, "name", 80));
         var slug = CategoryData.key(AdminController.input(request, "slug", 120));
         var description = AdminController.input(request, "description", 500);
-        if (name == "" || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(slug)) {
+        if (name == "" || !~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(slug)) {
             return CmsController.tags(request,
                 "Enter a name and a URL slug using lowercase letters, numbers and hyphens.", 422);
         }

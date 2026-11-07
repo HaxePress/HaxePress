@@ -25,7 +25,10 @@ typedef AdminCollectionChoice = {
     selected entries of option pickers.
 **/
 class AdminForms {
-    static final identifier = ~/^[1-9][0-9]{0,8}$/;
+    /** A record identifier. A new `EReg` each call: it keeps its last match, so threads must not share one. **/
+    static function identifierPattern():EReg {
+        return ~/^[1-9][0-9]{0,8}$/;
+    }
 
     /** Whether the previous submission failed with the field `marker` among its values. **/
     public static function resubmitted(request:Request, marker:String):Bool {
@@ -40,7 +43,7 @@ class AdminForms {
     /** The record identifier in the `edit` query value, or 0. **/
     public static function editId(request:Request):Int {
         var editing = request.query("edit", "");
-        return identifier.match(editing) ? Std.parseInt(editing) : 0;
+        return identifierPattern().match(editing) ? Std.parseInt(editing) : 0;
     }
 
     /**
@@ -58,7 +61,7 @@ class AdminForms {
             }
         }
         var submittedId = AdminController.input(request, "id", 16);
-        if (identifier.match(submittedId)) {
+        if (identifierPattern().match(submittedId)) {
             query.push('edit=${submittedId}');
         }
         var search = query.join("&");

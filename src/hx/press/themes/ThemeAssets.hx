@@ -71,7 +71,7 @@ class ThemeAssets {
 
     public static function imageUrl(value:String):Bool {
         return value != null
-            && ~/^\/theme-assets\/theme-[a-z0-9]+(?:-[a-z0-9]+)*\/ta_[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)$/.match(value);
+            && ~/^\/theme-assets\/theme-[a-z0-9]+(?:-[a-z0-9]+)*\/ta_[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)(?![\s\S])/.match(value);
     }
 
     public static function rules(id:String):Dynamic {

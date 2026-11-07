@@ -44,6 +44,10 @@ private class LinkDefinition {
     get `content-` ids, `#` headings become `<h2>`, only managed media
     images are shown, image-only paragraphs become figures, external links
     open in a new tab and tables scroll in a wrapper.
+
+    An `EReg` keeps the state of its last match, so threads must not share
+    one. Each document gets a `Markdown` and each inline span an
+    `InlineParser`, and those hold the expressions they match with.
 **/
 class Markdown {
     static inline final CACHE_LIMIT = 128;
@@ -53,19 +57,16 @@ class Markdown {
     static final lock = new Mutex();
     #end
 
-    static final atxHeading = ~/^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
-    static final rule = ~/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
-    static final fence = ~/^( {0,3})(`{3,}|~{3,})[ \t]*([^`]*)$/;
-    static final bullet = ~/^( {0,3})([-*+])([ \t]+|$)(.*)$/;
-    static final ordered = ~/^( {0,3})(\d{1,9})([.)])([ \t]+|$)(.*)$/;
-    static final setextOne = ~/^ {0,3}=+[ \t]*$/;
-    static final setextTwo = ~/^ {0,3}-+[ \t]*$/;
-    static final definition = ~/^ {0,3}\[([^\]]+)\]:[ \t]*<?([^\s>]+)>?(?:[ \t]+(?:"([^"]*)"|'([^']*)'|\(([^)]*)\)))?[ \t]*$/;
-    static final tableDelimiter = ~/^ *\|? *:?-+:? *(\| *:?-+:? *)*\|? *$/;
-    static final task = ~/^\[([ xX])\][ \t]+(.*)$/s;
-    static final mediaImage = ~/^\/media\/[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)$/;
-    static final autolinkUrl = ~/^(?:https?:\/\/|www\.)[^\s<]*[^\s<?!.,:*_~)'"\]]/i;
-    static final email = ~/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/;
+    final atxHeading = ~/^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
+    final rule = ~/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
+    final fence = ~/^( {0,3})(`{3,}|~{3,})[ \t]*([^`]*)$/;
+    final bullet = ~/^( {0,3})([-*+])([ \t]+|$)(.*)$/;
+    final ordered = ~/^( {0,3})(\d{1,9})([.)])([ \t]+|$)(.*)$/;
+    final setextOne = ~/^ {0,3}=+[ \t]*$/;
+    final setextTwo = ~/^ {0,3}-+[ \t]*$/;
+    final definition = ~/^ {0,3}\[([^\]]+)\]:[ \t]*<?([^\s>]+)>?(?:[ \t]+(?:"([^"]*)"|'([^']*)'|\(([^)]*)\)))?[ \t]*$/;
+    final tableDelimiter = ~/^ *\|? *:?-+:? *(\| *:?-+:? *)*\|? *$/;
+    final task = ~/^\[([ xX])\][ \t]+(.*)$/s;
 
     final definitions:Map<String, LinkDefinition> = [];
     final slugs:Map<String, Int> = [];
@@ -319,7 +320,7 @@ class Markdown {
     }
 
     /** Whether a line interrupts a paragraph. **/
-    static function startsBlock(line:String):Bool {
+    function startsBlock(line:String):Bool {
         if (atxHeading.match(line) || rule.match(line) || fence.match(line)) {
             return true;
         }
@@ -617,6 +618,7 @@ class Markdown {
     }
 
     public static function allowedImage(url:String):Bool {
+        var mediaImage = ~/^\/media\/[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)(?![\s\S])/;
         return mediaImage.match(url);
     }
 
@@ -637,14 +639,6 @@ class Markdown {
         var scheme = trimmed.substr(0, colon).toLowerCase();
         return
             ["http", "https", "mailto", "tel", "irc", "ircs", "xmpp"].indexOf(scheme) >= 0 ? trimmed : null;
-    }
-
-    public static function autolink():EReg {
-        return autolinkUrl;
-    }
-
-    public static function emailPattern():EReg {
-        return email;
     }
 }
 
@@ -670,7 +664,12 @@ private class Delimiter {
 /** Inline Markdown: code, emphasis, strikethrough, links, images, autolinks and breaks. */
 private class InlineParser {
     static final punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
-    static final entity = ~/^&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/;
+
+    final entity = ~/^&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/;
+    final autolinkUrl = ~/^(?:https?:\/\/|www\.)[^\s<]*[^\s<?!.,:*_~)'"\]]/i;
+    final email = ~/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/;
+    final alphanumeric = ~/[A-Za-z0-9]/;
+    final emailCharacter = ~/[A-Za-z0-9._+-]/;
 
     final text:String;
     final definitions:Map<String, LinkDefinition>;
@@ -792,7 +791,7 @@ private class InlineParser {
                         continue;
                     }
                     if (close > 0
-                        && ~/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.match(inner)) {
+                        && ~/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?![\s\S])/.match(inner)) {
                         flush();
                         pieces.push(anchor('mailto:${inner}', null, Markdown.escape(inner)));
                         index = close + 1;
@@ -1026,26 +1025,24 @@ private class InlineParser {
     function autolinkLiteral(index:Int):Null<{html:String, end:Int}> {
         if (index > 0) {
             var before = text.charAt(index - 1);
-            if (~/[A-Za-z0-9]/.match(before)) {
+            if (alphanumeric.match(before)) {
                 return null;
             }
         }
         var rest = text.substr(index, 2048);
         var first = rest.charAt(0);
         if (first == "h" || first == "H" || first == "w" || first == "W") {
-            var pattern = Markdown.autolink();
-            if (pattern.match(rest)) {
-                var raw = pattern.matched(0);
+            if (autolinkUrl.match(rest)) {
+                var raw = autolinkUrl.matched(0);
                 raw = balanceParentheses(raw);
                 var href = StringTools.startsWith(raw.toLowerCase(),
                     "www.") ? 'http://${raw}' : raw;
                 return {html: anchor(href, null, Markdown.escape(raw)), end: index + raw.length};
             }
         }
-        if (~/[A-Za-z0-9._+-]/.match(first)) {
-            var pattern = Markdown.emailPattern();
-            if (pattern.match(rest) && rest.indexOf("@") > 0) {
-                var raw = pattern.matched(0);
+        if (emailCharacter.match(first)) {
+            if (email.match(rest) && rest.indexOf("@") > 0) {
+                var raw = email.matched(0);
                 if (raw.indexOf("@") > 0 && !StringTools.endsWith(raw, ".")) {
                     return {
                         html: anchor('mailto:${raw}', null, Markdown.escape(raw)),

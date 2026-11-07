@@ -14,7 +14,8 @@ class MediaReferences {
     }
 
     public static function validFilename(filename:String):Bool {
-        return filename != null && ~/^[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)$/.match(filename);
+        return filename != null
+            && ~/^[A-Za-z0-9_-]{32}\.(jpg|png|webp|gif)(?![\s\S])/.match(filename);
     }
 
     public static function imageUrl(value:String):Bool {

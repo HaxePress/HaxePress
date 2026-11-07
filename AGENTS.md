@@ -29,6 +29,13 @@ Compile the JVM target after changing imports to verify type and native-binding 
 - The notes sample uses an older `Note.instance` API; this project's installed version uses `Model.query`. Keep explicit `auth("admin")` calls.
 - Use the standard formatter for each language and run `npm run format:check` before finishing source changes.
 
+## Regular expressions
+
+- Do not keep an `EReg` in a static field or in any object that request threads share. On the JVM an `EReg` keeps its last match in one `java.util.regex.Matcher`, so concurrent requests overwrite each other's matches.
+- Write the literal in the function that matches with it, or return it from a static function when several functions use the pattern. Create it once per operation, before any loop, or keep it in an instance field of an object that serves one operation, such as `Markdown`.
+- Haxe's JVM generator compiles each literal's pattern once per class, so a new `EReg` costs one `Matcher` (152 bytes).
+- End a pattern that validates a whole value at the end of the input. Without the `m` flag, `$` also matches before a final line break: on the JVM before `\n`, `\r`, `\r\n`, `\u0085`, `\u2028` or `\u2029`, and in PHP's PCRE before `\n`. `trim()` does not remove the Unicode separators. Haxe regex literals reject `\z`, so a literal ends with `(?![\s\S])`, and a pattern written as a string, such as HxWell's `Regex("...")` rule, ends with `\\z`. JSON Schema patterns in MCP tools keep `$`, because they follow ECMAScript, and `McpSchema` checks them with `\z`.
+
 ## Query scope and caching
 
 - Application and test source must use model/query builder and Schema APIs, without raw SQL strings, `selectRaw`, `whereRaw`, or direct database statements. Test data uses the test-only JVM ORM fixture process. Maintain necessary framework compatibility changes in `patches/hxwell-query-builder.patch`, rather than introducing SQL wrappers. Connection/result-set decorators may observe and forward framework-generated statements; they must not construct or rewrite them.

@@ -242,10 +242,38 @@ class McpSchema {
         if (maxLength != null && length > maxLength) {
             issue(issues, path, 'Too big: expected string to have <=${maxLength} characters');
         }
-        if (pattern != null && !new EReg(pattern, "u").match(text)) {
+        if (pattern != null && !new EReg(endOfInput(pattern), "u").match(text)) {
             issue(issues, path, 'Invalid string: must match pattern /${pattern}/');
         }
         return text;
+    }
+
+    /**
+        A JSON Schema `pattern` for Java and PCRE. The pattern follows
+        ECMAScript, where `$` matches only at the end of the input; Java and
+        PCRE also match `$` before a final line break, so each `$` outside a
+        character class becomes `\z`.
+    **/
+    static function endOfInput(pattern:String):String {
+        var result = new StringBuf();
+        var inClass = false;
+        var index = 0;
+        while (index < pattern.length) {
+            var character = pattern.charAt(index);
+            if (character == "\\") {
+                result.add(pattern.substr(index, 2));
+                index += 2;
+                continue;
+            }
+            if (character == "[") {
+                inClass = true;
+            } else if (character == "]") {
+                inClass = false;
+            }
+            result.add(character == "$" && !inClass ? "\\z" : character);
+            index++;
+        }
+        return result.toString();
     }
 
     /** The length of a string in UTF-16 code units, as JavaScript counts it. **/

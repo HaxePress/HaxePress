@@ -136,7 +136,8 @@ class PluginContract {
 
     /** A JavaScript file in the package's `public/` folder, without `..` or hidden segments. **/
     static function assetPath(path:String):Bool {
-        if (path.length > 240 || !~/^[A-Za-z0-9_\/-]+(\.[A-Za-z0-9_-]+)*\.(mjs|js)$/.match(path)) {
+        if (path.length > 240
+            || !~/^[A-Za-z0-9_\/-]+(\.[A-Za-z0-9_-]+)*\.(mjs|js)(?![\s\S])/.match(path)) {
             return false;
         }
         for (segment in path.split("/")) {

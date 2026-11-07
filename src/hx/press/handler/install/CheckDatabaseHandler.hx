@@ -20,16 +20,16 @@ class CheckDatabaseHandler extends AbstractHandler implements ValidationResponde
 
     public override function validate():Bool {
         var rules:Map<String,
-            Array<ValidatorRule>> = ["driver" => [Required, String, Regex("^(sqlite|mysql)$")]];
+            Array<ValidatorRule>> = ["driver" => [Required, String, Regex("^(sqlite|mysql)\\z")]];
         if (request().input("driver", "") == "sqlite") {
             rules.set("file",
-                [Required, String, Regex("^[A-Za-z0-9][A-Za-z0-9_.-]{0,74}\\.sqlite$")]);
+                [Required, String, Regex("^[A-Za-z0-9][A-Za-z0-9_.-]{0,74}\\.sqlite\\z")]);
         } else {
-            rules.set("host", [Required, String, Max(253), Regex("^[A-Za-z0-9_.:-]+$")]);
+            rules.set("host", [Required, String, Max(253), Regex("^[A-Za-z0-9_.:-]+\\z")]);
             rules.set("port", [Required, String, Custom("cms.port")]);
-            rules.set("database", [Required, String, Regex("^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$")]);
-            rules.set("username", [Required, String, Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")]);
-            rules.set("password", [String, Max(1000), Regex("^[^\\x00-\\x1f\\x7f]*$")]);
+            rules.set("database", [Required, String, Regex("^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}\\z")]);
+            rules.set("username", [Required, String, Max(100), Regex("^[^\\x00-\\x1f\\x7f]+\\z")]);
+            rules.set("password", [String, Max(1000), Regex("^[^\\x00-\\x1f\\x7f]*\\z")]);
         }
         return request().validate(rules);
     }

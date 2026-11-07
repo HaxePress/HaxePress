@@ -10,11 +10,7 @@ package hx.press.view;
 **/
 class DesignTemplates {
     static inline final MAX_DEPTH = 32;
-    static final identifier = ~/^[A-Za-z0-9_-]{1,80}$/;
-    static final bindingPath = ~/^(site|item|collection|page)\.[A-Za-z_][A-Za-z0-9_]*$/;
     static inline final CUSTOM_FIELDS = "item.fields.";
-    // Custom field keys, as content types define them.
-    static final fieldKey = ~/^[a-z][a-z0-9_]{0,31}$/;
     static final siteFields = [
         "locale",
         "site_name",
@@ -85,6 +81,7 @@ class DesignTemplates {
         if (document == null || document.templates == null) {
             return sources;
         }
+        var identifier = identifierPattern();
         for (name in Reflect.fields(document.templates)) {
             if (identifier.match(name)) {
                 sources.set(name, new DesignTemplates(document).page(name));
@@ -256,6 +253,7 @@ class DesignTemplates {
             // detail pages and public list fields in lists and content sources.
             return 'item.fields[${literal(key)}]';
         }
+        var bindingPath = ~/^(site|item|collection|page)\.[A-Za-z_][A-Za-z0-9_]*$/;
         if (!bindingPath.match(path)) {
             return null;
         }
@@ -275,6 +273,8 @@ class DesignTemplates {
             return null;
         }
         var key = path.substr(CUSTOM_FIELDS.length);
+        // Custom field keys, as content types define them.
+        var fieldKey = ~/^[a-z][a-z0-9_]{0,31}$/;
         return fieldKey.match(key) ? key : null;
     }
 
@@ -370,7 +370,7 @@ class DesignTemplates {
                 }
                 output.add('</div>');
             case "extension":
-                var slot = ~/^[a-z]+(\.[a-z-]+)?$/.match(Std.string(node.slot)) ? Std.string(node.slot) : "site.footer";
+                var slot = ~/^[a-z]+(\.[a-z-]+)?(?![\s\S])/.match(Std.string(node.slot)) ? Std.string(node.slot) : "site.footer";
                 output.add('<div${common(node)}><ExtensionSlot name="${slot}" /></div>');
             case "pagination":
                 output.add('<div${common(node)}><Pagination :if="pagination" :links="pagination" :count="size(items)" /></div>');
@@ -402,7 +402,7 @@ class DesignTemplates {
         var value = source == null ? "page.items" : Std.string(source);
         if (StringTools.startsWith(value, "feed:")) {
             var feed = value.substr(5);
-            return identifier.match(feed) ? 'themeFeeds[${literal(feed)}] ?? []' : "[]";
+            return identifierPattern().match(feed) ? 'themeFeeds[${literal(feed)}] ?? []' : "[]";
         }
         return value == "page.related" ? "related" : "withFeatured(featured, items)";
     }
@@ -417,7 +417,7 @@ class DesignTemplates {
         var hasValue = false;
         if (given != null) {
             for (key in Reflect.fields(given)) {
-                if (!~/^[A-Za-z][A-Za-z0-9:_-]{0,40}$/.match(key)
+                if (!~/^[A-Za-z][A-Za-z0-9:_-]{0,40}(?![\s\S])/.match(key)
                     || key == "class"
                     || key == "style"
                     || StringTools.startsWith(key.toLowerCase(), "on")) {
@@ -478,6 +478,7 @@ class DesignTemplates {
         }
         var names:Array<Dynamic> = value;
         var output = new StringBuf();
+        var identifier = identifierPattern();
         for (name in names) {
             var text = Std.string(name);
             if (identifier.match(text)) {
@@ -489,7 +490,12 @@ class DesignTemplates {
 
     static function safeId(value:Dynamic):String {
         var text = value == null ? "" : Std.string(value);
-        return identifier.match(text) ? text : "node";
+        return identifierPattern().match(text) ? text : "node";
+    }
+
+    /** Template, class and node names. A new `EReg` each call: it keeps its last match, so threads must not share one. **/
+    static function identifierPattern():EReg {
+        return ~/^[A-Za-z0-9_-]{1,80}(?![\s\S])/;
     }
 
     static function choice(value:Dynamic, options:Array<String>, fallback:String):String {

@@ -23,5 +23,7 @@ class TestProvider extends AbstractProvider {
             probe.release();
             return ResponseBuilder.asJson({released: true});
         });
+        Route.get("/__fixtures/concurrent-matches",
+            request -> ResponseBuilder.asJson({failures: ConcurrentMatchProbe.run()}));
     }
 }

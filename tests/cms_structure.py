@@ -217,6 +217,32 @@ def verify_presentation(owner, public, fixtures, definition, prefix, slug, ident
         fixtures.delete("navigation_regions", [("key", "=", region)])
 
 
+def verify_line_breaks(owner, fixtures, definition):
+    """`$` also matches before a final line break, and `trim()` keeps the Unicode separators."""
+    counts_before = {
+        entity: fixtures.count(entity) for entity in ["content_types", "navigation_regions"]
+    }
+    valid = {**definition, "icon": "file"}
+    for ending in ["\u2028", "\u0085"]:
+        for field in ["key", "publicPath", "icon", "template"]:
+            changed = {**valid, field: f"{valid[field]}{ending}"}
+            status, _, body = owner.request(
+                "/admin/content-types/create", "POST", {"definition": json.dumps(changed)}
+            )
+            check(
+                status == 422,
+                f"A collection {field} ending in {ending!r} was accepted: {body[:200]}",
+            )
+        region = {"key": f"line_region{ending}", "name": "Line region", "max_links": "5"}
+        status = owner.request("/admin/navigation/regions/save", "POST", region)[0]
+        check(status == 422, f"A navigation region key ending in {ending!r} was accepted")
+    check(
+        counts_before
+        == {entity: fixtures.count(entity) for entity in ["content_types", "navigation_regions"]},
+        "A collection or navigation region with a line break was stored",
+    )
+
+
 def run():
     owner = Client()
     public = Client()
@@ -250,6 +276,7 @@ def run():
     identifiers = []
     with FixtureStore.from_environment() as fixtures:
         try:
+            verify_line_breaks(owner, fixtures, definition)
             created = owner.request(
                 "/admin/content-types/create", "POST", {"definition": json.dumps(definition)}
             )

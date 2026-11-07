@@ -443,6 +443,19 @@ def verify_media_and_content(owner, public, connection):
         )
 
 
+def verify_end_of_input(owner, public, connection):
+    """`$` also matches before a final line break on the server; JSON Schema `$` does not."""
+    for ending in ["\n", "\r\n", "\u2028"]:
+        status, _, _ = post_json(owner, f"{STATE}/sessions", {"profile": f"claude{ending}"})
+        check(status == 422, f"An MCP profile ending in {ending!r} was accepted")
+        result = call(public, connection, "list_content", {"collection": f"entry{ending}"})
+        message = result.get("content", [{}])[0].get("text", "")
+        check(
+            result.get("isError") and "must match pattern" in message,
+            f"An MCP argument ending in {ending!r} matched its schema pattern: {message[:200]}",
+        )
+
+
 def run():
     owner = login(os.environ["TEST_ADMIN_EMAIL"], os.environ["TEST_ADMIN_PASSWORD"])
     public = Client()
@@ -513,6 +526,7 @@ def run():
         {"file": {"file_id": "invalid", "download_url": f"{os.environ['TEST_URL']}/"}},
     )
     check(denied.get("isError"), "The image tool accepted a non-attachment origin")
+    verify_end_of_input(owner, public, first)
     expected = {
         "list_content",
         "get_content",

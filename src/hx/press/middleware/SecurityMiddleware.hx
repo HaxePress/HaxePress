@@ -9,8 +9,6 @@ import hx.well.route.RouteElement;
 import hx.well.type.AttributeType;
 
 class SecurityMiddleware extends AbstractMiddleware {
-    static final plainHost = ~/^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?$/;
-
     /**
         The Content Security Policy of a response. Scripts run only from this
         site or with this request's nonce, which the renderer puts on its own
@@ -18,6 +16,7 @@ class SecurityMiddleware extends AbstractMiddleware {
         inline values, which themes use for their settings.
     **/
     static function policy(nonce:String, framed:Bool, host:Null<String>):String {
+        var plainHost = ~/^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?$/;
         var sockets = host != null && plainHost.match(host) ? ' ws://${host} wss://${host}' : "";
         var ancestors = framed ? "'self'" : "'none'";
         var directives = [

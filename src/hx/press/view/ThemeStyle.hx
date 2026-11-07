@@ -7,11 +7,12 @@ import wellout.render.Values;
     CSS custom properties from theme settings, validated before they reach
     a `style` attribute: colors must be `#rrggbb` and the content width is a
     clamped number of pixels.
+
+    An `EReg` keeps the state of its last match, so request threads must not
+    share one. Each function creates the expressions it needs before its
+    loop; the JVM target still compiles each pattern only once.
 **/
 class ThemeStyle {
-    static final color = ~/^#[0-9a-fA-F]{6}$/;
-    static final variableName = ~/^--[a-z][a-z0-9-]*$/;
-    static final safeValue = ~/^(?:#[0-9a-fA-F]{6}|-?[0-9]+(?:\.[0-9]+)?(?:px|rem|em|%)?)$/;
     static final colorSettings = [
         ["accent", "--green"],
         ["paper", "--paper"],
@@ -24,6 +25,7 @@ class ThemeStyle {
     public static function variables(theme:Dynamic):Map<String, String> {
         var result:Map<String, String> = [];
         var settings:Dynamic = theme == null ? null : theme.settings;
+        var color = ~/^#[0-9a-fA-F]{6}(?![\s\S])/;
         for (pair in colorSettings) {
             var value = settings == null ? null : Values.toText(Values.field(settings, pair[0]));
             if (value != null && color.match(value)) {
@@ -40,7 +42,13 @@ class ThemeStyle {
         return result;
     }
 
-    static final fontStack = ~/^(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})(?:, ?(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})){0,5}$/;
+    static function variableNamePattern():EReg {
+        return ~/^--[a-z][a-z0-9-]*$/;
+    }
+
+    static function safeValuePattern():EReg {
+        return ~/^(?:#[0-9a-fA-F]{6}|-?[0-9]+(?:\.[0-9]+)?(?:px|rem|em|%)?)(?![\s\S])/;
+    }
 
     /** A clamped pixel length from a numeric setting, such as a content width. **/
     public static function pixels(value:Null<String>, minimum:Int, maximum:Int,
@@ -63,13 +71,17 @@ class ThemeStyle {
             return "";
         }
         var output:Array<String> = [];
+        var wordBoundary = ~/([a-z0-9])([A-Z])/g;
+        var variableName = variableNamePattern();
+        var safeValue = safeValuePattern();
+        var fontStack = ~/^(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})(?:, ?(?:'[A-Za-z0-9 -]{1,40}'|[A-Za-z-]{1,40})){0,5}(?![\s\S])/;
         for (field in Reflect.fields(input)) {
             var value = Values.toText(Reflect.field(input, field));
             if (value == null || value == "") {
                 continue;
             }
             var name = "--"
-                + ~/([a-z0-9])([A-Z])/g.map(field,
+                + wordBoundary.map(field,
                     match -> '${match.matched(1)}-${match.matched(2).toLowerCase()}')
                     .toLowerCase();
             if (variableName.match(name) && (safeValue.match(value) || fontStack.match(value))) {
@@ -88,6 +100,8 @@ class ThemeStyle {
         var keys = [for (key in map.keys()) key];
         keys.sort(Reflect.compare);
         var output:Array<String> = [];
+        var variableName = variableNamePattern();
+        var safeValue = safeValuePattern();
         for (key in keys) {
             var value = map.get(key);
             if (variableName.match(key) && value != null && safeValue.match(value)) {

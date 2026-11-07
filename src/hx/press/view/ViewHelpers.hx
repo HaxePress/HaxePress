@@ -67,7 +67,7 @@ class ViewHelpers {
             var theme:Dynamic = host(context).root("theme");
             var base:String = theme == null || theme.assetBase == null ? "" : theme.assetBase;
             var path = arguments.string(0);
-            return ~/^[A-Za-z0-9_\/-]+(?:\.[A-Za-z0-9_-]+)+$/.match(path)
+            return ~/^[A-Za-z0-9_\/-]+(?:\.[A-Za-z0-9_-]+)+(?![\s\S])/.match(path)
                 && path.indexOf("..") < 0 ? '${base}${path}' : "";
         });
         // A file of the plugin or theme package whose template is rendering.
@@ -75,7 +75,7 @@ class ViewHelpers {
             var base = host(context).packageAssetBase;
             var path = arguments.string(0);
             return base != null
-                && ~/^[A-Za-z0-9_\/-]+(?:\.[A-Za-z0-9_-]+)+$/.match(path)
+                && ~/^[A-Za-z0-9_\/-]+(?:\.[A-Za-z0-9_-]+)+(?![\s\S])/.match(path)
                 && path.indexOf("..") < 0 ? '${base}${path}' : "";
         });
         runtime.addFilter("slice", (input, arguments, _) -> {

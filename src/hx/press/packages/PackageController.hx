@@ -137,8 +137,9 @@ class PackageController {
         }
         var admin = CmsAccess.current();
         var key = AdminController.input(request, "key", 64);
+        var validKey = ~/^[A-Za-z0-9_-]{32}(?![\s\S])/.match(key);
         try {
-            if (!~/^[A-Za-z0-9_-]{32}$/.match(key)) {
+            if (!validKey) {
                 throw new Exception("Inspect a package ZIP before installing it.");
             }
             PackageManager.install(key, kind, admin.id, admin.name,
@@ -146,7 +147,7 @@ class PackageController {
             return ResponseBuilder.asRedirect('${base(kind)}?notice=installed', 303);
         } catch (error:Dynamic) {
             // A failed installation keeps its inspection open, as the page did before.
-            var inspected = ~/^[A-Za-z0-9_-]{32}$/.match(key) ? '${base(kind)}?inspect=${key}' : base(kind);
+            var inspected = validKey ? '${base(kind)}?inspect=${key}' : base(kind);
             var redirect = AdminController.validationRedirect(request, "package",
                 Std.string(error), inspected);
             if (redirect != null) {
@@ -362,7 +363,7 @@ class PackageController {
         themeInfo.preview = false;
         themeInfo.previewBase = previewBase;
         var session = request.query("customizeSession", "");
-        if (~/^[A-Za-z0-9_-]{32}$/.match(session)) {
+        if (~/^[A-Za-z0-9_-]{32}(?![\s\S])/.match(session)) {
             themeInfo.customizeSession = session;
         }
         if (themeInfo.customizeSession != null) {

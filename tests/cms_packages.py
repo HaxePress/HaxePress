@@ -84,6 +84,30 @@ def updated_server_modules():
             }
 
 
+def verify_line_breaks(admin, manifest, files):
+    """`$` also matches before a final line break, and `trim()` keeps the Unicode separators."""
+    for ending in ["\u2028", "\u0085"]:
+        variants = []
+        for field in ["pluginId", "slug", "version"]:
+            variants.append((field, {**manifest, field: f"{manifest[field]}{ending}"}, files))
+        setting = json.loads(json.dumps(manifest))
+        setting["fields"][0]["key"] = f"{setting['fields'][0]['key']}{ending}"
+        variants.append(("setting key", setting, files))
+        extra_file = {**files, f"public/extra.js{ending}": "export {};"}
+        variants.append(("file name", manifest, extra_file))
+        for name, changed, archive_files in variants:
+            status, _, body = admin.request(
+                "/admin/plugins/upload",
+                "POST",
+                raw=zip_bytes(changed, archive_files),
+                content_type="application/zip",
+            )
+            check(
+                status == 422,
+                f"A package {name} ending in {ending!r} was accepted: {str(status)} {body[:200]}",
+            )
+
+
 def run():
     with FixtureStore.from_environment() as fixtures:
         verify(fixtures)
@@ -457,18 +481,17 @@ def verify(fixtures):
         ],
     }
     frontend["server"] = manifest["server"]
-    frontend_zip = zip_bytes(
-        frontend,
-        {
-            **{
-                path: content
-                for path, content in package_files.items()
-                if path in ("server.jar", "server.cppia") or path.startswith("php/")
-            },
-            "public/main.mjs": "export function activate() { return () => {}; }",
-            "public/style.css": ".cms-test-banner { color: green; }",
+    frontend_files = {
+        **{
+            path: content
+            for path, content in package_files.items()
+            if path in ("server.jar", "server.cppia") or path.startswith("php/")
         },
-    )
+        "public/main.mjs": "export function activate() { return () => {}; }",
+        "public/style.css": ".cms-test-banner { color: green; }",
+    }
+    frontend_zip = zip_bytes(frontend, frontend_files)
+    verify_line_breaks(admin, frontend, frontend_files)
     install(admin, "plugins", frontend_zip)
     frontend_id = "plugin-test-banner"
     check(

@@ -27,7 +27,7 @@ class ReviewInstallationHandler extends AbstractHandler implements ValidationRes
                 String,
                 Min(12),
                 Custom("cms.byte_length", [72]),
-                Regex("^[^\\x00-\\x1f\\x7f]+$")
+                Regex("^[^\\x00-\\x1f\\x7f]+\\z")
             ],
             "confirm_password" => [Required, String, Min(1)]
         ]);

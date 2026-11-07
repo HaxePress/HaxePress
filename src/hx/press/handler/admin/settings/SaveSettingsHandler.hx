@@ -77,13 +77,13 @@ class SaveSettingsHandler extends AbstractHandler implements ValidationResponder
         var pageInput:String = values.get("home_page");
         var page = Std.parseInt(pageInput);
         if (!["collection", "page"].contains(mode)
-            || !~/^[0-9]{1,2}$/.match(sizeInput)
+            || !~/^[0-9]{1,2}(?![\s\S])/.match(sizeInput)
             || size == null
             || size < 1
             || size > 24
-            || !~/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.match(template)
+            || !~/^[A-Za-z][A-Za-z0-9_-]{0,79}(?![\s\S])/.match(template)
             || ["ContentDetail", "ContentIndex", "Page", "About", "NotFound"].contains(template)
-            || !~/^[0-9]{1,10}$/.match(pageInput)) {
+            || !~/^[0-9]{1,10}(?![\s\S])/.match(pageInput)) {
             return AdminController.settingsForm(request,
                 "Choose valid homepage and presentation settings.", "", 422);
         }

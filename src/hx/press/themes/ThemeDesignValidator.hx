@@ -200,7 +200,7 @@ class ThemeDesignValidator {
     function identifier(value:Dynamic):String {
         var id = text(value, "id", 40);
         nodes++;
-        if (!~/^[A-Za-z0-9_-]{1,40}$/.match(id) || identifiers.exists(id)) {
+        if (!~/^[A-Za-z0-9_-]{1,40}(?![\s\S])/.match(id) || identifiers.exists(id)) {
             throw new Exception("Every section and block needs a unique identifier.");
         }
         if (nodes > ThemeDesignSchema.MAX_NODES) {
@@ -232,7 +232,7 @@ class ThemeDesignValidator {
     /** A path the renderer can read: `prefix.field`, or a custom field as `item.fields.<key>`. **/
     static function binding(value:String):Void {
         if (value != ""
-            && (!~/^((site|item|collection|page)\.[A-Za-z_][A-Za-z0-9_]*|item\.fields\.[a-z][a-z0-9_]{0,31})$/.match(value)
+            && (!~/^((site|item|collection|page)\.[A-Za-z_][A-Za-z0-9_]*|item\.fields\.[a-z][a-z0-9_]{0,31})(?![\s\S])/.match(value)
                 || ~/(^|\.)(__proto__|prototype|constructor)(\.|$)/.match(value))) {
             throw new Exception("Choose a public CMS field for this binding, such as item.title, or a custom field as item.fields.<key>.");
         }
@@ -245,7 +245,7 @@ class ThemeDesignValidator {
         unbalanced quotes would make browsers drop the whole declaration.
     **/
     static function fontStack(value:String):String {
-        if (!~/^[A-Za-z0-9 ,"'-]+$/.match(value)) {
+        if (!~/^[A-Za-z0-9 ,"'-]+(?![\s\S])/.match(value)) {
             throw new Exception(FONT_STACK);
         }
         for (entry in value.split(",")) {
@@ -282,7 +282,7 @@ class ThemeDesignValidator {
                 }
                 var declarations:Dynamic = {};
                 for (property in Reflect.fields(input)) {
-                    if (!~/^(--[a-zA-Z][a-zA-Z0-9-]*|-?[a-z][a-z0-9-]*)$/.match(property)
+                    if (!~/^(--[a-zA-Z][a-zA-Z0-9-]*|-?[a-z][a-z0-9-]*)(?![\s\S])/.match(property)
                         || property.length > 64
                         || ["behavior", "-moz-binding"].contains(property)) {
                         throw new Exception("Choose a valid CSS property.");
@@ -308,7 +308,8 @@ class ThemeDesignValidator {
             return [];
         }
         return list(value, "Classes", 64).map(entry -> {
-            if (!Std.isOfType(entry, String) || !~/^[A-Za-z_][A-Za-z0-9_:-]{0,79}$/.match(entry)) {
+            if (!Std.isOfType(entry, String)
+                || !~/^[A-Za-z_][A-Za-z0-9_:-]{0,79}(?![\s\S])/.match(entry)) {
                 throw new Exception("Use a class name with lowercase letters, numbers and hyphens.");
             }
             return cast entry;
@@ -353,7 +354,8 @@ class ThemeDesignValidator {
                 throw new Exception("Use at most 32 HTML attributes on an element.");
             }
             for (key in Reflect.fields(attributesInput)) {
-                if (!attributes.contains(key) && !~/^(aria|data)-[a-z][a-z0-9-]{0,40}$/.match(key)) {
+                if (!attributes.contains(key)
+                    && !~/^(aria|data)-[a-z][a-z0-9-]{0,40}(?![\s\S])/.match(key)) {
                     throw new Exception('This HTML attribute is not supported: ${key}.');
                 }
                 var attributeValue = text(attributesInput,
@@ -394,14 +396,14 @@ class ThemeDesignValidator {
                 references.push(component);
             }
             var source = text(node, "source", 80, "page.items");
-            if (!~/^(page\.(items|related)|feed:[a-zA-Z0-9_-]{1,40})$/.match(source)) {
+            if (!~/^(page\.(items|related)|feed:[a-zA-Z0-9_-]{1,40})(?![\s\S])/.match(source)) {
                 throw new Exception("Choose a current-page list or a named content source.");
             }
             if (kind == "repeat" && StringTools.startsWith(source, "feed:")) {
                 sourceReferences.push(source.substr(5));
             }
             var slot = text(node, "slot", 80);
-            if (slot != "" && !~/^[a-z][a-z0-9_.-]{0,79}$/.match(slot)) {
+            if (slot != "" && !~/^[a-z][a-z0-9_.-]{0,79}(?![\s\S])/.match(slot)) {
                 throw new Exception("Choose a valid plugin slot name.");
             }
             var block:Dynamic = {
@@ -494,7 +496,7 @@ class ThemeDesignValidator {
             }
         }
         for (name in names) {
-            if (!~/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.match(name)
+            if (!~/^[A-Za-z][A-Za-z0-9_-]{0,79}(?![\s\S])/.match(name)
                 || StringTools.startsWith(name, "Admin")) {
                 throw new Exception("Choose a public template name with letters, numbers, hyphens and underscores.");
             }
@@ -514,7 +516,7 @@ class ThemeDesignValidator {
             throw new Exception("Use at most 32 reusable components.");
         }
         for (id in Reflect.fields(rawComponents)) {
-            if (!~/^[a-zA-Z0-9_-]{1,40}$/.match(id)) {
+            if (!~/^[a-zA-Z0-9_-]{1,40}(?![\s\S])/.match(id)) {
                 throw new Exception("Choose a valid component identifier.");
             }
             var component = Reflect.field(rawComponents, id);
@@ -534,7 +536,7 @@ class ThemeDesignValidator {
             throw new Exception("Use at most 64 reusable style classes.");
         }
         for (name in Reflect.fields(rawClasses)) {
-            if (!~/^[a-z][a-z0-9-]{0,39}$/.match(name)) {
+            if (!~/^[a-z][a-z0-9-]{0,39}(?![\s\S])/.match(name)) {
                 throw new Exception("Choose a valid style class name.");
             }
             Reflect.setField(classes, name, styles(Reflect.field(rawClasses, name)));
@@ -542,7 +544,7 @@ class ThemeDesignValidator {
         var feedIds:Map<String, Bool> = [];
         var feeds = list(input.feeds ?? [], "Content sources", 8).map(feed -> {
             var id = text(feed, "id", 40);
-            if (!~/^[a-zA-Z0-9_-]{1,40}$/.match(id) || feedIds.exists(id)) {
+            if (!~/^[a-zA-Z0-9_-]{1,40}(?![\s\S])/.match(id) || feedIds.exists(id)) {
                 throw new Exception("Each content source needs a unique identifier.");
             }
             feedIds.set(id, true);
