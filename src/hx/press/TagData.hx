@@ -5,6 +5,7 @@ import hx.press.ContentCache;
 import hx.press.Pagination;
 import hx.press.Pagination.PageCursor;
 import hx.press.data.QueryPage;
+import hx.press.validation.PositiveInt;
 import hx.well.database.query.QueryBuilder;
 import hx.press.model.ContentTag;
 import hx.press.model.Tag;
@@ -111,7 +112,7 @@ class TagData {
             if (value == "") {
                 continue;
             }
-            if (!~/^[1-9][0-9]*$/.match(value)) {
+            if (PositiveInt.parse(value) == null) {
                 return null;
             }
             if (!identifiers.contains(value)) {

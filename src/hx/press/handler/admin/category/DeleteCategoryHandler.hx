@@ -5,6 +5,7 @@ import hx.press.CmsController;
 import hx.press.AdminController;
 import hx.press.SiteController;
 import hx.press.ContentCache;
+import hx.press.validation.PositiveInt;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -18,7 +19,7 @@ class DeleteCategoryHandler extends AbstractHandler {
             return CmsController.forbidden(request);
         }
         var category = Category.query.select(["id", "name"])
-            .where("id", Std.parseInt(request.route("id")))
+            .where("id", PositiveInt.route(request, "id"))
             .limit(1)
             .first();
         if (category == null)

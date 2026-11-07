@@ -16,6 +16,7 @@ import hx.press.install.InstallationState;
 import hx.press.model.Admin;
 import hx.press.provider.DatabaseProvider;
 import hx.press.provider.SiteRuntime;
+import hx.press.validation.Flag;
 import hx.press.validation.ValidationResponder;
 import hx.press.view.View;
 import hx.well.database.Connection;
@@ -33,21 +34,16 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
         if (reviewed(request()) != null) {
             // The review step already checked these fields; only its option arrives here.
             var sample:Dynamic = request().input("sample_content", "0");
-            return Std.isOfType(sample, String) && (sample == "0" || sample == "1");
+            return Flag.valid(sample);
         }
         return request().validate([
-            "site_name" => [Required, String, Min(2), Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")],
-            "admin_name" => [Required, String, Min(2), Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")],
-            "admin_email" => [Required, String, Email, Max(254), Regex("^[^\\x00-\\x1f\\x7f]+\\z")],
-            "admin_password" => [
-                Required,
-                String,
-                Min(12),
-                Custom("cms.byte_length", [72]),
-                Regex("^[^\\x00-\\x1f\\x7f]+\\z")
-            ],
+            "site_name" => [Required, String, Min(2), Max(100), Custom("cms.line")],
+            "admin_name" => [Required, String, Min(2), Max(100), Custom("cms.line")],
+            "admin_email" => [Required, String, Email, Max(254), Custom("cms.line")],
+            "admin_password" => [Required, String, Min(12), Custom("cms.byte_length",
+                [72]), Custom("cms.line")],
             "confirm_password" => [Required, String, Min(1)],
-            "sample_content" => [Required, String, Regex("^[01]$")]
+            "sample_content" => [Required, String, Custom("cms.flag")]
         ]);
     }
 

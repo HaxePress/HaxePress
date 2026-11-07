@@ -8,6 +8,7 @@ import hx.press.CategoryData;
 import hx.press.ContentCache;
 import hx.press.SiteSettingsStore;
 import haxe.Exception;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.DBStatic;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -30,9 +31,8 @@ class SaveCategoryHandler extends AbstractHandler implements ValidationResponder
             return true;
         }
         var rawId = AdminController.input(current, "id", 30);
-        if (rawId != ""
-            && (!~/^[1-9][0-9]*$/.match(rawId)
-                || !Category.query.where("id", Std.parseInt(rawId)).exists())) {
+        var id = PositiveInt.parse(rawId);
+        if (rawId != "" && (id == null || !Category.query.where("id", id).exists())) {
             return true;
         }
         return current.validate(["name" => [Required, String, Min(1), Max(200)]]);
@@ -52,10 +52,10 @@ class SaveCategoryHandler extends AbstractHandler implements ValidationResponder
             return CmsController.forbidden(request);
         }
         var rawId = AdminController.input(request, "id", 30);
-        if (rawId != "" && !~/^[1-9][0-9]*$/.match(rawId)) {
+        var id = PositiveInt.parse(rawId);
+        if (rawId != "" && id == null) {
             return SiteController.notFound(request);
         }
-        var id = Std.parseInt(rawId);
         var category = id == null ? null : Category.query.select(["id", "name"])
             .where("id", id)
             .limit(1)

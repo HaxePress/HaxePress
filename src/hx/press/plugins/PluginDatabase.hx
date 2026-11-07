@@ -6,6 +6,8 @@ import haxe.Exception;
 import haxe.Json;
 import haxe.crypto.Md5;
 import haxe.io.Bytes;
+import hx.press.validation.Slug;
+import hx.press.validation.TextLine;
 import hx.well.database.Connection;
 import hx.well.database.schema.SchemaBuilder;
 import hx.well.database.query.QueryBuilder;
@@ -37,7 +39,7 @@ class PluginDatabase {
     }
 
     static function validateSlug(slug:String):Void {
-        if (slug == null || slug.length > 64 || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(slug)) {
+        if (slug == null || slug.length > 64 || !Slug.valid(slug)) {
             throw new Exception("Plugin database namespaces require a valid package slug.");
         }
     }
@@ -157,8 +159,8 @@ class PluginDatabase {
 
     static function validateKey(key:String, scope:String):Void {
         if (key == null || key == "" || scope == null || Bytes.ofString(key).length > 128
-            || Bytes.ofString(scope).length > 128 || ~/[\x00-\x1f\x7f]/.match(key)
-            || ~/[\x00-\x1f\x7f]/.match(scope)) {
+            || Bytes.ofString(scope).length > 128 || TextLine.hasControl(key)
+            || TextLine.hasControl(scope)) {
             throw new Exception("Plugin value keys and scopes must be bounded text without control characters.");
         }
     }

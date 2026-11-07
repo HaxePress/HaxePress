@@ -4,6 +4,7 @@ import hx.press.themes.ThemeAiAccess;
 import hx.press.themes.ThemeAiAccess.ThemeAiActor;
 import hx.press.themes.ThemeDesignSchema;
 import hx.press.themes.ThemeStudio;
+import hx.press.validation.PositiveInt;
 import hx.press.validation.ValidationResponder;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -17,7 +18,7 @@ class SaveAiThemeDesignHandler extends AbstractHandler implements ValidationResp
         var rules:Map<String, Array<ValidatorRule>> = [
             "name" => [Required, String, Min(2), Max(100)],
             "design" => [Required, String, Max(ThemeDesignSchema.MAX_BYTES)],
-            "version" => [Required, String, Regex("^[1-9][0-9]{0,8}$")]
+            "version" => [Required, String, Custom("cms.positive_int")]
         ];
         return request().validate(rules);
     }
@@ -39,7 +40,8 @@ class SaveAiThemeDesignHandler extends AbstractHandler implements ValidationResp
         }
         try {
             var result = ThemeStudio.save(request.route("id"), name, request.input("design", ""),
-                Std.parseInt(request.input("version", "0")), false, actor.id, '${actor.name} (AI)');
+                PositiveInt.parse(request.input("version", "")) ?? 0, false, actor.id,
+                '${actor.name} (AI)');
             return ResponseBuilder.asJson({
                 version: result.version,
                 publishedVersion: result.published_version,

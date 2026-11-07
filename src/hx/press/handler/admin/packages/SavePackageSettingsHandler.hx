@@ -8,6 +8,7 @@ import hx.press.packages.PackageController;
 import hx.press.packages.PackageData;
 import hx.press.packages.PackageManager;
 import hx.press.packages.PackageManifest;
+import hx.press.validation.Flag;
 import hx.press.validation.ValidationResponder;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -65,7 +66,7 @@ class SavePackageSettingsHandler extends AbstractHandler implements ValidationRe
         var clear:Array<String> = [];
         for (field in manifest.fields) {
             input.set(field.key, AdminController.input(request, field.key, 2100));
-            if (request.input('clear_${field.key}', "0") == "1") {
+            if (Flag.input(request, 'clear_${field.key}')) {
                 clear.push(field.key);
             }
         }

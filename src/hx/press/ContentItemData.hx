@@ -11,6 +11,7 @@ import hx.press.content.ContentTypes;
 import hx.press.content.ContentFields;
 import hx.press.content.ContentTypeDefinition;
 import hx.press.model.ContentItem;
+import hx.press.validation.Flag;
 import hx.well.http.Request;
 
 typedef DraftContentDetails = {
@@ -69,7 +70,7 @@ class ContentItemData {
         form.image_alt = AdminController.input(request, "image_alt", 500);
         form.status = AdminController.input(request, "status", 30);
         form.featured = ContentTypes.supports(type, "featured")
-            && request.input("featured", "0") == "1" ? 1 : 0;
+            && Flag.input(request, "featured") ? 1 : 0;
         form.published_at = AdminController.input(request, "published_at", 50);
         form.seo_title = AdminController.input(request, "seo_title", 200);
         form.seo_description = AdminController.input(request, "seo_description", 600);

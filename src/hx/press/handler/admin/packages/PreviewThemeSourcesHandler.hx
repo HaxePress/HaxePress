@@ -7,6 +7,7 @@ import hx.press.SiteController;
 import hx.press.packages.PackageData;
 import hx.press.themes.ThemeDesignSchema;
 import hx.press.themes.ThemeFeedData;
+import hx.press.validation.Flag;
 import hx.press.validation.ValidationResponder;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -50,7 +51,7 @@ class PreviewThemeSourcesHandler extends AbstractHandler implements ValidationRe
                 throw new Exception("Choose a template or component in this design.");
             }
             var feeds = ThemeFeedData.resolve({design: document}, scope);
-            if (request.input("normalize", "") == "1") {
+            if (Flag.input(request, "normalize")) {
                 return ResponseBuilder.asJson({document: document, feeds: feeds});
             }
             return ResponseBuilder.asJson({feeds: feeds});

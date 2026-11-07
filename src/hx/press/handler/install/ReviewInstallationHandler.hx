@@ -19,16 +19,11 @@ import hx.well.http.ResponseBuilder;
 class ReviewInstallationHandler extends AbstractHandler implements ValidationResponder {
     public override function validate():Bool {
         return request().validate([
-            "site_name" => [Required, String, Min(2), Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")],
-            "admin_name" => [Required, String, Min(2), Max(100), Regex("^[^\\x00-\\x1f\\x7f]+$")],
-            "admin_email" => [Required, String, Email, Max(254), Regex("^[^\\x00-\\x1f\\x7f]+$")],
-            "admin_password" => [
-                Required,
-                String,
-                Min(12),
-                Custom("cms.byte_length", [72]),
-                Regex("^[^\\x00-\\x1f\\x7f]+\\z")
-            ],
+            "site_name" => [Required, String, Min(2), Max(100), Custom("cms.line")],
+            "admin_name" => [Required, String, Min(2), Max(100), Custom("cms.line")],
+            "admin_email" => [Required, String, Email, Max(254), Custom("cms.line")],
+            "admin_password" => [Required, String, Min(12), Custom("cms.byte_length",
+                [72]), Custom("cms.line")],
             "confirm_password" => [Required, String, Min(1)]
         ]);
     }

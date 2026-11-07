@@ -25,5 +25,7 @@ class TestProvider extends AbstractProvider {
         });
         Route.get("/__fixtures/concurrent-matches",
             request -> ResponseBuilder.asJson({failures: ConcurrentMatchProbe.run()}));
+        Route.get("/__fixtures/validators",
+            request -> ResponseBuilder.asJson(ValidatorProbe.run()));
     }
 }

@@ -7,6 +7,7 @@ import hx.press.ContentCache;
 import hx.press.MediaController;
 import hx.press.SiteSettingsStore;
 import hx.press.model.MediaAsset;
+import hx.press.validation.PositiveInt;
 import hx.press.validation.ValidationResponder;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -25,7 +26,7 @@ class SaveMediaHandler extends AbstractHandler implements ValidationResponder {
     }
 
     public function validationFailed(request:Request):AbstractResponse {
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         return MediaController.index(request,
             "Use at most 180 characters for the title and 500 for the image description.", 422,
             '/admin/media?edit=${id}');
@@ -36,7 +37,7 @@ class SaveMediaHandler extends AbstractHandler implements ValidationResponder {
             return CmsController.forbidden(request);
         }
 
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         MediaAsset.query.where("id", id).update([
             "title" => AdminController.input(request, "title", 180),
             "alt" => AdminController.input(request, "alt", 500),

@@ -1,5 +1,6 @@
 package hx.press.handler.admin.navigation;
 
+import hx.press.validation.Flag;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -21,8 +22,8 @@ class SaveNavigationRegionHandler extends AbstractHandler implements ValidationR
         return request().validate([
             "key" => [Required, String, Min(1), Max(40)],
             "name" => [Required, String, Min(1), Max(100)],
-            "max_links" => [Required, String, Regex("^[1-9][0-9]{0,2}$")],
-            "enabled" => [String, Regex("^[01]$")]
+            "max_links" => [Required, String, Custom("cms.positive_int", [999])],
+            "enabled" => [String, Custom("cms.flag")]
         ]);
     }
 
@@ -39,7 +40,7 @@ class SaveNavigationRegionHandler extends AbstractHandler implements ValidationR
         try {
             var maximum = Std.parseInt(AdminController.input(request, "max_links", 3));
             NavigationRegions.save(key, AdminController.input(request, "name", 101), maximum,
-                request.input("enabled", "0") == "1");
+                Flag.input(request, "enabled"));
             return
                 ResponseBuilder.asRedirect('/admin/navigation?location=${StringTools.urlEncode(key)}&notice=saved',
                     303);

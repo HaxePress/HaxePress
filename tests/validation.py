@@ -249,6 +249,7 @@ def verify(owner, public, fixtures):
             post_json(public, "/subscribe", {"email": []})[0] == 422,
             "Reactivated plugin validation did not return",
         )
+        verify_shared_validators(owner, public)
     finally:
         owner.delete_media(image_id)
         owner.request("/admin/logout", "POST", {})
@@ -256,6 +257,75 @@ def verify(owner, public, fixtures):
         "PASS Native validation: all write handlers, plugin forwarding, JSON/page-data responses, no writes, byte limits, permissions and 404/409 precedence",
         flush=True,
     )
+
+
+def verify_shared_validators(owner, public):
+    """The parsers behind cms.positive_int, cms.port, cms.slug, cms.token, cms.line and cms.flag."""
+    status, _, body = public.request("/__fixtures/validators")
+    check(status == 200, f"Validator probe failed: {status}")
+    # The probe echoes its inputs, control characters included, unescaped.
+    answers = json.loads(body, strict=False)
+
+    def table(name, key):
+        return {row["text"]: row[key] for row in answers[name]}
+
+    expected_numbers = {
+        "1": 1,
+        "42": 42,
+        "2147483647": 2147483647,
+        **{
+            text: None
+            for text in [
+                "2147483648",
+                "99999999999",
+                "0",
+                "01",
+                "+1",
+                " 1",
+                "1 ",
+                "1\n",
+                "0x1F",
+                "-1",
+                "",
+                "\u0661",
+            ]
+        },
+    }
+    check(
+        table("positiveInt", "value") == expected_numbers, f"PositiveInt: {answers['positiveInt']}"
+    )
+    check(answers["capped"] == [999, None], f"PositiveInt maximum: {answers['capped']}")
+    expected_ports = {"1": 1, "80": 80, "65535": 65535, "65536": None, "0": None, "080": 80}
+    expected_ports["3306\n"] = None
+    check(table("ports", "value") == expected_ports, f"Port: {answers['ports']}")
+    slugs = table("slugs", "valid")
+    check(
+        [text for text, valid in slugs.items() if valid] == ["my-post", "a", "a1-b2"],
+        f"Slug: {slugs}",
+    )
+    check(answers["prefixed"] == [True, False, False], f"Slug.prefixed: {answers['prefixed']}")
+    tokens = table("tokens", "valid")
+    check(
+        [valid for valid in tokens.values()] == [True, False, False, False, False],
+        f"Token: {tokens}",
+    )
+    check(
+        answers["bearer"] == ["abcdefghijklmnopqrstuvwxyzAB_-09", None],
+        f"Token.after: {answers['bearer']}",
+    )
+    lines = table("lines", "valid")
+    check(
+        [text for text, valid in lines.items() if valid] == ["Ada Lovelace", "", "Çağrı Yıldırım"],
+        f"TextLine: {lines}",
+    )
+    flags = table("flags", "valid")
+    check([text for text, valid in flags.items() if valid] == ["0", "1"], f"Flag: {flags}")
+    check(
+        answers["nonText"] == [False, False, False, False], f"Non-text values: {answers['nonText']}"
+    )
+    # A record ID too large for an Int is a missing page, not a server error.
+    for path in ["/admin/content/99999999999/edit", "/admin/media/99999999999/references"]:
+        check(owner.request(path)[0] == 404, f"An overflowing ID did not answer 404: {path}")
 
 
 def verify_line_terminators(owner, fixtures, owner_id):

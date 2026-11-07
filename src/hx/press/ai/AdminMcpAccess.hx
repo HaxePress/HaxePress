@@ -5,6 +5,7 @@ import haxe.crypto.Sha256;
 import hx.press.access.Roles;
 import hx.press.model.Admin;
 import hx.press.model.AdminMcpLink;
+import hx.press.validation.Token;
 import hx.well.cache.FileSystemSessionCacheStore;
 import hx.well.facades.Cache;
 import hx.well.facades.Environment;
@@ -51,6 +52,9 @@ class AdminMcpError extends Exception {
 
 /** Each endpoint selects one grant. A bearer is valid only on its own endpoint. */
 class AdminMcpAccess {
+    // The Authorization scheme, lower-cased for comparison.
+    static inline final BEARER = "bearer ";
+
     /** The header the preview browser sends its capture pass in. **/
     public static inline var TICKET_HEADER = "X-HaxePress-Admin-Request";
 
@@ -71,7 +75,7 @@ class AdminMcpAccess {
     static final mutex = new MutexPool();
 
     public static function validId(value:Null<String>):Bool {
-        return value != null && ~/^[A-Za-z0-9_-]{32}$/.match(value);
+        return Token.valid(value);
     }
 
     public static function path(id:String):String {
@@ -234,7 +238,9 @@ class AdminMcpAccess {
             throw new AdminMcpError("authorization_required",
                 "Supply the bearer token for this MCP URL.");
         }
-        if (!~/^Bearer hxa_[A-Za-z0-9_-]{32}$/i.match(authorization)) {
+        // The scheme is case-insensitive (RFC 9110); the token is not.
+        var scheme = authorization.substr(0, BEARER.length).toLowerCase();
+        if (scheme != BEARER || Token.after(authorization.substr(BEARER.length), "hxa_") == null) {
             throw invalidToken();
         }
         var link = current(id);

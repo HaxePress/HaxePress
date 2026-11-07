@@ -4,6 +4,7 @@ import hx.press.CmsAccess;
 import hx.press.Pagination;
 import hx.press.model.ThemeAsset;
 import hx.press.model.ThemeDesign;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.Storage;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -49,7 +50,7 @@ class ThemeAssetController {
         var id = request.route("id");
         var asset = ThemeAsset.query.select(["filename", "mime_type"])
             .where("theme_id", id)
-            .where("id", Std.parseInt(request.route("asset")))
+            .where("id", PositiveInt.route(request, "asset"))
             .limit(1)
             .first();
         if (asset == null) {
@@ -89,7 +90,7 @@ class ThemeAssetController {
             return ResponseBuilder.asJson({error: "Theme management access is required."}, 403);
         }
         try {
-            ThemeAssets.remove(request.route("id"), Std.parseInt(request.route("asset")));
+            ThemeAssets.remove(request.route("id"), PositiveInt.route(request, "asset"));
             return ResponseBuilder.asJson({removed: true});
         } catch (error:Dynamic) {
             return ResponseBuilder.asJson({error: Std.string(error)}, 422);

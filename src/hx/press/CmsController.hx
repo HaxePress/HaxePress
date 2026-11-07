@@ -5,6 +5,7 @@ import hx.press.SiteController;
 import hx.press.ContentCache;
 import hx.press.Pagination;
 import hx.press.SiteSettingsStore;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.DBStatic;
 import hx.press.view.View;
 import hx.press.AdminForms;
@@ -106,7 +107,7 @@ class CmsController {
         if (!CmsAccess.can("taxonomy")) {
             return forbidden(request);
         }
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         var tag = Tag.query.select(["id", "name"]).where("id", id).limit(1).first();
         if (tag != null) {
             DBStatic.transaction(() -> {

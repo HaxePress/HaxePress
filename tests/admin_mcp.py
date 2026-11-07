@@ -96,6 +96,14 @@ def verify_role_limits(owner, public):
     category = f"MCP role {secrets.token_hex(3)}"
     connection = issue(login(email, password), "claude")
     try:
+        # The Authorization scheme is case-insensitive; the token after it is not.
+        lowercase = {**credentials(connection), "Authorization": f"bearer {connection['token']}"}
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        status, _, body = post_json(public, endpoint(connection), request, lowercase)
+        check(
+            status == 200 and "result" in json.loads(body),
+            f"A lowercase bearer scheme failed: {status}",
+        )
         names = tool_names(public, connection)
         check(
             {"list_categories", "save_category", "list_content"} <= names

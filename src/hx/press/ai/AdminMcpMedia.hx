@@ -3,6 +3,7 @@ package hx.press.ai;
 import hx.press.CmsAccess;
 import hx.press.media.MediaReferences;
 import hx.press.model.MediaAsset;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.Storage;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -14,7 +15,7 @@ class AdminMcpMedia {
             return ResponseBuilder.asJson({error: "This account cannot browse the media library."},
                 403);
         }
-        return read(Std.parseInt(request.route("id")));
+        return read(PositiveInt.route(request, "id"));
     }
 
     public static function read(id:Int):AbstractResponse {
@@ -43,7 +44,7 @@ class AdminMcpMedia {
                 403);
         }
         var image = MediaAsset.query.select(["id", "filename", "alt"])
-            .where("id", Std.parseInt(request.route("id")))
+            .where("id", PositiveInt.route(request, "id"))
             .where("trashed_epoch", 0)
             .limit(1)
             .first();

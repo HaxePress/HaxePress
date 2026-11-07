@@ -9,6 +9,8 @@ import hx.press.ContentCache;
 import hx.press.SiteController;
 import hx.press.SiteSettingsStore;
 import hx.press.model.Tag;
+import hx.press.validation.PositiveInt;
+import hx.press.validation.Slug;
 import hx.press.validation.ValidationResponder;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -27,7 +29,7 @@ class SaveTagHandler extends AbstractHandler implements ValidationResponder {
         }
         var rawId = AdminController.input(current, "id", 16);
         if (rawId != ""
-            && (!~/^[1-9][0-9]*$/.match(rawId) || !Tag.query.where("id", rawId).exists())) {
+            && (PositiveInt.parse(rawId) == null || !Tag.query.where("id", rawId).exists())) {
             return true;
         }
         return current.validate([
@@ -47,7 +49,7 @@ class SaveTagHandler extends AbstractHandler implements ValidationResponder {
             return CmsController.forbidden(request);
         }
         var rawId = AdminController.input(request, "id", 16);
-        if (rawId != "" && !~/^[1-9][0-9]*$/.match(rawId)) {
+        if (rawId != "" && PositiveInt.parse(rawId) == null) {
             return SiteController.notFound(request);
         }
         var existing = rawId == "" ? null : Tag.query.select(["id"])
@@ -62,7 +64,7 @@ class SaveTagHandler extends AbstractHandler implements ValidationResponder {
         var name = CategoryData.normalize(AdminController.input(request, "name", 80));
         var slug = CategoryData.key(AdminController.input(request, "slug", 120));
         var description = AdminController.input(request, "description", 500);
-        if (name == "" || !~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(slug)) {
+        if (name == "" || !Slug.valid(slug)) {
             return CmsController.tags(request,
                 "Enter a name and a URL slug using lowercase letters, numbers and hyphens.", 422);
         }

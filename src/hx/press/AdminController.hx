@@ -1,6 +1,7 @@
 package hx.press;
 
 import hx.press.ai.AdminMcpAccess;
+import hx.press.validation.PositiveInt;
 import hx.press.view.View;
 import hx.press.media.MediaReferences;
 import hx.press.AdminForms;
@@ -118,10 +119,10 @@ class AdminController {
         var links = Pagination.links("/admin/categories", ["q" => query], page, cursor, total,
             category -> category.id, category -> null);
         var categories = page.items;
-        var editing = request.query("edit", "");
+        var editedId = PositiveInt.parse(request.query("edit", ""));
         var editedCategory = form == null
-            && ~/^[1-9][0-9]*$/.match(editing) ? Category.query.select(["id", "name"])
-                .where("id", Std.parseInt(editing))
+            && editedId != null ? Category.query.select(["id", "name"])
+                .where("id", editedId)
                 .limit(1)
                 .first() : null;
         var categoryForm = form ?? (editedCategory == null ? {id: "", name: ""} : {

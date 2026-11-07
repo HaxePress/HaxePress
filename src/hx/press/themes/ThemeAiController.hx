@@ -12,6 +12,7 @@ import hx.press.content.ContentTypes;
 import hx.press.model.ContentType;
 import hx.press.model.ThemeDesign;
 import hx.press.themes.ThemeAiAccess.ThemeAiActor;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.Storage;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -131,6 +132,6 @@ class ThemeAiController {
             return ResponseBuilder.asJson({error: "This account cannot browse the media library."},
                 403);
         }
-        return AdminMcpMedia.read(Std.parseInt(request.route("media")));
+        return AdminMcpMedia.read(PositiveInt.route(request, "media"));
     }
 }

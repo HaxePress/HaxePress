@@ -1,6 +1,8 @@
 package hx.press.packages;
 
 import haxe.Json;
+import hx.press.validation.Flag;
+import hx.press.validation.Token;
 import hx.press.view.PackageFieldViews;
 import hx.press.view.PackageFieldViews;
 import hx.press.view.View;
@@ -137,13 +139,12 @@ class PackageController {
         }
         var admin = CmsAccess.current();
         var key = AdminController.input(request, "key", 64);
-        var validKey = ~/^[A-Za-z0-9_-]{32}(?![\s\S])/.match(key);
+        var validKey = Token.valid(key);
         try {
             if (!validKey) {
                 throw new Exception("Inspect a package ZIP before installing it.");
             }
-            PackageManager.install(key, kind, admin.id, admin.name,
-                request.input("replace", "0") == "1");
+            PackageManager.install(key, kind, admin.id, admin.name, Flag.input(request, "replace"));
             return ResponseBuilder.asRedirect('${base(kind)}?notice=installed', 303);
         } catch (error:Dynamic) {
             // A failed installation keeps its inspection open, as the page did before.
@@ -363,7 +364,7 @@ class PackageController {
         themeInfo.preview = false;
         themeInfo.previewBase = previewBase;
         var session = request.query("customizeSession", "");
-        if (~/^[A-Za-z0-9_-]{32}(?![\s\S])/.match(session)) {
+        if (Token.valid(session)) {
             themeInfo.customizeSession = session;
         }
         if (themeInfo.customizeSession != null) {

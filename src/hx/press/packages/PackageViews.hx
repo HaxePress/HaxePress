@@ -6,6 +6,8 @@ import hx.press.i18n.I18n.TranslationProps;
 import hx.press.i18n.TranslationCatalogue;
 import hx.press.model.InstalledPackage;
 import hx.press.model.PackageUpload;
+import hx.press.validation.PositiveInt;
+import hx.press.validation.Token;
 import hx.press.view.ViewAssets;
 import hx.press.view.ViewHelpers;
 import hx.well.http.Request;
@@ -73,8 +75,7 @@ class PackageViews {
     public static function inspection(request:Request, kind:String):Null<Dynamic> {
         var key = request.query("inspect", "");
         var admin = CmsAccess.current();
-        var uploadKey = ~/^[A-Za-z0-9_-]{32}$/;
-        if (admin == null || !uploadKey.match(key)) {
+        if (admin == null || !Token.valid(key)) {
             return null;
         }
         var upload = PackageUpload.query.select(["key", "manifest"])
@@ -137,8 +138,7 @@ class PackageViews {
         }
         var input = StringTools.trim(request.query("repository", "")).substr(0, 180);
         var requested = request.query("release_page", "1");
-        var releasePage = ~/^(?:[1-9][0-9]{0,2}|1000)$/;
-        var number = releasePage.match(requested) ? Std.parseInt(requested) : 1;
+        var number = PositiveInt.parse(requested, GitHubReleases.MAX_PAGE) ?? 1;
         var picker:Dynamic = {
             repository: input,
             error: "",

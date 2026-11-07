@@ -1,6 +1,7 @@
 package hx.press.install;
 
 import haxe.Exception;
+import hx.press.validation.TextLine;
 import hx.well.facades.Environment;
 import hx.well.facades.Storage;
 import hx.well.internal.SecureToken;
@@ -8,7 +9,7 @@ import hx.well.internal.SecureToken;
 /** Preserve unrelated settings and use literal, private dotenv values for credentials. */
 class InstallationEnv {
     static function quoted(value:String):String {
-        if (~/[\x00-\x1f\x7f]/.match(value)) {
+        if (TextLine.hasControl(value)) {
             throw new Exception("Configuration values cannot contain control characters.");
         }
         var escaped = StringTools.replace(value, "\\", "\\\\");

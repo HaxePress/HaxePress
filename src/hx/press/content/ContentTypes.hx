@@ -17,6 +17,7 @@ import hx.press.model.ContentType;
 import hx.press.model.ContentTypePath;
 import hx.press.model.EditorDraft;
 import hx.press.model.InstalledPackage;
+import hx.press.validation.Slug;
 import hx.well.database.query.QueryBuilder;
 import hx.well.facades.DBStatic;
 
@@ -150,7 +151,7 @@ class ContentTypes {
     }
 
     public static function byPath(path:String):Null<ContentTypeDefinition> {
-        if (path == null || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(path)) {
+        if (!Slug.valid(path)) {
             return null;
         }
         var row:ContentTypeRecord = ContentCache.remember("structure", "public-path",
@@ -486,7 +487,7 @@ class ContentTypes {
         var icon = text(input, "icon", 40, "file");
         if (name == ""
             || singular == ""
-            || !~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(path)
+            || !Slug.valid(path)
             || reservedPaths.contains(path)
             || !~/^[a-z][a-z0-9-]*(?![\s\S])/.match(icon)) {
             throw new Exception("Enter collection labels and a public path that is not reserved by the CMS.");

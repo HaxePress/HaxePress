@@ -13,6 +13,7 @@ import hx.press.i18n.I18n;
 import hx.press.packages.PackageData;
 import hx.press.packages.ThemeData;
 import hx.press.plugins.PluginRuntime;
+import hx.press.validation.Token;
 import hx.press.view.View;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -95,7 +96,7 @@ class ThemeStudioController {
         info.design = document;
         info.studioScope = template;
         var session = request.query("studioSession", "");
-        if (~/^[A-Za-z0-9_-]{32}$/.match(session)) {
+        if (Token.valid(session)) {
             info.studioSession = session;
         }
         View.share("theme", info);

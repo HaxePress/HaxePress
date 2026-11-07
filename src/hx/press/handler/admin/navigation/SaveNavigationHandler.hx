@@ -14,6 +14,7 @@ import hx.press.media.MediaLocks;
 import hx.press.model.ContentItem;
 import hx.press.model.MenuLink;
 import hx.press.navigation.NavigationRegions;
+import hx.press.validation.Flag;
 import hx.press.validation.ValidationResponder;
 import hx.well.facades.DBStatic;
 import hx.well.handler.AbstractHandler;
@@ -110,7 +111,7 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
             "position" => position,
             "content_id" => contentId,
             "collection_key" => collectionKey,
-            "new_tab" => request.input("new_tab", "0") == "1" ? 1 : 0,
+            "new_tab" => Flag.input(request, "new_tab") ? 1 : 0,
             "updated_at" => SiteSettingsStore.timestamp()
         ];
         MediaLocks.run(() -> {

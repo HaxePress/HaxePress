@@ -19,9 +19,9 @@ class SaveThemeAiPermissionsHandler extends AbstractHandler implements Validatio
             return true;
         }
         var rules:Map<String, Array<ValidatorRule>> = [
-            "read" => [Required, String, Regex("^[01]$")],
-            "edit" => [Required, String, Regex("^[01]$")],
-            "media" => [Required, String, Regex("^[01]$")]
+            "read" => [Required, String, Custom("cms.flag")],
+            "edit" => [Required, String, Custom("cms.flag")],
+            "media" => [Required, String, Custom("cms.flag")]
         ];
         return request().validate(rules);
     }

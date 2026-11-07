@@ -5,6 +5,7 @@ import hx.press.AdminController;
 import hx.press.CmsAccess;
 import hx.press.access.Roles;
 import hx.press.packages.GitHubReleases.GitHubReleaseError;
+import hx.press.validation.PositiveInt;
 import hx.press.view.View;
 import hx.press.view.ViewHelpers;
 import hx.well.database.Connection;
@@ -19,13 +20,13 @@ class GitHubPackageController {
         }
         if (!request.validate([
             "repository" => [Required, String, Max(180)],
-            "page" => [Regex("^(?:[1-9][0-9]{0,2}|1000)$")]
+            "page" => [Custom("cms.positive_int", [GitHubReleases.MAX_PAGE])]
         ])) {
             return json({error: "Enter a public GitHub repository URL."}, 422);
         }
         try {
             var repository = GitHubReleases.repository(request.input("repository"));
-            var page = Std.parseInt(request.query("page", "1"));
+            var page = PositiveInt.parse(request.query("page", "1"), GitHubReleases.MAX_PAGE) ?? 1;
             Connection.free();
             return json(GitHubReleases.list(repository, page));
         } catch (error:GitHubReleaseError) {
@@ -73,7 +74,7 @@ class GitHubPackageController {
         var requested = Std.string(request.input("release_page", "1"));
         var listed = Std.isOfType(repository,
             String) ? StringTools.trim(repository).substr(0, 180) : "";
-        var page = ~/^[1-9][0-9]{0,3}$/.match(requested) ? Std.parseInt(requested) : 1;
+        var page = PositiveInt.parse(requested, GitHubReleases.MAX_PAGE) ?? 1;
         var url = PackageViews.releasesUrl(listed, page);
         var redirect = AdminController.validationRedirect(request, "github", message, url);
         return redirect ?? json({error: message}, status);

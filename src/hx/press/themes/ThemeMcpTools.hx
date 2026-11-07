@@ -18,6 +18,7 @@ import hx.press.mcp.McpServer;
 import hx.press.mcp.McpSkills;
 import hx.press.mcp.McpTools;
 import hx.press.themes.ThemeAiPermissions.AiPermissions;
+import hx.press.validation.Slug;
 #if jvm
 import hx.press.ServerSettings;
 import hx.press.themes.ThemePreviewBrowser;
@@ -113,7 +114,7 @@ class ThemeMcpTools {
 
     function send(theme:String, path:String, method:String, headers:Map<String, String>,
             body:Null<Bytes>, limit:Int):InternalReply {
-        if (!~/^theme-[a-z0-9]+(?:-[a-z0-9]+)*$/.match(theme) || theme.length > 80) {
+        if (!Slug.prefixed(theme, "theme-") || theme.length > 80) {
             throw new Exception("Choose a valid theme ID.");
         }
         return InternalRequest.send(method, '${endpoint(theme)}${path}', headers, body,

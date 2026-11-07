@@ -11,6 +11,7 @@ import hx.press.ManagementController;
 import hx.press.SiteSettingsStore;
 import hx.press.access.Roles;
 import hx.press.model.Admin;
+import hx.press.validation.Flag;
 import hx.press.validation.ValidationResponder;
 import hx.well.facades.DBStatic;
 import hx.well.facades.Hash;
@@ -54,7 +55,7 @@ class SaveMemberHandler extends AbstractHandler implements ValidationResponder {
             var name = AdminController.input(request, "name", 120);
             var email = CategoryData.key(AdminController.input(request, "email", 254));
             var role = AdminController.input(request, "role", 33);
-            var active = request.input("active", "0") == "1" ? 1 : 0;
+            var active = Flag.input(request, "active") ? 1 : 0;
             var password:String = request.input("password", "");
 
             var validMember = name != "" && (id <= 0 || existing != null);

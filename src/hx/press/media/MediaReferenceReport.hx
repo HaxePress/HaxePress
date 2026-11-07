@@ -20,6 +20,7 @@ import hx.press.model.Setting;
 import hx.press.model.Tag;
 import hx.press.packages.PackageManifest;
 import hx.press.packages.PackageSettings;
+import hx.press.validation.TextLine;
 import hx.well.database.query.QueryBuilder;
 
 typedef MediaReference = {
@@ -255,7 +256,7 @@ class MediaReferenceReport {
         var sourceIndex = sources.indexOf(start);
         if (sourceIndex < 0
             || after.length > 200
-            || ~/[\x00-\x1f\x7f]/.match(after)
+            || TextLine.hasControl(after)
             || (after != "" && numeric(start) && !~/^[0-9]{1,10}$/.match(after))) {
             throw new Exception("Choose a valid media reference cursor.");
         }

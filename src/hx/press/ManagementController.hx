@@ -5,6 +5,7 @@ import hx.press.AdminController;
 import hx.press.SiteController;
 import hx.press.ContentCache;
 import hx.press.Pagination;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.DBStatic;
 import hx.press.view.View;
 import hx.press.AdminForms;
@@ -214,7 +215,7 @@ class ManagementController {
         }
         return ContentLocks.run("navigation", () -> {
             var link = MenuLink.query.select(["id", "label", "location"])
-                .where("id", Std.parseInt(request.route("id")))
+                .where("id", PositiveInt.route(request, "id"))
                 .limit(1)
                 .first();
             if (link == null) {

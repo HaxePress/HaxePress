@@ -3,6 +3,7 @@ package hx.press.packages;
 import haxe.Exception;
 import haxe.Json;
 import hx.press.CmsVersion;
+import hx.press.validation.Slug;
 
 typedef SettingOption = {
     var value:String;
@@ -150,8 +151,7 @@ class PackageManifest {
         }
         var slug = text(input, "slug", 64, true);
         var version = text(input, "version", 40, true);
-        if (!["plugin", "theme"].contains(kind)
-            || !~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(slug)) {
+        if (!["plugin", "theme"].contains(kind) || !Slug.valid(slug)) {
             throw new Exception("Choose a valid plugin or theme package.");
         }
         if (!~/^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(?![\s\S])/.match(version)) {
@@ -244,7 +244,7 @@ class PackageManifest {
             hooks.push("i18n.catalogues");
         }
         if (kind == "theme") {
-            if (!~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(layout)) {
+            if (!Slug.valid(layout)) {
                 throw new Exception("A theme requires a valid layout name.");
             }
             if (stylesheet == "" && layout != "simple" && layout != "builder") {

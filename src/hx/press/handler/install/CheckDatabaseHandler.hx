@@ -28,8 +28,8 @@ class CheckDatabaseHandler extends AbstractHandler implements ValidationResponde
             rules.set("host", [Required, String, Max(253), Regex("^[A-Za-z0-9_.:-]+\\z")]);
             rules.set("port", [Required, String, Custom("cms.port")]);
             rules.set("database", [Required, String, Regex("^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}\\z")]);
-            rules.set("username", [Required, String, Max(100), Regex("^[^\\x00-\\x1f\\x7f]+\\z")]);
-            rules.set("password", [String, Max(1000), Regex("^[^\\x00-\\x1f\\x7f]*\\z")]);
+            rules.set("username", [Required, String, Min(1), Max(100), Custom("cms.line")]);
+            rules.set("password", [String, Max(1000), Custom("cms.line")]);
         }
         return request().validate(rules);
     }

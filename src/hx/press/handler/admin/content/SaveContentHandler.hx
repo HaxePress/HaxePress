@@ -18,6 +18,9 @@ import hx.press.TagData;
 import hx.press.WorkingCopies;
 import haxe.Exception;
 import hx.press.plugins.PluginRuntime;
+import hx.press.validation.Flag;
+import hx.press.validation.PositiveInt;
+import hx.press.validation.Slug;
 import hx.well.facades.DBStatic;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -50,15 +53,16 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
             return true;
         }
         var rawId = AdminController.input(current, "id", 16);
-        if (rawId != "" && !~/^[1-9][0-9]*$/.match(rawId)) {
+        var parsedId = PositiveInt.parse(rawId);
+        if (rawId != "" && parsedId == null) {
             return true;
         }
-        var id = Std.parseInt(rawId) ?? 0;
+        var id = parsedId ?? 0;
         var expected = AdminController.input(current, "version", 16);
-        if (expected != "" && !~/^[1-9][0-9]*$/.match(expected)) {
+        var version = PositiveInt.parse(expected);
+        if (expected != "" && version == null) {
             return true;
         }
-        var version = Std.parseInt(expected);
         if (id > 0
             && ((expected != "" && version == null) || !ContentController.owned(id, kind,
                 version))) {
@@ -114,10 +118,11 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
             return CmsController.forbidden(request);
         }
         var rawId = AdminController.input(request, "id", 16);
-        if (rawId != "" && !~/^[1-9][0-9]*$/.match(rawId)) {
+        var parsedId = PositiveInt.parse(rawId);
+        if (rawId != "" && parsedId == null) {
             return SiteController.notFound(request);
         }
-        var id = Std.parseInt(rawId) ?? 0;
+        var id = parsedId ?? 0;
         var admin = CmsAccess.current();
         var lockKey = id == 0 ? 'new-${admin.id}-${kind}' : 'document-${id}';
         return ContentLocks.run('type-${kind}',
@@ -146,7 +151,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         var error = "";
         if (form.title.length < type.minimumTitleLength) {
             error = "Check the content fields and their length limits before saving.";
-        } else if (!~/^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/.match(form.slug)) {
+        } else if (!Slug.valid(form.slug)) {
             error = "Use lowercase letters, numbers, and single hyphens for the URL slug.";
         } else if (ContentTypes.supports(type, "excerpt")
             && form.excerpt.length < type.minimumExcerptLength) {
@@ -191,9 +196,10 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
             }
         }
         var expected = AdminController.input(request, "version", 16);
+        var expectedVersion = PositiveInt.parse(expected);
         if (expected != ""
-            && (!~/^[1-9][0-9]*$/.match(expected)
-                || (existing != null && Std.parseInt(expected) != existing.version))) {
+            && (expectedVersion == null
+                || (existing != null && expectedVersion != existing.version))) {
             return ContentController.editor(request, form.toObject(),
                 "This content changed in another editor. Reload the saved version before saving.",
                 409);
@@ -309,7 +315,7 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         savedData.fields = customFields;
         PluginRuntime.saved(savedData);
         var base = ContentController.base(kind);
-        var stay = request.input("stay", "0") == "1";
+        var stay = Flag.input(request, "stay");
         var location = stay ? '${base}/${saved.id}/edit?notice=saved' : '${base}?notice=saved';
         return ResponseBuilder.asRedirect(location, 303);
     }

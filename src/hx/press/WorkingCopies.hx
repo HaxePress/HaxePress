@@ -4,6 +4,7 @@ import hx.press.content.ContentLocks;
 import hx.press.SiteSettingsStore;
 import haxe.Exception;
 import haxe.Json;
+import hx.press.validation.Token;
 import hx.well.internal.SecureToken;
 import hx.press.model.EditorDraft;
 import hx.press.content.ContentTypes;
@@ -12,9 +13,8 @@ import hx.press.media.MediaLocks;
 class WorkingCopies {
     static function validNewKey(value:String, userId:Int, kind:String):Bool {
         var prefix = 'draft-${userId}-${kind}-';
-        return ContentTypes.validKey(kind)
-            && StringTools.startsWith(value, prefix)
-            && ~/^[A-Za-z0-9_-]{32}(?![\s\S])/.match(value.substr(prefix.length));
+        return ContentTypes.validKey(kind) && StringTools.startsWith(value, prefix)
+            && Token.valid(value.substr(prefix.length));
     }
 
     public static function key(userId:Int, kind:String, documentId:Int):String {

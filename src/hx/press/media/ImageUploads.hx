@@ -86,7 +86,7 @@ class ImageUploads {
     public static function verify(request:Request, userId:Int, credential:String,
             themeId:String):AbstractResponse {
         if (!request.validate([
-            "id" => [Required, String, Regex("^[A-Za-z0-9_-]{32}$")],
+            "id" => [Required, String, Custom("cms.token")],
             "sha256" => [Required, String, Regex("^[a-f0-9]{64}$")],
             "width" => [Required, Int, Min(1), Max(10000)],
             "height" => [Required, Int, Min(1), Max(10000)]

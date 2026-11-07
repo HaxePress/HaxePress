@@ -5,6 +5,7 @@ import hx.press.ContentCache;
 import hx.press.Activity;
 import hx.press.CmsAccess;
 import hx.press.CmsController;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.DBStatic;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.Request;
@@ -35,7 +36,7 @@ class DeleteContentHandler extends AbstractHandler {
         if (!ContentTypes.exists(kind)) {
             return SiteController.notFound(request);
         }
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         return ContentLocks.run('document-${id}', () -> {
             var item = ContentItem.query.select(["id", "author_id", "status", "title"])
                 .where("id", id)

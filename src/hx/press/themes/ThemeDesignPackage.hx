@@ -29,6 +29,7 @@ import hx.press.packages.PackageManifest.ManifestData;
 import hx.press.packages.PackageStorage;
 import hx.press.packages.SafePackageArchive;
 import hx.press.storage.TemporaryDownloadInput;
+import hx.press.validation.TextLine;
 import hx.well.facades.DBStatic;
 import hx.well.facades.Storage;
 import hx.well.http.InputResponse;
@@ -318,7 +319,7 @@ class ThemeDesignPackage {
             || manifest.mediaFile == ""
             || manifest.mediaPrefix == ""
             || !StringTools.endsWith(manifest.mediaPrefix, "/")
-            || ~/[\x00-\x1f\x7f]/.match(manifest.mediaPrefix)) {
+            || TextLine.hasControl(manifest.mediaPrefix)) {
             throw new Exception("A visual theme package requires its design, media list and source media prefix.");
         }
         if (manifest.module != "" || manifest.legacyRenderer || manifest.stylesheet != ""

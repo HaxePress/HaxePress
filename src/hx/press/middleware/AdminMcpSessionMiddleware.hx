@@ -4,6 +4,7 @@ import hx.press.ai.AdminMcpAccess;
 import hx.press.ai.AdminMcpAccess.AdminMcpError;
 import hx.press.ai.AdminMcpAccess.AdminMcpGrant;
 import hx.press.ai.AdminMcpPolicy;
+import hx.press.validation.Token;
 import hx.well.http.Request;
 import hx.well.http.RequestStatic;
 import hx.well.http.Response;
@@ -42,7 +43,7 @@ class AdminMcpSessionMiddleware extends SessionMiddleware {
                     403);
         }
         var csrf = request.header("X-CSRF-TOKEN", "");
-        if (!~/^[A-Za-z0-9_-]{32}$/.match(csrf)) {
+        if (!Token.valid(csrf)) {
             return ResponseBuilder.asJson({error: "The MCP request could not be authenticated."},
                 403);
         }

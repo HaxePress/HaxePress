@@ -4,6 +4,7 @@ import hx.press.content.ContentLocks;
 import hx.press.ContentCache;
 import hx.press.SiteSettingsStore;
 import hx.press.plugins.PluginRuntime;
+import hx.press.validation.PositiveInt;
 import hx.well.facades.DBStatic;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -17,7 +18,7 @@ class ContentWorkflow {
         if (!ContentTypes.exists(kind)) {
             return SiteController.notFound(request);
         }
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         return ContentLocks.run('document-${id}', () -> {
             var document = ContentItem.query.select([
                 "id",

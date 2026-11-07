@@ -2,6 +2,7 @@ package hx.press;
 
 import hx.press.AdminController;
 import hx.press.Pagination;
+import hx.press.validation.PositiveInt;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
@@ -100,10 +101,10 @@ class MediaController {
     /** The image whose details are edited (`?edit=ID`), from this page or by its ID. **/
     static function selectedImage(request:Request, images:Array<Dynamic>):Dynamic {
         var editing = request.query("edit", "");
-        if (!~/^[1-9][0-9]{0,9}$/.match(editing)) {
+        var id = PositiveInt.parse(editing);
+        if (id == null) {
             return null;
         }
-        var id = Std.parseInt(editing);
         for (image in images) {
             if (image.id == id) {
                 return image;
@@ -131,7 +132,7 @@ class MediaController {
             return ResponseBuilder.asJson({error: "Your account cannot access the media library."},
                 403);
         }
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         var image = MediaAsset.query.select(["id", "filename"]).where("id", id).first();
         if (image == null) {
             return ResponseBuilder.asJson({error: "Image not found."}, 404);
@@ -178,7 +179,7 @@ class MediaController {
             return CmsController.forbidden(request);
         }
         var image = MediaAsset.query.select(["filename"])
-            .where("id", Std.parseInt(request.route("id")))
+            .where("id", PositiveInt.route(request, "id"))
             .where("trashed_epoch", ">", 0)
             .limit(1)
             .first();
@@ -196,7 +197,7 @@ class MediaController {
             return CmsController.forbidden(request);
         }
         try {
-            action(Std.parseInt(request.route("id")));
+            action(PositiveInt.route(request, "id"));
             return ResponseBuilder.asRedirect(done, 303);
         } catch (error:Dynamic) {
             return index(request, Std.string(error), 422, returnUrl);

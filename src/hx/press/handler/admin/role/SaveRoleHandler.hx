@@ -1,5 +1,6 @@
 package hx.press.handler.admin.role;
 
+import hx.press.validation.Flag;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
@@ -30,7 +31,7 @@ class SaveRoleHandler extends AbstractHandler implements ValidationResponder {
             "key" => [Required, String, Min(1), Max(32)],
             "name" => [Required, String, Min(1), Max(100)],
             "description" => [String, Max(500)],
-            "enabled" => [String, Regex("^[01]$")]
+            "enabled" => [String, Custom("cms.flag")]
         ];
         if (!RoleController.capabilityFields(current)) {
             rules.set("capabilities", [Required, String, Max(16000)]);
@@ -83,7 +84,7 @@ class SaveRoleHandler extends AbstractHandler implements ValidationResponder {
             }
             Roles.save(key, AdminController.input(request, "name", 101),
                 AdminController.input(request, "description", 501),
-                request.input("enabled", "0") == "1", grants, creating);
+                Flag.input(request, "enabled"), grants, creating);
             Activity.record("saved", "role", 0, key);
             return ResponseBuilder.asRedirect('/admin/roles/${key}/edit?notice=saved', 303);
         } catch (error:Dynamic) {

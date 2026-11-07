@@ -5,6 +5,7 @@ import hx.press.CmsController;
 import hx.press.themes.ThemeStudio;
 import hx.press.themes.ThemeDesignSchema;
 import hx.press.packages.PackageManager;
+import hx.press.validation.PositiveInt;
 import hx.press.validation.ValidationResponder;
 import hx.press.view.View;
 import hx.well.handler.AbstractHandler;
@@ -33,7 +34,7 @@ class SaveThemeDesignHandler extends AbstractHandler implements ValidationRespon
             rules.set("design", [String, Max(ThemeDesignSchema.MAX_BYTES)]);
         } else {
             rules.set("design", [Required, String, Max(ThemeDesignSchema.MAX_BYTES)]);
-            rules.set("version", [Required, String, Regex("^[1-9][0-9]{0,8}$")]);
+            rules.set("version", [Required, String, Custom("cms.positive_int")]);
             rules.set("action", [Required, String, Regex("^(save|publish|launch)\\z")]);
         }
         return request().validate(rules);
@@ -67,7 +68,7 @@ class SaveThemeDesignHandler extends AbstractHandler implements ValidationRespon
                     admin.id, admin.name, request.input("design", ""));
                 return ResponseBuilder.asRedirect('/admin/themes/${id}/design', 303);
             }
-            var version = Std.parseInt(request.input("version", "0")) ?? 0;
+            var version = PositiveInt.parse(request.input("version", "")) ?? 0;
             var action = request.input("action", "save");
             var publish = action != "save";
             var saved = ThemeStudio.save(request.route("id"), name, request.input("design", ""),

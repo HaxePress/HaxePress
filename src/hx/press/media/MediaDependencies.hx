@@ -7,6 +7,8 @@ import haxe.io.Bytes;
 import hx.press.model.MediaAsset;
 import hx.press.model.MediaDependency;
 import hx.press.model.MediaDependencySource;
+import hx.press.validation.Slug;
+import hx.press.validation.TextLine;
 import hx.well.database.Connection;
 import hx.well.model.BaseModel;
 import hx.well.facades.Storage;
@@ -22,7 +24,7 @@ class MediaDependencies {
     }
 
     static function namespace(kind:String, slug:String):MediaDependencies {
-        if (slug == null || slug.length > 64 || !~/^[a-z0-9]+(-[a-z0-9]+)*$/.match(slug)) {
+        if (slug == null || slug.length > 64 || !Slug.valid(slug)) {
             throw new Exception("Use a valid package slug for media dependencies.");
         }
         return new MediaDependencies('${kind}-${slug}');
@@ -40,7 +42,7 @@ class MediaDependencies {
         if (reference == null
             || reference == ""
             || Bytes.ofString(reference).length > 200
-            || ~/[\x00-\x1f\x7f]/.match(reference)
+            || TextLine.hasControl(reference)
             || label == null
             || label.length > 240) {
             throw new Exception("Use a bounded, stable reference key and label for media dependencies.");

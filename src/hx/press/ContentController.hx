@@ -6,6 +6,7 @@ import hx.press.CategoryData;
 import hx.press.Pagination;
 import hx.press.ContentItemData;
 import hx.press.data.ContentItemRecord;
+import hx.press.validation.PositiveInt;
 import hx.press.view.ContentAdminRows;
 import hx.press.view.View;
 import haxe.Json;
@@ -107,7 +108,7 @@ class ContentController {
         if (type == null) {
             return SiteController.notFound(request);
         }
-        var item = ContentData.detail(Std.parseInt(request.route("id")), kind);
+        var item = ContentData.detail(PositiveInt.route(request, "id"), kind);
         return item == null ? SiteController.notFound(request) : renderEditor(request, item, type);
     }
 
@@ -289,7 +290,7 @@ class ContentController {
     }
 
     public static function discardWorking(request:Request, kind:String):AbstractResponse {
-        var id = Std.parseInt(request.route("id")) ?? 0;
+        var id = PositiveInt.route(request, "id");
         if (!CmsAccess.canCollection(kind) || (id > 0 && !owned(id, kind))) {
             return CmsController.forbidden(request);
         }
@@ -304,7 +305,7 @@ class ContentController {
         if (!ContentTypes.supports(ContentTypes.find(kind), "revisions")) {
             return SiteController.notFound(request);
         }
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         if (!owned(id, kind)) {
             return ResponseBuilder.asJson({error: "This history is not available."}, 403);
         }
@@ -326,11 +327,11 @@ class ContentController {
 
     public static function revision(request:Request, kind:String,
             restore:Bool = false):AbstractResponse {
-        var id = Std.parseInt(request.route("id"));
+        var id = PositiveInt.route(request, "id");
         if (!owned(id, kind)) {
             return CmsController.forbidden(request);
         }
-        var revisionId = Std.parseInt(request.route("revision"));
+        var revisionId = PositiveInt.route(request, "revision");
         var revision = ContentRevision.query.select(["id", "snapshot"])
             .where("id", revisionId)
             .where("document_id", id)

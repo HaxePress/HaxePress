@@ -5,6 +5,7 @@ import hx.press.ai.AdminMcpAccess;
 import hx.press.ai.AdminMcpAccess.AdminMcpError;
 import hx.press.ai.AdminMcpAccess.AdminMcpGrant;
 import hx.press.themes.ThemeAiPermissions.AiPermissions;
+import hx.press.validation.Token;
 import hx.well.facades.Cache;
 import hx.well.facades.Config;
 import hx.press.CmsAccess;
@@ -69,7 +70,7 @@ class ThemeAiAccess {
         if (authorization == null) {
             return null;
         }
-        if (~/^Bearer hxb_[A-Za-z0-9_-]{32}$/.match(authorization)) {
+        if (Token.after(authorization, "Bearer hxb_") != null) {
             var ticket:Null<{themeId:String, sessionKey:String}> = Cache.store()
                 .get('${BROWSER_PREFIX}${Sha256.encode(authorization.substr(7))}');
             if (ticket == null || ticket.themeId != themeId) {

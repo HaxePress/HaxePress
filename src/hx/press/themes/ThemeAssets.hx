@@ -12,6 +12,7 @@ import hx.press.data.QueryPage;
 import hx.press.media.MediaReferences;
 import hx.press.model.ThemeAsset;
 import hx.press.model.ThemeDesign;
+import hx.press.validation.Slug;
 import hx.well.facades.Storage;
 import hx.well.internal.SecureToken;
 import hx.well.thread.MutexPool;
@@ -43,7 +44,7 @@ class ThemeAssets {
     static final columns = ["id", "filename", "title", "alt", "mime_type", "width", "height", "size"];
 
     public static function validThemeId(id:String):Bool {
-        return id != null && id.length <= 80 && ~/^theme-[a-z0-9]+(?:-[a-z0-9]+)*$/.match(id);
+        return id != null && id.length <= 80 && Slug.prefixed(id, "theme-");
     }
 
     public static function prefix(id:String):String {

@@ -4,6 +4,7 @@ import hx.press.AdminController;
 import hx.press.content.ContentTypes;
 import hx.press.model.ContentItem;
 import hx.press.model.ContentType;
+import hx.press.validation.PositiveInt;
 import hx.press.view.View;
 import hx.well.http.Request;
 
@@ -25,11 +26,6 @@ typedef AdminCollectionChoice = {
     selected entries of option pickers.
 **/
 class AdminForms {
-    /** A record identifier. A new `EReg` each call: it keeps its last match, so threads must not share one. **/
-    static function identifierPattern():EReg {
-        return ~/^[1-9][0-9]{0,8}$/;
-    }
-
     /** Whether the previous submission failed with the field `marker` among its values. **/
     public static function resubmitted(request:Request, marker:String):Bool {
         return View.old(request, marker) != null;
@@ -43,7 +39,7 @@ class AdminForms {
     /** The record identifier in the `edit` query value, or 0. **/
     public static function editId(request:Request):Int {
         var editing = request.query("edit", "");
-        return identifierPattern().match(editing) ? Std.parseInt(editing) : 0;
+        return PositiveInt.parse(editing) ?? 0;
     }
 
     /**
@@ -61,7 +57,7 @@ class AdminForms {
             }
         }
         var submittedId = AdminController.input(request, "id", 16);
-        if (identifierPattern().match(submittedId)) {
+        if (PositiveInt.parse(submittedId) != null) {
             query.push('edit=${submittedId}');
         }
         var search = query.join("&");
