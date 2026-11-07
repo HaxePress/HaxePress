@@ -77,6 +77,100 @@ def refused(result):
     )
 
 
+def routes_of(public, connection):
+    data = succeeded(call(public, connection, "get_admin_routes", {}))["data"]
+    return {route["path"] for route in data["routes"]}
+
+
+def verify_role_limits(owner, public):
+    """An MCP link acts with its account's current role and nothing more."""
+    password = secrets.token_urlsafe(18)
+    email = f"mcp-role-{secrets.token_hex(4)}@example.test"
+    member = {"name": "MCP Editor", "email": email, "role": "editor", "password": password}
+    check(
+        owner.request("/admin/team/save", "POST", {**member, "active": "1"})[0] == 303,
+        "Could not create an editor account",
+    )
+    with FixtureStore.from_environment() as store:
+        member_id = store.rows("admins", ["id"], [("email", "=", email)], limit=1)[0]["id"]
+    category = f"MCP role {secrets.token_hex(3)}"
+    connection = issue(login(email, password), "claude")
+    try:
+        names = tool_names(public, connection)
+        check(
+            {"list_categories", "save_category", "list_content"} <= names
+            and not {"save_site_settings", "list_themes", "create_theme_draft"} & names,
+            f"An editor's MCP tools do not match the role: {sorted(names)}",
+        )
+        routes = routes_of(public, connection)
+        forbidden = (
+            "/admin/settings",
+            "/admin/team",
+            "/admin/roles",
+            "/admin/themes",
+            "/admin/plugins",
+            "/admin/backups",
+        )
+        check(
+            "/admin/categories/save" in routes
+            and not any(path.startswith(forbidden) for path in routes),
+            "MCP route discovery listed areas outside the editor role",
+        )
+        succeeded(call(public, connection, "save_category", {"name": category}))
+        settings = call(
+            public,
+            connection,
+            "write_admin",
+            {"path": "/admin/settings", "method": "POST", "data": {"site_name": "Taken over"}},
+        )
+        check(refused(settings), "An editor changed site settings through MCP")
+
+        # A lower role applies to the same link on its next request.
+        demoted = {**member, "id": str(member_id), "role": "writer", "password": ""}
+        check(
+            owner.request("/admin/team/save", "POST", {**demoted, "active": "1"})[0] == 303,
+            "Could not change the account's role",
+        )
+        attempt = call(
+            public,
+            connection,
+            "write_admin",
+            {
+                "path": "/admin/categories/save",
+                "method": "POST",
+                "data": {"name": f"{category} after"},
+            },
+        )
+        check(refused(attempt), "A demoted account kept its category rights over MCP")
+        routes = routes_of(public, connection)
+        check(
+            "/admin/categories/save" not in routes and "/admin/content/save" in routes,
+            "MCP route discovery did not follow the new role",
+        )
+        with FixtureStore.from_environment() as store:
+            check(
+                store.count("categories", [("name", "=", f"{category} after")]) == 0,
+                "A refused MCP request created a category",
+            )
+
+        # A deactivated account's link stops working.
+        check(
+            owner.request("/admin/team/save", "POST", {**demoted, "active": "0"})[0] == 303,
+            "Could not deactivate the account",
+        )
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        status = post_json(public, endpoint(connection), request, credentials(connection))[0]
+        check(status == 401, f"A deactivated account's MCP link returned {status}")
+    finally:
+        with FixtureStore.from_environment() as store:
+            store.delete("categories", [("name", "=", category)])
+            store.delete("admins", [("id", "=", member_id)])
+    print(
+        "PASS Admin MCP: links act with their account's current role; demotion and deactivation apply at once",
+        flush=True,
+    )
+
+
 def verify_expiry(owner, public):
     """A link's expiry is chosen when it is generated and can change until a client connects."""
     hour = issue(owner, "cursor", hours=1)
@@ -264,6 +358,7 @@ def run():
         "An MCP URL that was never generated did not return 404",
     )
     verify_expiry(owner, public)
+    verify_role_limits(owner, public)
     check(
         public.request(endpoint(first), extra_headers=credentials(second))[0] == 401,
         "A bearer crossed its session audience",

@@ -90,7 +90,7 @@ class AdminMcpController {
         var capabilities = Roles.grants(admin.role);
         return json({
             navigation: ViewRoots.adminNavigation(request),
-            routes: AdminMcpPolicy.routes(),
+            routes: AdminMcpPolicy.routes(capabilities),
             capabilities: capabilities,
             tools: AdminMcpPolicy.pluginTools(capabilities)
         });

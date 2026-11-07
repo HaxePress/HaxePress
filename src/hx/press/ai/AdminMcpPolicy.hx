@@ -1,6 +1,7 @@
 package hx.press.ai;
 
 import haxe.Json;
+import hx.press.CmsAccess;
 import hx.press.access.Roles;
 import hx.press.model.Admin;
 import hx.press.themes.ThemeAiPermissions;
@@ -16,6 +17,93 @@ class AdminMcpPolicy {
         cannot empty it.
     **/
     public static inline var PEOPLE_ONLY = "cms.mcp.peopleOnly";
+
+    /** In `areas`, access to at least one content collection. **/
+    static inline var CONTENT = "@content";
+
+    /**
+        The capabilities each area of the panel needs, most specific first;
+        any one of them is enough. MCP requests outside the connected
+        account's areas are refused before the route runs, and route
+        discovery leaves them out, so an MCP client never does more than the
+        person who connected it, with that person's current role. Pages
+        outside these areas, such as the dashboard, the account and plugin
+        pages, check access themselves.
+    **/
+    static final areas:Array<{prefix:String, capabilities:Array<String>}> = [
+        {prefix: "/admin/tags/options", capabilities: ["taxonomy", CONTENT]},
+        {prefix: "/admin/navigation/content", capabilities: ["navigation", "settings", CONTENT]},
+        {prefix: "/admin/content-types/options", capabilities: ["settings", "navigation", CONTENT]},
+        {prefix: "/admin/content-options", capabilities: ["settings", "navigation", CONTENT]},
+        {prefix: "/admin/collections", capabilities: [CONTENT, "settings"]},
+        {prefix: "/admin/content", capabilities: [CONTENT]},
+        {prefix: "/admin/pages", capabilities: [CONTENT]},
+        {prefix: "/admin/content-types", capabilities: ["settings"]},
+        {prefix: "/admin/ai/media", capabilities: ["media"]},
+        {prefix: "/admin/media", capabilities: ["media"]},
+        {prefix: "/admin/categories", capabilities: ["taxonomy"]},
+        {prefix: "/admin/tags", capabilities: ["taxonomy"]},
+        {prefix: "/admin/navigation", capabilities: ["navigation"]},
+        {prefix: "/admin/activity", capabilities: ["activity"]},
+        {prefix: "/admin/settings", capabilities: ["settings"]},
+        {prefix: "/admin/team", capabilities: ["team"]},
+        {prefix: "/admin/roles", capabilities: ["roles"]},
+        {prefix: "/admin/themes", capabilities: ["extensions"]},
+        {prefix: "/admin/plugins", capabilities: ["extensions"]},
+        {prefix: "/admin/extension-assets", capabilities: ["extensions"]}
+    ];
+
+    /** Whether an account with `grants` may use the admin area of `path`. **/
+    public static function grantsArea(path:String, grants:Array<String>):Bool {
+        if (grants.contains("*")) {
+            return true;
+        }
+        path = normalize(path);
+        for (area in areas) {
+            if (!within(path, area.prefix)) {
+                continue;
+            }
+            for (capability in area.capabilities) {
+                var granted = capability == CONTENT ? CmsAccess.hasAccessibleCollections(grants) : grants.contains(capability);
+                if (granted) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return pluginAreaAllows(path, grants);
+    }
+
+    /**
+        A plugin page that declares a capability for its menu entry needs it
+        for every route below it as well. Plugin routes without such a page
+        check access in their own handlers.
+    **/
+    static function pluginAreaAllows(path:String, grants:Array<String>):Bool {
+        for (route in Route.routes) {
+            var plugin:String = route.getAttribute("hx.press.plugin", "");
+            var entry:Dynamic = route.getAttribute("cms.navigation", null);
+            if (plugin == "" || entry == null || !within(path, normalize(route.value))) {
+                continue;
+            }
+            var required:Array<String> = entry.anyCapabilities is Array ? entry.anyCapabilities.copy() : [];
+            if (entry.capability is String && entry.capability != "") {
+                required.push(entry.capability);
+            }
+            if (required.length == 0) {
+                continue;
+            }
+            var granted = false;
+            for (capability in required) {
+                granted = granted
+                    || (capability == "content" ? CmsAccess.hasAccessibleCollections(grants) : grants.contains(capability));
+            }
+            if (!granted) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     public static function allows(path:String, method:String):Bool {
         path = normalize(path);
@@ -60,7 +148,7 @@ class AdminMcpPolicy {
             return false;
         }
         var route:RouteElement = request.getAttribute(AttributeType.RouteElement);
-        if (peopleOnly(route)) {
+        if (peopleOnly(route) || !grantsArea(path, Roles.grants(admin.role))) {
             return false;
         }
         var metadata = pluginMetadata(route);
@@ -147,11 +235,12 @@ class AdminMcpPolicy {
         };
     }
 
-    public static function routes():Array<{path:String, methods:Array<String>}> {
+    /** The routes an MCP client of an account with `grants` may call. **/
+    public static function routes(grants:Array<String>):Array<{path:String, methods:Array<String>}> {
         var result:Array<{path:String, methods:Array<String>}> = [];
         for (route in Route.routes) {
             if (route.getWsHandler() != null || route.value == "/admin/ai/routes"
-                || peopleOnly(route)) {
+                || peopleOnly(route) || !grantsArea(route.value, grants)) {
                 continue;
             }
             var methods:Array<String> = [];
