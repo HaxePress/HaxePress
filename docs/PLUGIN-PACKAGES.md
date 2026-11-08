@@ -4,7 +4,7 @@ Owners upload ZIP packages from **Plugins** or **Themes**, review their manifest
 
 On JVM sites, **Plugins → Install from GitHub** accepts a public GitHub repository or its Releases URL. Choose a release ZIP, inspect its manifest, then use the normal install or replace action. The picker lists uploaded release assets up to 64 MB. Publish a HaxePress package ZIP containing the native modules for the exact CMS version. GitHub's automatically generated source archives are outside the picker. [GitHub release assets](https://docs.github.com/en/rest/releases/assets)
 
-The example repository publishes a ready-to-install package for HaxePress 2.16.0. Its source and build instructions are also in `examples/plugin-repository`. [Example plugin releases](https://github.com/hxwell/haxepress-plugin-example/releases)
+The example repository publishes a ready-to-install package for HaxePress 2.16.0. Its source and build instructions are also in `examples/plugin-repository`. [Example plugin releases](https://github.com/HaxePress/plugin-example/releases)
 
 Set `TEST_GITHUB_RELEASE=true` when running `python3 tests/run.py --only cms_packages` to include a live installation from the example release.
 

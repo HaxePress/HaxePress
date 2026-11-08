@@ -1,6 +1,6 @@
 # Writing HaxePress views
 
-HaxePress renders every page with [Wellout](https://github.com/hxwell/wellout) templates (`*.well.html`) on the server: the public site, themes, plugin pages and the administration. Inertia and the Node.js renderer are gone. The language reference is `wellout/docs/SPEC.md`. This guide covers the HaxePress conventions, and how pages were ported from the former React ones.
+HaxePress renders every page with [Wellout](https://github.com/HaxePress/WellOut) templates (`*.well.html`) on the server: the public site, themes, plugin pages and the administration. Inertia and the Node.js renderer are gone. The language reference is `wellout/docs/SPEC.md`. This guide covers the HaxePress conventions, and how pages were ported from the former React ones.
 
 ## Goals
 

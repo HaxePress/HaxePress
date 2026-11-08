@@ -22,7 +22,7 @@ from fixture_store import FixtureStore
 
 ROOT = Path(__file__).resolve().parents[1]
 HEADERS = {"X-Well-Data": "true", "Accept": "application/json"}
-GITHUB_EXAMPLE = "https://github.com/hxwell/haxepress-plugin-example"
+GITHUB_EXAMPLE = "https://github.com/HaxePress/plugin-example"
 
 
 def props(client, path):

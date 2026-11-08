@@ -2,7 +2,7 @@
 
 > **Development preview — not production-ready.** HaxePress is under active development and is intended for local testing and evaluation. APIs, package compatibility and database schemas may change; it has not completed production security, reliability or performance validation.
 
-HaxePress is a general-purpose content management system built with **HxWell**, its native ORM/Schema/Cache/Storage APIs, **hxwell-crossbyte** and **[Wellout](https://github.com/hxwell/wellout)**. The JVM renders the public site, themes, plugin pages and administration from type-checked Wellout templates (`*.well.html`). Browsers receive HTML; small client islands built with TypeScript and Vite add interactive parts such as the content editor and the theme builder. English is the default language; Turkish is included.
+HaxePress is a general-purpose content management system built with **HxWell**, its native ORM/Schema/Cache/Storage APIs, **hxwell-crossbyte** and **[Wellout](https://github.com/HaxePress/WellOut)**. The JVM renders the public site, themes, plugin pages and administration from type-checked Wellout templates (`*.well.html`). Browsers receive HTML; small client islands built with TypeScript and Vite add interactive parts such as the content editor and the theme builder. English is the default language; Turkish is included.
 
 The current release is **2.16.0**, with **plugin/theme API 4**. The application runs on **JVM** or **PHP** with **SQLite or MySQL**. Native extension packages include JVM JAR, C++ CPPIA and PHP modules in one version-specific ZIP.
 

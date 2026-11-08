@@ -28,7 +28,7 @@
   "hxcpp": "4.3.2",
   "wellout": {
     "version": "0.1.0",
-    "repository": "https://github.com/hxwell/wellout",
+    "repository": "https://github.com/HaxePress/WellOut",
     "commit": "a274a232822bd8b6e64ad0c552af32933d3efcd6"
   }
 }
