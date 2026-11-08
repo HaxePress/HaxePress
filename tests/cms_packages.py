@@ -474,22 +474,27 @@ def verify(fixtures):
         "version": "2.16.0",
         "description": "A frontend extension test.",
         "author": "CMS tests",
-        "assets": {"module": "main.mjs", "stylesheet": "style.css"},
+        "assets": {"module": "main.mjs", "stylesheet": "style.css", "messages": ["Banner"]},
         "fields": [
             {"key": "message", "label": "Message", "kind": "text", "defaultValue": "Hello"},
             {"key": "api_key", "label": "Private API key", "kind": "secret", "required": True},
         ],
+        "translations": {"en": "lang/en.json"},
     }
-    frontend["server"] = manifest["server"]
+    # A plugin of frontend assets only, without server modules.
     frontend_files = {
-        **{
-            path: content
-            for path, content in package_files.items()
-            if path in ("server.jar", "server.cppia") or path.startswith("php/")
-        },
         "public/main.mjs": "export function activate() { return () => {}; }",
         "public/style.css": ".cms-test-banner { color: green; }",
+        "lang/en.json": json.dumps({"Banner": "Site banner", "Private API key": "Private API key"}),
     }
+    server_hook = zip_bytes({**frontend, "hooks": ["site.shared"]}, frontend_files)
+    status, _, body = admin.request(
+        "/admin/plugins/upload", "POST", raw=server_hook, content_type="application/zip"
+    )
+    check(
+        status != 201 and "without a server module" in body,
+        "a plugin without a server module subscribed to a server hook",
+    )
     frontend_zip = zip_bytes(frontend, frontend_files)
     verify_line_breaks(admin, frontend, frontend_files)
     install(admin, "plugins", frontend_zip)
@@ -526,6 +531,23 @@ def verify(fixtures):
     check(
         "api_key" not in asset["settings"] and secret not in json.dumps(assets),
         "secret leaked to public extension settings",
+    )
+    modules = props(public, "/")["extensions"]["modules"]
+    module = next(item for item in modules if item["id"] == frontend_id)
+    check(
+        module["module"] == asset["module"]
+        and module["settings"] == asset["settings"]
+        and secret not in json.dumps(modules),
+        "the frontend module was not offered with its public settings",
+    )
+    check(
+        module["messages"] == {"Banner": "Site banner"},
+        "the frontend module received other messages than it declares",
+    )
+    _, _, home = public.request("/")
+    check(
+        'data-name="site-extensions"' in home and asset["module"] in home,
+        "public pages do not activate plugin frontend modules",
     )
     status, headers, _ = public.request(asset["module"])
     check(

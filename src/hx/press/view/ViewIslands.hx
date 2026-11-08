@@ -107,7 +107,12 @@ class ViewIslands {
             new IslandSignature("theme-thumbnail", TRecord([new FieldInfo("source", TString)]),
                 ["Preview unavailable"]),
             // Sends a datetime-local field of its form as epoch milliseconds in the browser's zone.
-            new IslandSignature("local-datetime", TRecord([]))
+            new IslandSignature("local-datetime", TRecord([])),
+            // Activates the frontend modules of active plugins on public pages.
+            new IslandSignature("site-extensions", TRecord([
+                new FieldInfo("modules", TList(TView("ExtensionModuleView"))),
+                new FieldInfo("locale", TString)
+            ]))
         ];
     }
 }

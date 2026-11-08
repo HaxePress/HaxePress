@@ -1,6 +1,7 @@
 package hx.press;
 
 import hx.press.view.View;
+import hx.press.view.ViewRoots;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.http.ResponseBuilder;
@@ -33,12 +34,10 @@ class SiteController {
                 footer: theme == null ? [] : PluginRuntime.navigation("footer", []),
                 admin: []
             },
-            "extensions" => {
-                assets: theme == null ? [] : PluginRuntime.assets(),
-                blocks: theme == null ? [] : PluginRuntime.blocks("site.shared", {
+            "extensions" => ViewRoots.extensionValues(theme == null ? [] : PluginRuntime.assets(),
+                theme == null ? [] : PluginRuntime.blocks("site.shared", {
                     path: path
-                })
-            }
+                }))
         ];
     }
 

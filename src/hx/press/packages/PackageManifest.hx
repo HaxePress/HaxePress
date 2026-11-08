@@ -53,6 +53,12 @@ typedef ManifestData = {
     **/
     var locks:Array<String>;
 
+    /**
+        The catalogue keys the frontend module translates with `t`. Pages send
+        the module only these messages of the package's catalogue.
+    **/
+    var messages:Array<String>;
+
     var stylesheet:String;
     var serverJar:String;
     var serverCppia:String;
@@ -93,6 +99,9 @@ class PackageManifest {
         "i18n.catalogues",
         "installation"
     ];
+
+    /** The hooks the host serves itself, the only ones a plugin without a server module uses. **/
+    public static final hostEvents = ["site.assets", "i18n.catalogues"];
 
     /** The host locks a plugin can hold while it runs, in the order they are acquired. **/
     public static final lockNames = ["packages", "media"];
@@ -207,6 +216,10 @@ class PackageManifest {
             throw new Exception("Only plugins can hold host locks.");
         }
         var stylesheet = text(assets, "stylesheet", 240);
+        var messages = messageKeys(assets == null ? null : assets.messages);
+        if (messages.length > 0 && module == "") {
+            throw new Exception("Only a package with a frontend module can declare its messages.");
+        }
         if (module != "" && (!safePath(module) || !~/\.(mjs|js)$/.match(module))) {
             throw new Exception("The frontend module must reference a JavaScript file in public/.");
         }
@@ -243,6 +256,16 @@ class PackageManifest {
             && serverCppia == ""
             && serverPhp == "") {
             throw new Exception("A plugin requires a server module or frontend assets.");
+        }
+        var frontendOnly = kind == "plugin"
+            && serverJar == ""
+            && serverCppia == ""
+            && serverPhp == "";
+        if (uploaded && frontendOnly) {
+            var serverHooks = hooks.filter(event -> !hostEvents.contains(event));
+            if (serverHooks.length > 0 || locks.length > 0) {
+                throw new Exception("A plugin without a server module can only use the site.assets and i18n.catalogues hooks and holds no host locks.");
+            }
         }
         var layout = text(input, "layout", 30);
         var designFile = text(input.design, "file", 240);
@@ -285,6 +308,7 @@ class PackageManifest {
             fields: fields(input.fields),
             module: module,
             legacyRenderer: legacyRenderer,
+            messages: messages,
             views: views,
             locks: locks,
             stylesheet: stylesheet,
@@ -301,6 +325,30 @@ class PackageManifest {
             navigation: navigationDefinitions(input.navigation)
         };
         return manifest;
+    }
+
+    /** The catalogue keys a frontend module declares in `assets.messages`. **/
+    static function messageKeys(input:Dynamic):Array<String> {
+        if (input == null) {
+            return [];
+        }
+        if (!Std.isOfType(input, Array)) {
+            throw new Exception("Declare the frontend module's messages as a list of catalogue keys.");
+        }
+        var requested:Array<Dynamic> = input;
+        if (requested.length > 200) {
+            throw new Exception("A frontend module can declare at most 200 messages.");
+        }
+        var keys:Array<String> = [];
+        for (key in requested) {
+            if (!Std.isOfType(key, String) || key == "" || (key : String).length > 500) {
+                throw new Exception("The frontend module's messages must be catalogue keys.");
+            }
+            if (!keys.contains(key)) {
+                keys.push(key);
+            }
+        }
+        return keys;
     }
 
     static function lockList(input:Dynamic):Array<String> {
@@ -480,7 +528,8 @@ class PackageManifest {
             var message = 'This plugin targets CMS ${target}; this server runs CMS ${CmsVersion.version}.';
             throw new Exception('${message} An exact version match is required.');
         }
-        if (manifest.serverJar == "" || manifest.serverCppia == "") {
+        // A plugin made only of frontend assets and translations runs no server code.
+        if (serverModule && (manifest.serverJar == "" || manifest.serverCppia == "")) {
             throw new Exception("Every plugin ZIP must contain both a JAR and a CPPIA server module.");
         }
     }

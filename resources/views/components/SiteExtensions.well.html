@@ -3,3 +3,10 @@
     ><link :if="asset.stylesheet" rel="stylesheet" href="{{ asset.stylesheet }}"
   /></template>
 </well:head>
+<template :if="size(extensions.modules) > 0"
+  ><Island
+    name="site-extensions"
+    :props="{ modules: extensions.modules, locale: i18n.locale }"
+    load="eager"
+  ></Island
+></template>

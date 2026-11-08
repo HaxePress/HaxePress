@@ -16,7 +16,16 @@
   },
   "assets": {
     "module": "newsletter.js",
-    "stylesheet": "newsletter.css"
+    "stylesheet": "newsletter.css",
+    "messages": [
+      "Newsletter",
+      "Email address",
+      "Your email address",
+      "Subscribe",
+      "Subscribing…",
+      "Could not subscribe.",
+      "Please try again in a moment."
+    ]
   },
   "hooks": ["ui.navigation", "dashboard.widgets"],
   "fields": [

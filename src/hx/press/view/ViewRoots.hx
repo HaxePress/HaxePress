@@ -12,7 +12,10 @@ import hx.press.media.MediaReferences;
 import hx.press.packages.ThemeData;
 import hx.press.plugins.PluginHealth;
 import hx.press.plugins.PluginRuntime;
+import hx.press.plugins.PluginRuntime.PluginAsset;
+import hx.press.plugins.PluginRuntime.PluginBlock;
 import hx.press.themes.ThemeFeedData;
+import hx.press.view.types.RootViews.ExtensionModuleView;
 import hx.well.facades.Environment;
 import hx.well.http.Request;
 
@@ -179,13 +182,58 @@ class ViewRoots {
     static function extensions(host:ViewHost):Dynamic {
         var theme:Dynamic = host.root("theme");
         var request = host.request;
-        return {
-            assets: theme == null ? [] : PluginRuntime.assets(),
-            blocks: theme == null ? [] : PluginRuntime.blocks("site.shared", {
+        return extensionValues(theme == null ? [] : PluginRuntime.assets(),
+            theme == null ? [] : PluginRuntime.blocks("site.shared", {
                 path: request == null ? "/" : request.path,
                 content: ContentViews.content(request)
-            })
+            }));
+    }
+
+    /**
+        The `extensions` root from the active plugins' assets and `site.shared`
+        blocks, for pages and for previews that share it themselves.
+    **/
+    public static function extensionValues(assets:Array<PluginAsset>,
+            blocks:Array<PluginBlock>):Dynamic {
+        return {
+            assets: assets,
+            modules: modules(assets),
+            blocks: blocks
         };
+    }
+
+    /**
+        The plugins' frontend modules, each with the messages it declares from
+        its package's catalogue in the page's locale.
+    **/
+    static function modules(assets:Array<PluginAsset>):Array<ExtensionModuleView> {
+        var result:Array<ExtensionModuleView> = [];
+        var locale:Null<String> = null;
+        for (asset in assets) {
+            if (asset.module == "") {
+                continue;
+            }
+            var messages:Map<String, Dynamic> = new Map();
+            if (asset.messages.length > 0) {
+                if (locale == null) {
+                    locale = I18n.locale();
+                }
+                var catalogue = I18n.namespaceMessages(asset.id, locale);
+                for (key in asset.messages) {
+                    var message:Dynamic = catalogue == null ? null : catalogue.get(key);
+                    if (message != null) {
+                        messages.set(key, message);
+                    }
+                }
+            }
+            result.push({
+                id: asset.id,
+                module: asset.module,
+                settings: asset.settings,
+                messages: messages
+            });
+        }
+        return result;
     }
 
     /** The administration menu groups the signed-in member may open, with plugin links. **/

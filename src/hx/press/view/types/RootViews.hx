@@ -87,6 +87,18 @@ typedef ExtensionAssetView = {
     var settings:Map<String, String>;
 }
 
+/**
+    The frontend module of an active plugin, which public pages activate
+    with its public settings and the messages of its catalogue.
+**/
+@:well.view
+typedef ExtensionModuleView = {
+    var id:String;
+    var module:Url;
+    var settings:Map<String, String>;
+    var messages:Map<String, Dynamic>;
+}
+
 @:well.view
 typedef ExtensionBlockView = {
     var id:String;
@@ -97,6 +109,7 @@ typedef ExtensionBlockView = {
 @:well.view
 typedef ExtensionsView = {
     var assets:Array<ExtensionAssetView>;
+    var modules:Array<ExtensionModuleView>;
     var blocks:Array<ExtensionBlockView>;
 }
 

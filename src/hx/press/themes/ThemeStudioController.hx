@@ -15,6 +15,7 @@ import hx.press.packages.ThemeData;
 import hx.press.plugins.PluginRuntime;
 import hx.press.validation.Token;
 import hx.press.view.View;
+import hx.press.view.ViewRoots;
 import hx.well.http.AbstractResponse;
 import hx.well.http.Request;
 import hx.well.internal.SecureToken;
@@ -113,10 +114,10 @@ class ThemeStudioController {
             case "About": "/about";
             default: type == null ? "/" : type.publicBase;
         };
-        View.share("extensions", {
-            assets: PluginRuntime.assets(),
-            blocks: PluginRuntime.blocks("site.shared", {path: path})
-        });
+        View.share("extensions",
+            ViewRoots.extensionValues(PluginRuntime.assets(), PluginRuntime.blocks("site.shared", {
+                path: path
+            })));
         View.share("pluginNavigation", {
             header: PluginRuntime.navigation("header", []),
             footer: PluginRuntime.navigation("footer", []),

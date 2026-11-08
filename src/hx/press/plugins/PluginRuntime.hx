@@ -35,6 +35,9 @@ typedef PluginAsset = {
     var module:String;
     var stylesheet:String;
     var settings:Map<String, String>;
+
+    /** The catalogue keys the module translates (`assets.messages`). **/
+    var messages:Array<String>;
 }
 
 typedef PluginBlock = {
@@ -391,7 +394,8 @@ class PluginRuntime {
                 id: record.id,
                 module: PackageStorage.assetUrl(record, manifest.module),
                 stylesheet: PackageStorage.assetUrl(record, manifest.stylesheet),
-                settings: PackageSettings.values(manifest, record.settings, false)
+                settings: PackageSettings.values(manifest, record.settings, false),
+                messages: manifest.messages
             });
         }
         return result;

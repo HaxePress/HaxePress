@@ -17,7 +17,8 @@
   "hooks": ["site.shared", "site.assets", "dashboard.widgets", "content.render", "content.saving"],
   "assets": {
     "module": "reading.js",
-    "stylesheet": "reading.css"
+    "stylesheet": "reading.css",
+    "messages": ["Reading progress"]
   },
   "fields": [
     {
