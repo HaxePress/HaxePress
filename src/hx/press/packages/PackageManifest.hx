@@ -88,6 +88,7 @@ class PackageManifest {
         "content.render",
         "content.saving",
         "content.saved",
+        "content.viewed",
         "dashboard.widgets",
         "ui.navigation",
         "i18n.catalogues",

@@ -156,6 +156,7 @@ def run(app, url):
         "content text is escaped",
     )
 
+    viewed_at = visit_content_views(app, admin)
     check_forks(admin, public)
     check_cloudflare(admin)
 
@@ -170,6 +171,7 @@ def run(app, url):
     )
     check(scheduled.returncode == 0, "the schedule command runs")
     check_mcp(admin, url)
+    check_content_views(app, admin, viewed_at)
 
 
 def check_forks(admin, public):
@@ -233,6 +235,85 @@ def check_cloudflare(admin):
     check(admin.request(f"{plugin}/enable", "POST", {})[0] == 303, "Cloudflare enables")
     check(sign_in(forwarded) == 429, "the middleware returns with the plugin")
     tunnel(False)
+
+
+BROWSER = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/140.0 Safari/537.36"
+}
+VIEWED = "/content/welcome-to-haxepress"
+
+
+def visit_content_views(app, admin):
+    """Views of a content page; the plugins receive them once their minute has ended."""
+    from e2e import Client
+
+    cloudflare = "/admin/plugins/plugin-cloudflare/settings"
+    plugin = "/admin/plugins/plugin-view-count"
+    plugins = admin.request("/admin/plugins")[2]
+    check(f"{plugin}/disable" in plugins, "View Count is enabled by default")
+    settings = {"show_count": "false", "position": "content.after", "count_countries": "true"}
+    check(admin.request(f"{plugin}/settings", "POST", settings)[0] == 303, "Countries on")
+
+    def visit(headers, method="GET"):
+        status = Client().request(VIEWED, method, extra_headers={**BROWSER, **headers})[0]
+        check(status == 200, f"{method} {VIEWED} with {headers} renders")
+
+    check(admin.request(cloudflare, "POST", {"tunnel": "true"})[0] == 303, "Tunnel on")
+    visit({"CF-IPCountry": "TR"})
+    visit({"CF-IPCountry": "TR"})
+    visit({"CF-IPCountry": "TR"}, "HEAD")
+    visit({"User-Agent": "Mozilla/5.0 (compatible; bingbot/2.0)"})
+    check(admin.request(cloudflare, "POST", {"tunnel": "false"})[0] == 303, "Tunnel off")
+    visit({"CF-IPCountry": "DE"})
+    check(admin.request(VIEWED, extra_headers=BROWSER)[0] == 200, "a member views the page")
+    lines = [
+        line
+        for log in (app / "storage/content-views").glob("*.log")
+        for line in log.read_text().splitlines()
+    ]
+    check(
+        sorted(line.rsplit("\t", 1)[1] for line in lines) == ["TR", "TR", "UNKNOWN"],
+        f"three views wait in the minute's file instead of the database: {lines}",
+    )
+    return time.monotonic()
+
+
+def check_content_views(app, admin, visited):
+    """The minute's views reach View Count, by country too, through `content.viewed`."""
+    counts = {}
+    countries = {}
+    expected = {"TR": 2, "UNKNOWN": 1}
+    # PHP runs due jobs after a response; the views' minute must end first.
+    while time.monotonic() - visited < 200:
+        status, _, body = admin.request("/admin/view-counts/data")
+        if status != 200:
+            break
+        counts = {item["url"]: item for item in json.loads(body)["items"]}
+        if VIEWED in counts:
+            content = counts[VIEWED]["contentId"]
+            status, _, body = admin.request(f"/admin/view-counts/countries/data?content={content}")
+            if status != 200:
+                break
+            countries = {item["country"]: item["views"] for item in json.loads(body)["items"]}
+            if counts[VIEWED]["views"] == 3 and countries == expected:
+                break
+        time.sleep(3)
+    check(
+        VIEWED in counts and counts[VIEWED]["views"] == 3,
+        f"View Count counted the visitors' views once their minute ended: {counts}",
+    )
+    check(
+        countries == expected,
+        f"the country counts used CF-IPCountry only from the trusted connection: {countries}",
+    )
+    check(
+        not list((app / "storage/content-views").glob("*.log"))
+        and not list((app / "storage/content-views").glob("*.claimed")),
+        "the handed over minute files are removed",
+    )
+    for page in ["/admin/view-counts", "/admin/view-counts/countries"]:
+        check(admin.request(page)[0] == 200, f"{page} renders")
 
 
 MODERN = "2026-07-28"

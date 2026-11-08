@@ -32,6 +32,11 @@ class BuiltInPlugins {
             identity: "e36ea9f4-dfb0-4c29-ad55-113f3abe5aca",
             entrypoint: "extensions.cloudflare.CloudflarePlugin"
         },
+        {
+            slug: "view-count",
+            identity: "d47e7c67-745e-4783-8c9c-1d95c3931ab0",
+            entrypoint: "extensions.viewcount.ViewCountPlugin"
+        },
         #if jvm
         {
             slug: "site-backup",

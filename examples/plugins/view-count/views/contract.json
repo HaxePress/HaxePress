@@ -1,0 +1,12 @@
+{
+  "views": {
+    "CountryViewRowView": {
+      "title": "String",
+      "url": "String",
+      "country": "String",
+      "views": "Int",
+      "contentAddress": "Url",
+      "countryAddress": "Url"
+    }
+  }
+}

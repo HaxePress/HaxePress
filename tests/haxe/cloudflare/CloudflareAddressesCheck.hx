@@ -1,6 +1,7 @@
 import extensions.cloudflare.CloudflareAddresses;
+import extensions.cloudflare.CloudflareCountry;
 
-/** Checks the Cloudflare plugin's address parsing and ranges; run with `--interp`. **/
+/** Checks the Cloudflare plugin's address parsing, ranges and countries; run with `--interp`. **/
 class CloudflareAddressesCheck {
     static var failures:Array<String> = [];
 
@@ -88,14 +89,34 @@ class CloudflareAddressesCheck {
             check(actual == item.expected,
                 'fromCloudflare("${item.peer}", ${item.tunnel}) returned ${actual}');
         }
+        var countries:Array<{text:Null<String>, expected:Null<String>}> = [
+            {text: "TR", expected: "TR"},
+            {text: "de", expected: "DE"},
+            {text: " US ", expected: "US"},
+            {text: "XX", expected: null},
+            {text: "xx", expected: null},
+            {text: "T1", expected: null},
+            {text: "", expected: null},
+            {text: "T", expected: null},
+            {text: "TUR", expected: null},
+            {text: "1A", expected: null},
+            {text: "Ü1", expected: null},
+            {text: "TR\nDE", expected: null},
+            {text: null, expected: null}
+        ];
+        for (item in countries) {
+            var actual = CloudflareCountry.normalize(item.text);
+            check(actual == item.expected,
+                'CloudflareCountry.normalize("${item.text}") returned ${actual}');
+        }
         if (failures.length > 0) {
             for (failure in failures) {
                 Sys.println('FAIL ${failure}');
             }
             Sys.exit(1);
         }
-        var total = parsed.length + peers.length;
-        Sys.println('PASS ${total} Cloudflare address checks');
+        var total = parsed.length + peers.length + countries.length;
+        Sys.println('PASS ${total} Cloudflare address and country checks');
     }
 
     static function check(condition:Bool, label:String):Void {

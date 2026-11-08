@@ -7,6 +7,7 @@ import hx.well.http.ResponseBuilder;
 import hx.press.TagData.TagRecord;
 import hx.press.content.ContentTypes;
 import hx.press.content.ContentFields;
+import hx.press.content.ContentViews;
 import hx.press.content.ContentFields.ContentFieldFilter;
 import hx.press.content.ContentTypeDefinition;
 import hx.press.data.ContentItemRecord;
@@ -176,6 +177,9 @@ class SiteController {
     public static function renderDocument(request:Request, item:ContentItemRecord,
             type:ContentTypeDefinition, home:Bool = false,
             ?draft:DraftContentDetails):AbstractResponse {
+        if (draft == null) {
+            ContentViews.shown(request, item.id, type.key);
+        }
         var relatedRecords = type.hasArchive ? ContentQueries.related(item.id, type.key) : [];
         var content = ContentItemData.detail(item, true, type, draft);
         content.content = PluginRuntime.render(content);

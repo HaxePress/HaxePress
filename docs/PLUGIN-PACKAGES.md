@@ -46,7 +46,7 @@ Place `cms-package.json` at the archive root or inside one enclosing folder. Fro
 
 Generate one lowercase UUID for the plugin project and declare it in `pluginId`. Keep it across releases. Installation rejects a UUID owned by another package and updates must retain the installed UUID. An existing package that predates this field adopts the UUID from its first updated ZIP. Themes use their usual theme IDs.
 
-The default RSS, Newsletter and JVM Backups plugins are installed from the packages shipped with HaxePress. Startup upgrades them from the current shipped artifacts while preserving compatible settings and activation. Their lifecycle controls are **Activate** and **Deactivate**.
+The default RSS, Newsletter, Cloudflare, View Count and JVM Backups plugins are installed from the packages shipped with HaxePress. Startup upgrades them from the current shipped artifacts while preserving compatible settings and activation. Their lifecycle controls are **Activate** and **Deactivate**.
 
 Packages are capped at 64 MB compressed, 128 MB expanded, 16 MB per file and 256 archive entries. The HTTP upload configuration can impose a lower limit on local uploads. Inspection validates paths, duplicates/case aliases, declared assets, translation files and native artifact structure. Extraction streams bounded entries through Storage. Server modules and browser/SSR code are trusted owner-supplied code with the application's permissions.
 
@@ -154,7 +154,46 @@ public function onDestroy():Void {
 }
 ```
 
-`ExampleMiddleware` extends `hx.well.middleware.AbstractMiddleware`. Plugin middleware runs after the application's global middleware and before route middleware, in the order plugins added it; HxWell creates an instance for each request and disposes it afterwards, so keep shared state in immutable or static values. The runtime records the middleware a plugin adds while it is created: a failed creation removes it, and stopping a plugin removes whatever `onDestroy` left. A request keeps the list it started with, so a removal applies to the requests that start after it. The bundled Cloudflare plugin (`examples/plugins/cloudflare`) uses this to set `request.ip` from `CF-Connecting-IP` on connections from Cloudflare.
+`ExampleMiddleware` extends `hx.well.middleware.AbstractMiddleware`. Plugin middleware runs after the application's global middleware and before route middleware, in the order plugins added it; HxWell creates an instance for each request and disposes it afterwards, after the response has been sent, so keep shared state in immutable or static values. The runtime records the middleware a plugin adds while it is created: a failed creation removes it, and stopping a plugin removes whatever `onDestroy` left. A request keeps the list it started with, so a removal applies to the requests that start after it. The bundled Cloudflare plugin (`examples/plugins/cloudflare`) uses this to set `request.ip` from `CF-Connecting-IP` and the `cms.visitor.country` attribute from `CF-IPCountry` on connections from Cloudflare.
+
+### Content views
+
+A plugin that counts visits subscribes to `content.viewed` and adds the counts it receives. The application decides what a view is, keeps the counts and hands them over once a minute, so a page view writes nothing to the database:
+
+```haxe
+public function dispatch(event:String, context:String):String {
+    if (event == "content.viewed") {
+        var input:Dynamic = Json.parse(context);
+        var views:Array<Dynamic> = input.data.views;
+        for (view in views) {
+            var id:Int = view.content.id;
+            var count:Int = view.count;
+            PageViews.query.upsertIncrement(["content_id" => id, "views" => count], ["content_id"],
+                ["views"]);
+        }
+    }
+    return "{}";
+}
+```
+
+Each entry of `views` is `{content: {id, type}, country, count}`: the views of one published content item from one country since the last call, at most 500 entries per call. `country` is two uppercase letters, or `UNKNOWN` when no trusted country is known. The hook runs in one transaction of the default connection, so a plugin's writes for the batch commit together; a failure rolls them back and is logged, and the plugin stays active. Content deleted since its views were counted can appear, so a table with a foreign key to `content_items` checks that the IDs still exist. `Model.query.upsertIncrement(data, uniqueBy, increment)` inserts `data`, or adds the supplied values of the `increment` columns to the row with the same `uniqueBy` values, in one statement.
+
+A view is a GET of a public page that shows a published content item and answers 200. HEAD requests, previews and other administration pages, browsers of signed-in members, clients that do not send a browser's `User-Agent`, crawlers, link previews and speculative loads (`Sec-Purpose`, `Purpose`, `X-Purpose`, `X-Moz`) are left out. The JVM keeps the counts in memory and hands them over at a graceful shutdown too. PHP serves each request in a new process, so a view appends one line to the file of its minute in `storage/content-views`, and a minute is handed over after it has ended; run `schedule:run` from cron so the counts arrive when the site is quiet. Pages served from a cache in front of the site, such as a Cloudflare rule that caches HTML, are not seen.
+
+`hx.press.content.ContentViews` holds the same rules for plugins with their own middleware or hooks:
+
+| Name                                      | Use                                                                                                                                                  |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ContentViews.CONTENT`                    | Request attribute `cms.content`: `{id, type}` of the published content item the page shows; set while it renders, also for previews.                 |
+| `ContentViews.content(request)`           | That value, or null.                                                                                                                                 |
+| `ContentViews.counted(request, response)` | The content ID when the finished response is a visitor's view, or 0.                                                                                 |
+| `ContentViews.COUNTRY`                    | Request attribute `cms.visitor.country`: two uppercase letters, set only by a plugin that trusts the connection's proxy.                             |
+| `ContentViews.country(request)`           | That country, or `UNKNOWN`.                                                                                                                          |
+| `ContentViews.MEMBER_COOKIE`              | `cms_member`, which the administration sets for the whole site while a member is signed in. It grants nothing; public pages have no session to read. |
+
+The `site.shared` hook receives the same `content` on pages that show a published item, so a plugin can add a block about it. The bundled Cloudflare plugin sets `cms.visitor.country` from `CF-IPCountry` on the connections it trusts, ignoring `XX`, Tor's `T1` and malformed values; a plugin for another trusted proxy can set it the same way. Read it after `next(request)` returns, or from `content.viewed`, so the order of plugin middleware does not matter.
+
+The bundled View Count plugin (`examples/plugins/view-count`) keeps one row per content item. Its page under **View counts** lists the most viewed content, `/admin/view-counts/data` answers the same as JSON (`content`, `cursor`, `limit` up to 100) and as the MCP tool `plugin_view_count_views`, the dashboard shows the total, and its settings can show the count before or after the content of public pages. Its **Count views by country** setting, off by default, keeps one row per content item and country as well, listed under **Views by country** (`/admin/view-counts/countries`) with filters by content and country, `/admin/view-counts/countries/data` (`content`, `country`, `cursor`, `limit`) and the MCP tool `plugin_view_count_country_views`. Countries come only from the Cloudflare plugin: without it, or on a connection it does not trust, a view counts as `UNKNOWN`, and the page says when the setting is off or the Cloudflare plugin is inactive. Its pages need the `view_counts` capability.
 
 ### Plugin pages
 
@@ -230,10 +269,11 @@ Handlers without this interface retain HxWell's standard 422 response. Permissio
 
 | Event               | Data                                                                                     | Result                                             |
 | ------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `site.shared`       | `{ path }`                                                                               | Markdown `blocks` with `slot` / `content`          |
+| `site.shared`       | `{ path, content }`, with `content` as `{ id, type }` on published content pages         | Markdown `blocks` with `slot` / `content`          |
 | `content.render`    | `{ document, content }`                                                                  | Transformed `content`; stored content is unchanged |
 | `content.saving`    | `{ document }`                                                                           | An `error` to reject a manual save                 |
 | `content.saved`     | `{ document }`                                                                           | Notification after saving or scheduled publication |
+| `content.viewed`    | `{ views }`, once a minute; see [Content views](#content-views)                          | Notification; writes commit in one transaction     |
 | `dashboard.widgets` | `{ summary }`                                                                            | Markdown blocks with slot `dashboard`              |
 | `ui.navigation`     | `{ location, capabilities }`                                                             | Safe internal `items` with label/href/icon         |
 | `site.assets`       | Automatically registered for module/styles                                               | Public frontend assets                             |
@@ -352,7 +392,7 @@ var exists = database.has("note", "content:42");
 database.forget("note", "content:42");
 ```
 
-Lookups include slug/scope/key and read one value. Keys/scopes are bounded to 128 UTF-8 bytes without control characters, and JSON to 65,535 bytes. `has` distinguishes a stored `null`/`false` from a missing key. Native single-row `upsert(data, uniqueBy, updateColumns)` preserves row IDs. Modern SQLite uses UPSERT; older bundled SQLite uses an atomic update/conditional-insert savepoint, including inside explicitly transactional migrations. SQL generation stays inside the framework patch.
+Lookups include slug/scope/key and read one value. Keys/scopes are bounded to 128 UTF-8 bytes without control characters, and JSON to 65,535 bytes. `has` distinguishes a stored `null`/`false` from a missing key. Native single-row `upsert(data, uniqueBy, updateColumns)` preserves row IDs, and `upsertIncrement(data, uniqueBy, incrementColumns)` adds the supplied values to the stored ones, for counters. Modern SQLite uses UPSERT; older bundled SQLite uses an atomic update/conditional-insert savepoint, including inside explicitly transactional migrations. SQL generation stays inside the framework patch.
 
 A configured alternate connection can be passed to `new PluginDatabase(slug, connectionName)`. Call `initialize()` once before its value store; `migrate()` initializes history/store tables. `schema()` returns the native connection-specific `SchemaBuilder`; models use `@:connection` or configured query parents. Hydrated models retain parent connection/table/primary metadata. Event `database` context exposes `connection`, `namespace` and `tablePrefix`.
 

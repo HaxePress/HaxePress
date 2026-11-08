@@ -5,6 +5,8 @@ import hx.press.validation.ValidationResponder;
 import hx.well.template.StatusTemplate;
 import hx.press.ContentCache;
 import hx.well.database.Connection;
+import hx.well.facades.DBStatic;
+import hx.press.content.ContentViewBuffer;
 import hx.well.facades.Storage;
 import hx.well.http.ResponseBuilder;
 import hx.well.http.AbstractResponse;
@@ -214,6 +216,12 @@ class PluginRuntime {
     }
 
     public static function shutdown():Void {
+        // Counted views still in memory reach the plugins before they stop.
+        try {
+            ContentViewBuffer.flush();
+        } catch (error:Dynamic) {
+            trace('Content views could not be handed over: ${Std.string(error)}');
+        }
         ready = false;
         var runningPlugins = modules.copy();
         for (live in runningPlugins) {
@@ -432,6 +440,25 @@ class PluginRuntime {
     public static function saved(document:Dynamic):Void {
         for (record in PackageData.forEvent("content.saved")) {
             invoke(record, "content.saved", {document: document});
+        }
+    }
+
+    /**
+        Gives plugins a batch of counted content views. Each plugin's hook
+        runs in one transaction of the default connection, so its writes for
+        the batch commit together. A failure rolls back that plugin's writes
+        and is logged; it does not turn the plugin off.
+    **/
+    public static function viewed(views:Array<Dynamic>):Void {
+        var data = {views: views};
+        for (record in PackageData.forEvent("content.viewed", "plugin")) {
+            try {
+                DBStatic.transaction(() -> {
+                    invoke(record, "content.viewed", data, true);
+                });
+            } catch (error:Dynamic) {
+                trace('${record.id} could not record content views: ${Std.string(error)}');
+            }
         }
     }
 

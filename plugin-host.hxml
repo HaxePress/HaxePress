@@ -10,6 +10,7 @@
 --macro haxe.macro.Context.getType("hx.well.middleware.AbstractMiddleware")
 --macro haxe.macro.Context.getType("hx.press.content.ContentTypes")
 --macro haxe.macro.Context.getType("hx.press.content.ContentFields")
+--macro haxe.macro.Context.getType("hx.press.content.ContentViews")
 --macro haxe.macro.Context.getType("hx.press.media.MediaReferences")
 --macro haxe.macro.Context.getType("hx.press.media.MediaDependencies")
 --macro haxe.macro.Context.getType("hx.press.media.MediaUsage")
@@ -33,3 +34,4 @@
 --macro haxe.macro.Context.getType("hx.press.CmsVersion")
 --macro haxe.macro.Context.getType("hx.press.i18n.I18n")
 --macro haxe.macro.Context.getType("hx.press.validation.ValidationResponder")
+--macro haxe.macro.Context.getType("hx.press.validation.PositiveInt")

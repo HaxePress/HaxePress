@@ -1,0 +1,80 @@
+<props
+  rows="List<CountryViewRowView>"
+  heading="String"
+  filtered="Bool"
+  pagination="PageLinksView"
+  total="Int"
+  countingCountries="Bool"
+  countrySourceActive="Bool"
+  settingsAddress="Url"
+  dataAddress="Url"
+/>
+<AdminLayout :title="t('Views by country')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Views by country') }}</h1>
+      <p>
+        {{ t('Views of published content by the country of the visitor. Counts are updated once a
+        minute.') }}
+      </p>
+    </div>
+    <div>
+      <a class="button button-outline" href="{{ dataAddress }}" download
+        >{!! icon('download') !!}{{ t('Download JSON') }}</a
+      >
+    </div>
+  </div>
+  <div :if="not countingCountries" class="alert error" role="alert">
+    {!! icon('alert') !!}{{ t('Views are not counted by country. Turn on Count views by country in
+    the plugin settings.') }}
+    <a href="{{ settingsAddress }}">{{ t('Open the settings') }}</a>
+  </div>
+  <div :else-if="not countrySourceActive" class="alert error" role="alert">
+    {!! icon('alert') !!}{{ t('Countries come from the Cloudflare plugin, which is not active. Until
+    it is, every view is counted as UNKNOWN.') }}
+  </div>
+  <section class="admin-card">
+    <div class="admin-card-heading">
+      <h2>{{ heading }} <span class="count-badge">{{ total }}</span></h2>
+      <a :if="filtered" class="button button-outline" href="/admin/view-counts/countries"
+        >{{ t('Show all') }}</a
+      >
+    </div>
+    <div :if="rows" class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('Content') }}</th>
+            <th>{{ t('Country') }}</th>
+            <th>{{ t('Views') }}</th>
+            <th><span class="sr-only">{{ t('Public page') }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for="row in rows">
+            <td>
+              <a href="{{ row.contentAddress }}"><strong>{{ row.title }}</strong></a>
+            </td>
+            <td><a href="{{ row.countryAddress }}">{{ row.country }}</a></td>
+            <td>{{ row.views }}</td>
+            <td>
+              <a
+                :if="row.url"
+                class="icon-button"
+                href="{{ row.url }}"
+                aria-label="{{ t('Open {title}', title: row.title) }}"
+                >{!! icon('external') !!}</a
+              >
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div :else class="empty-state">
+      {!! icon('compass') !!}
+      <h2>{{ t('No views by country yet.') }}</h2>
+      <p>{{ t('New entries will appear here.') }}</p>
+    </div>
+    <Pagination :links="pagination" :count="size(rows)" noun="views by country" />
+  </section>
+</AdminLayout>

@@ -23,7 +23,7 @@ BACKUPS = "/admin/backups"
 SCHEDULES = f"{BACKUPS}/schedules"
 BACKUP_PLUGIN = "/admin/plugins/plugin-site-backup"
 # A restored site installs the bundled plugins when the backup leaves plugins out.
-BUNDLED_PLUGINS = ["rss", "newsletter", "cloudflare", "site-backup"]
+BUNDLED_PLUGINS = ["rss", "newsletter", "cloudflare", "view-count", "site-backup"]
 CMS_VERSION = json.loads((Path(__file__).resolve().parents[1] / "cms.json").read_text())["version"]
 VERIFY = f"{BACKUPS}/verify"
 RESTORE = "/admin/install/restore"

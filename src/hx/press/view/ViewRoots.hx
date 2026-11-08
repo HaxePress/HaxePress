@@ -6,6 +6,7 @@ import hx.press.SiteSettingsStore;
 import hx.press.AdminNavigation;
 import hx.press.access.Roles;
 import hx.press.content.ContentTypes;
+import hx.press.content.ContentViews;
 import hx.press.i18n.I18n;
 import hx.press.media.MediaReferences;
 import hx.press.packages.ThemeData;
@@ -181,7 +182,8 @@ class ViewRoots {
         return {
             assets: theme == null ? [] : PluginRuntime.assets(),
             blocks: theme == null ? [] : PluginRuntime.blocks("site.shared", {
-                path: request == null ? "/" : request.path
+                path: request == null ? "/" : request.path,
+                content: ContentViews.content(request)
             })
         };
     }

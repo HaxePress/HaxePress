@@ -3,6 +3,7 @@ package hx.press.provider;
 import hx.press.ContentWorkflow;
 import hx.press.MediaCatalog;
 import hx.press.ai.AdminMcpAccess;
+import hx.press.content.ContentViewBuffer;
 import hx.press.WorkingCopies;
 import hx.press.media.ImageUploads;
 import hx.press.packages.PackageManager;
@@ -39,6 +40,8 @@ class SiteRuntime {
             WorkingCopies.expire();
             AdminMcpAccess.cleanup();
         });
+        ScheduledJobs.registerCore(ContentViewBuffer.JOB, ContentViewBuffer.INTERVAL_SECONDS,
+            ContentViewBuffer.flush);
         ScheduledJobs.registerCore("media-trash", 3600, () -> {
             MediaCatalog.purgeTrash();
         });

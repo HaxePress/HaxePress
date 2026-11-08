@@ -1,0 +1,57 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "pluginId": "d47e7c67-745e-4783-8c9c-1d95c3931ab0",
+  "slug": "view-count",
+  "name": "View Count",
+  "version": "2.16.0",
+  "description": "Counts visitors' views of published content, by country if you choose, for the administration and, if you choose, shows them on content pages.",
+  "author": "HaxePress",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.viewcount.ViewCountPlugin"
+  },
+  "hooks": ["content.viewed", "site.shared", "dashboard.widgets"],
+  "assets": {
+    "views": "views"
+  },
+  "fields": [
+    {
+      "key": "show_count",
+      "label": "Show the view count on content pages",
+      "kind": "boolean",
+      "defaultValue": "false",
+      "help": "Visitors then see how many times the content was viewed. Counts are updated once a minute."
+    },
+    {
+      "key": "position",
+      "label": "Place on content pages",
+      "kind": "select",
+      "defaultValue": "content.after",
+      "options": [
+        {
+          "value": "content.before",
+          "label": "Before the content"
+        },
+        {
+          "value": "content.after",
+          "label": "After the content"
+        }
+      ]
+    },
+    {
+      "key": "count_countries",
+      "label": "Count views by country",
+      "kind": "boolean",
+      "defaultValue": "false",
+      "help": "Countries come from the Cloudflare plugin. Views without a country from Cloudflare are counted as UNKNOWN."
+    }
+  ],
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
+  }
+}

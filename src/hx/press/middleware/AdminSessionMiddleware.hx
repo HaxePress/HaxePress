@@ -10,6 +10,8 @@ import hx.well.http.CookieData;
 import hx.well.facades.Config;
 import hx.well.facades.Environment;
 import hx.press.ai.AdminMcpAccess;
+import hx.press.content.ContentViews;
+import hx.well.http.RequestStatic.auth;
 
 /** Cookie policy for the /admin group. Public routes never run this middleware. */
 class AdminSessionMiddleware extends AbstractMiddleware {
@@ -44,11 +46,29 @@ class AdminSessionMiddleware extends AbstractMiddleware {
             xsrf.httpOnly = false;
             ResponseStatic.get().cookieFromData(xsrf.key, xsrf);
         }
+        markMember(request, secure, cookie.maxAge);
         // HxWell disposes middleware after sending the response. Persist the admin
         // session before returning so an immediate redirect cannot outrun its write.
         if (!request.session.save()) {
             request.session.touch();
         }
         request.session.needsRefresh = false;
+    }
+
+    /**
+        Public pages run without this session, so plugins that count visits
+        recognize a signed-in member's browser by `ContentViews.MEMBER_COOKIE`
+        on the whole site. It grants nothing, so it needs no protection.
+    **/
+    function markMember(request:Request, secure:Bool, maxAge:Null<Int>):Void {
+        var signedIn = auth("admin").check();
+        if (!signedIn && request.cookie(ContentViews.MEMBER_COOKIE) == null) {
+            return;
+        }
+        var member = new CookieData(ContentViews.MEMBER_COOKIE, "1");
+        member.path = "/";
+        member.secure = secure;
+        member.maxAge = signedIn ? maxAge : 0;
+        ResponseStatic.get().cookieFromData(member.key, member);
     }
 }

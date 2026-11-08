@@ -212,6 +212,7 @@ def build(application, public_root=None):
             "src/hx/press/content/ContentTypes.hx",
             "src/hx/press/content/ContentTypeDefinition.hx",
             "src/hx/press/content/ContentFields.hx",
+            "src/hx/press/content/ContentViews.hx",
             "src/hx/press/content/ContentLocks.hx",
             "src/hx/press/access/Roles.hx",
             "src/hx/press/navigation/NavigationRegions.hx",

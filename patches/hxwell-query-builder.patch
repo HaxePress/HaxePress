@@ -147,15 +147,20 @@ diff --git a/src/hx/well/database/query/InsertQueryBuilder.hx b/src/hx/well/data
          stringBuf.add(" (");
          stringBuf.add(columns);
          stringBuf.add(") VALUES (");
-@@ -30,4 +31,43 @@
+@@ -30,4 +31,54 @@
  
          return stringBuf.toString();
      }
 -}
 \ No newline at end of file
 +
++    /**
++        An INSERT that updates the `update` columns of the row with the same
++        `uniqueBy` values instead. With `increment`, the supplied values are
++        added to the stored ones rather than replacing them.
++    **/
 +    public static function upsert<T>(query:QueryBuilder<T>, columns:Array<String>,
-+            uniqueBy:Array<String>, update:Array<String>):String {
++            uniqueBy:Array<String>, update:Array<String>, increment:Bool = false):String {
 +        if (uniqueBy == null || uniqueBy.length == 0 || update == null || update.length == 0) {
 +            throw new Exception("Upsert requires conflict columns and update columns.");
 +        }
@@ -166,7 +171,7 @@ diff --git a/src/hx/well/database/query/InsertQueryBuilder.hx b/src/hx/well/data
 +            }
 +        }
 +        var statement = toString(query, columns.iterator());
-+        var assignments = update.map(column -> '${QueryIdentifier.quote(column)} = ?').join(", ");
++        var assignments = update.map(column -> assignment(column, increment)).join(", ");
 +        return switch (Connection.driver(query.model.__connection)) {
 +            case "sqlite":
 +                var conflict = uniqueBy.map(QueryIdentifier.quote).join(", ");
@@ -180,10 +185,10 @@ diff --git a/src/hx/well/database/query/InsertQueryBuilder.hx b/src/hx/well/data
 +
 +    /** SQLite before 3.24 needs an update/conditional-insert inside a savepoint. */
 +    public static function legacyUpsert<T>(query:QueryBuilder<T>, columns:Array<String>,
-+            uniqueBy:Array<String>, update:Array<String>):Array<String> {
++            uniqueBy:Array<String>, update:Array<String>, increment:Bool = false):Array<String> {
 +        var table = QueryIdentifier.quote(query.model.getTable());
 +        var predicate = uniqueBy.map(column -> '${QueryIdentifier.quote(column)} = ?').join(" AND ");
-+        var assignments = update.map(column -> '${QueryIdentifier.quote(column)} = ?').join(", ");
++        var assignments = update.map(column -> assignment(column, increment)).join(", ");
 +        var projection = columns.map(QueryIdentifier.quote).join(", ");
 +        var placeholders = columns.map(_ -> "?").join(", ");
 +        var exists = 'SELECT 1 FROM ${table} WHERE ${predicate}';
@@ -191,6 +196,12 @@ diff --git a/src/hx/well/database/query/InsertQueryBuilder.hx b/src/hx/well/data
 +            'UPDATE ${table} SET ${assignments} WHERE ${predicate}',
 +            'INSERT INTO ${table} (${projection}) SELECT ${placeholders} WHERE NOT EXISTS (${exists})'
 +        ];
++    }
++
++    /** `column = ?`, or `column = column + ?` when the value is added to the stored one. */
++    static function assignment(column:String, increment:Bool):String {
++        var name = QueryIdentifier.quote(column);
++        return increment ? '${name} = ${name} + ?' : '${name} = ?';
 +    }
 +}
 diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/query/QueryBuilder.hx
@@ -610,7 +621,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
          var values:Array<Dynamic> = dataValues.concat(this.values);
          db.update(toUpdateSql(keys.iterator()), ...values);
      }
-@@ -273,9 +493,37 @@
+@@ -273,9 +493,52 @@
      }
  
      public function insert(data:StringMap<Dynamic>):Int {
@@ -623,10 +634,25 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
 +
 +    public function upsert(data:StringMap<Dynamic>, uniqueBy:Array<String>,
 +            update:Array<String>):Void {
++        writeUpsert(data, uniqueBy, update, false);
++    }
++
++    /**
++        Inserts `data`, or adds the supplied values of the `increment` columns
++        to the row with the same `uniqueBy` values, in one statement.
++    **/
++    public function upsertIncrement(data:StringMap<Dynamic>, uniqueBy:Array<String>,
++            increment:Array<String>):Void {
++        writeUpsert(data, uniqueBy, increment, true);
++    }
++
++    private function writeUpsert(data:StringMap<Dynamic>, uniqueBy:Array<String>,
++            update:Array<String>, increment:Bool):Void {
 +        var columns = [for (column in data.keys()) column];
-+        var statement = InsertQueryBuilder.upsert(this, columns, uniqueBy, update);
++        var statement = InsertQueryBuilder.upsert(this, columns, uniqueBy, update, increment);
 +        if (!Connection.supportsNativeUpsert(model.__connection)) {
-+            var statements = InsertQueryBuilder.legacyUpsert(this, columns, uniqueBy, update);
++            var statements = InsertQueryBuilder.legacyUpsert(this, columns, uniqueBy, update,
++                increment);
 +            var conflictValues = [for (column in uniqueBy) data.get(column)];
 +            var updateValues = [for (column in update) data.get(column)];
 +            var insertValues = [for (column in columns) data.get(column)];
@@ -650,7 +676,7 @@ diff --git a/src/hx/well/database/query/QueryBuilder.hx b/src/hx/well/database/q
      }
  
      public function unsafe(value:Bool):QueryBuilder<T> {
-@@ -283,21 +531,38 @@
+@@ -283,21 +546,38 @@
          return this;
      }
  
@@ -2222,7 +2248,7 @@ diff --git a/src/hx/well/model/BaseModelQuery.hx b/src/hx/well/model/BaseModelQu
          return new QueryBuilder(parent).getResultSetResponse(resultSetReplacer, statusCode);
      }
  
-@@ -129,4 +152,13 @@
+@@ -129,4 +152,26 @@
          var primaryKey:String = getPrimary();
          return data.exists(primaryKey) ? find(data.get(primaryKey)) : find(id);
      }
@@ -2234,6 +2260,19 @@ diff --git a/src/hx/well/model/BaseModelQuery.hx b/src/hx/well/model/BaseModelQu
 +            data.set(getPrimary(), primary);
 +        }
 +        new QueryBuilder(parent).upsert(data, uniqueBy, update);
++    }
++
++    /**
++        Inserts `data`, or adds the supplied values of the `increment` columns
++        to the row with the same `uniqueBy` values, such as a counter.
++    **/
++    public function upsertIncrement(data:StringMap<Dynamic>, uniqueBy:Array<String>,
++            increment:Array<String>):Void {
++        var primary = parent.primaryKeyFactory();
++        if (primary != null && !data.exists(getPrimary())) {
++            data.set(getPrimary(), primary);
++        }
++        new QueryBuilder(parent).upsertIncrement(data, uniqueBy, increment);
 +    }
  }
 diff --git a/src/hx/well/pool/DatabasePool.hx b/src/hx/well/pool/DatabasePool.hx

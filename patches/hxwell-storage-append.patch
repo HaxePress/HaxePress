@@ -1,0 +1,60 @@
+diff --git a/src/hx/well/storage/IStorageAdapter.hx b/src/hx/well/storage/IStorageAdapter.hx
+--- a/src/hx/well/storage/IStorageAdapter.hx
++++ b/src/hx/well/storage/IStorageAdapter.hx
+@@ -10,6 +10,8 @@
+     public function directoryExists(path:String):Bool;
+     public function readStream(path:String):Input;
+     public function writeStream(path:String, input:Input, ?visibility:String):Void;
++    /** Adds `data` at the end of the file in one write, creating the file when it is missing. */
++    public function append(path:String, data:String):Void;
+     public function delete(path:String):Void;
+     public function copy(from:String, to:String):Void;
+     public function move(from:String, to:String):Void;
+diff --git a/src/hx/well/storage/LocalStorageAdapter.hx b/src/hx/well/storage/LocalStorageAdapter.hx
+--- a/src/hx/well/storage/LocalStorageAdapter.hx
++++ b/src/hx/well/storage/LocalStorageAdapter.hx
+@@ -242,6 +242,29 @@
+         }
+     }
+ 
++    /** Writes in the system's append mode, so concurrent writers, including other processes, keep every record. */
++    public function append(path:String, data:String):Void {
++        var absolute = this.path(StoragePath.file(path));
++        createParents(Path.directory(absolute));
++        var existing = FileSystem.exists(absolute);
++        if (existing && FileSystem.isDirectory(absolute))
++            throw new StorageException("append to file", path);
++        #if php
++        var written:Dynamic = Syntax.code("\\file_put_contents({0}, {1}, \\FILE_APPEND | \\LOCK_EX)", absolute, data);
++        if (written == false) throw new StorageException("append to file", path);
++        #else
++        var output = File.append(absolute, true);
++        try {
++            output.writeString(data);
++            output.close();
++        } catch (e:Dynamic) {
++            try output.close() catch (_:Dynamic) {}
++            throw e;
++        }
++        #end
++        if (!existing) LocalPermissions.set(absolute, defaultVisibility, false);
++    }
++
+     public function delete(path:String):Void {
+         var absolute = this.path(StoragePath.file(path));
+         if (!FileSystem.exists(absolute)) return;
+diff --git a/src/hx/well/storage/StorageDisk.hx b/src/hx/well/storage/StorageDisk.hx
+--- a/src/hx/well/storage/StorageDisk.hx
++++ b/src/hx/well/storage/StorageDisk.hx
+@@ -171,6 +171,11 @@
+         return StorageLock.run(this.path(path), () -> {
+             try {
+                 writable(path);
++                if (!prepend) {
++                    // One append-mode write: concurrent appends, also from other processes, all stay.
++                    adapter.append(scoped(path, true), fileExists(path) ? separator + data : data);
++                    return true;
++                }
+                 if (!fileExists(path)) return put(path, data);
+                 var previous = get(path);
+                 if (previous == null) return false;
