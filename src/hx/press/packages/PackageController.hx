@@ -12,6 +12,7 @@ import hx.press.SiteController;
 import hx.press.Pagination;
 import hx.press.CategoryData;
 import hx.press.i18n.I18n;
+import hx.press.AdminNavigation;
 import hx.press.CmsAccess;
 import hx.press.CmsController;
 import hx.press.handler.SitePublicHandler;
@@ -67,8 +68,13 @@ class PackageController {
         var publishStates:Map<String,
             Bool> = kind == "theme" ? ThemeDesignData.publishStates(page.items.map(item ->
                 item.id)) : [];
+        // A plugin's own settings page replaces the settings form on its card.
+        var settingsPages = kind == "plugin" ? AdminNavigation.settingsPages(capability ->
+            CmsAccess.can(capability)) : new Map<String, String>();
         var packages = page.items.map(item -> {
             var props:Dynamic = Reflect.copy(item);
+            var settingsForm = item.setting_count > 0 ? '${url}/${item.id}/settings' : "";
+            props.settings_url = settingsPages.get(item.id) ?? settingsForm;
             props.built_in = BuiltInTheme.isBuiltIn(item.id)
                 || BuiltInPlugins.isBuiltIn(item.id, item.plugin_id)
                 || PackageBundles.isBundledTheme(item.id, item.author);

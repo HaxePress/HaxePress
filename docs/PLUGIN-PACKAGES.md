@@ -101,7 +101,7 @@ In `onCreate`, register an optional persistent job with `host.schedule(pluginId,
 
 Tasks a user manages, such as backup schedules, use `host.saveSchedule(pluginId, key, intervalSeconds, payload, enabled, nextRun)`, which creates or replaces a task with its first run in epoch milliseconds (one interval from now when omitted). `host.schedules(pluginId, limit)` returns the plugin's tasks as a JSON array of `key`, `payload`, `intervalSeconds`, `enabled`, `nextRun`, `lastRun`, `lastError` and `running`, soonest first.
 
-The runtime calls `dispatch("schedule.run", context)` on the active plugin. The event's `data` includes `id`, `key` and the parsed `payload`. Return an empty object on success or an object with an `error` message to record a failed run. Keep effects idempotent across an interrupted run. Use `host.unschedule(pluginId, key)` to remove a rule; it returns false while a run holds the task. Deactivation pauses the plugin's jobs and uninstall removes them. Core jobs have a null plugin ID. Each plugin can provide management controls on its own admin page through `host.admin` and native `cms.navigation` route metadata.
+The runtime calls `dispatch("schedule.run", context)` on the active plugin. The event's `data` includes `id`, `key` and the parsed `payload`. Return an empty object on success or an object with an `error` message to record a failed run. Keep effects idempotent across an interrupted run. Use `host.unschedule(pluginId, key)` to remove a rule; it returns false while a run holds the task. Deactivation pauses the plugin's jobs and uninstall removes them. Core jobs have a null plugin ID. Each plugin can provide management controls on its own admin page through `host.admin` and native `cms.navigation` or `cms.settings` route metadata.
 
 ### Server modules
 
@@ -282,7 +282,7 @@ Roles.ensureCapability("catalog.export", "Export catalog", "Catalog", "plugin-ca
 NavigationRegions.ensure("catalog_links", "Catalog links", 10);
 ```
 
-Native administration routes can declare `cms.navigation` metadata with `label`, `icon`, `group`, `groupPosition`, `position`, `capability`, optional `exact` and `activePaths`. The host merges these with authorized collection links and the existing `ui.navigation` hook. Core route/session/CSRF middleware remains required through `host.admin`.
+Native administration routes can declare `cms.navigation` metadata with `label`, `icon`, `group`, `groupPosition`, `position`, `capability`, optional `exact` and `activePaths`. The host merges these with authorized collection links and the existing `ui.navigation` hook. A plugin page that belongs to the plugin's settings declares `cms.settings` (`{capability}`) instead: it stays out of the menu, the Settings button on the plugin's card opens it in place of the generated settings form, and Plugins is the current menu entry while it is open. The Backups plugin opens Backup / Restore this way. Either attribute's capability also guards the routes below the page for MCP clients. Core route/session/CSRF middleware remains required through `host.admin`.
 
 ## Models, migrations and state
 

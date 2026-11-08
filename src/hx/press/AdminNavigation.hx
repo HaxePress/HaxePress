@@ -37,12 +37,44 @@ typedef AdminRouteNavigation = {
 
 /** Navigation follows native route metadata and the current collection definitions. */
 class AdminNavigation {
+    /**
+        The route attribute that makes a plugin's admin page its settings
+        page, `{capability}`. The page stays out of the menu: the plugin's
+        Settings button opens it, and Plugins is the current menu entry there.
+    **/
+    public static inline final SETTINGS = "cms.settings";
+
+    /** The settings pages of active plugins, by plugin ID, that `permitted` capabilities may open. **/
+    public static function settingsPages(permitted:String->Bool):Map<String, String> {
+        var pages:Map<String, String> = [];
+        for (route in Route.routes) {
+            var plugin:String = route.getAttribute("hx.press.plugin", "");
+            var entry:Dynamic = route.getAttribute(SETTINGS, null);
+            if (plugin == ""
+                || entry == null
+                || pages.exists(plugin)
+                || !route.getMethods().contains("GET")
+                || !StringTools.startsWith(route.value, "/admin/")
+                || route.value.indexOf("{") >= 0) {
+                continue;
+            }
+            var capability:String = entry.capability is String ? entry.capability : "";
+            if (capability == "" || permitted(capability)) {
+                pages.set(plugin, route.value);
+            }
+        }
+        return pages;
+    }
+
     public static function groups(request:Request, pluginLinks:Array<Dynamic>,
             grants:Array<String>):Array<AdminNavigationGroup> {
         var groups:Map<String, AdminNavigationGroup> = [];
         var known:Map<String, Bool> = [];
         var allCapabilities = grants.contains("*");
         var contentAccess = CmsAccess.hasAccessibleCollections(grants);
+        var permittedPages = settingsPages(capability -> allCapabilities
+            || grants.contains(capability));
+        var pluginSettings = [for (path in permittedPages) path];
 
         function append(group:String, groupPosition:Int, link:AdminNavigationLink):Void {
             if (known.exists(link.href)) {
@@ -83,6 +115,9 @@ class AdminNavigation {
                 activePaths: entry.activePaths ?? [],
                 position: entry.position ?? 50
             };
+            if (route.value == "/admin/plugins") {
+                link.activePaths = link.activePaths.concat(pluginSettings);
+            }
             if (entry.parent != null) {
                 link.parent = entry.parent;
             }

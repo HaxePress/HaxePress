@@ -270,9 +270,9 @@
             {{ t('Deactivate') }}
           </button>
           <a
-            :if="item.setting_count > 0"
+            :if="item.settings_url != ''"
             class="button button-outline"
-            href="{{ base }}/{{ item.id }}/settings"
+            href="{{ item.settings_url }}"
             >{{ t('Settings') }}</a
           >
           <button

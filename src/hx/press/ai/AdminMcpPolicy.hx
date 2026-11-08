@@ -1,6 +1,7 @@
 package hx.press.ai;
 
 import haxe.Json;
+import hx.press.AdminNavigation;
 import hx.press.CmsAccess;
 import hx.press.access.Roles;
 import hx.press.model.Admin;
@@ -75,14 +76,17 @@ class AdminMcpPolicy {
     }
 
     /**
-        A plugin page that declares a capability for its menu entry needs it
-        for every route below it as well. Plugin routes without such a page
+        A plugin page that declares a capability for its menu entry or its
+        settings page needs it for every route below it as well. Plugin routes without such a page
         check access in their own handlers.
     **/
     static function pluginAreaAllows(path:String, grants:Array<String>):Bool {
         for (route in Route.routes) {
             var plugin:String = route.getAttribute("hx.press.plugin", "");
             var entry:Dynamic = route.getAttribute("cms.navigation", null);
+            if (entry == null) {
+                entry = route.getAttribute(AdminNavigation.SETTINGS, null);
+            }
             if (plugin == "" || entry == null || !within(path, normalize(route.value))) {
                 continue;
             }

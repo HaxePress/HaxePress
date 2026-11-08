@@ -46,15 +46,9 @@ class BackupPlugin implements PluginEntrypoint {
         host.schedule(identity, BackupSchedules.CLEANUP, 60);
         host.admin(() -> {
             Route.path("/backups").group(() -> {
-                Route.get("", SiteBackup.page).attribute("cms.navigation", {
-                    group: "Administration",
-                    groupPosition: 30,
-                    label: "Backup / Restore",
-                    namespace: NAMESPACE,
-                    icon: "database",
-                    capability: SiteBackup.CAPABILITY,
-                    position: 21,
-                    exact: true
+                // Opened from the plugin's Settings button rather than the menu.
+                Route.get("", SiteBackup.page).attribute("cms.settings", {
+                    capability: SiteBackup.CAPABILITY
                 });
                 Route.post("", SiteBackup.export);
                 Route.post("/verify", SiteBackup.verify)

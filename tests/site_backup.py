@@ -345,9 +345,14 @@ def verify_permissions(owner, fixtures):
         "Backup / Restore did not render as server HTML",
     )
     links = [link for group in page["adminNavigation"] for link in group["links"]]
+    check(all(link["href"] != BACKUPS for link in links), "Backup / Restore is still in the menu")
     check(
-        any(link["href"] == BACKUPS and not link.get("parent") for link in links),
-        "Backup / Restore is missing from its own navigation entry",
+        any(link["href"] == "/admin/plugins" and BACKUPS in link["activePaths"] for link in links),
+        "Plugins is not the current menu entry on the backups page",
+    )
+    listing = owner.request("/admin/plugins")[2]
+    check(
+        f'href="{BACKUPS}"' in listing, "The Backups card's Settings button does not open its page"
     )
     check("backup" not in props(owner, "/admin/settings"), "The old Settings card was retained")
     status, _, body = owner.request("/admin/roles/capabilities?q=backups")
@@ -406,6 +411,11 @@ def verify_permissions(owner, fixtures):
             )
             check(status == 303, "Could not change the delegated role")
 
+        grant("extensions")
+        check(
+            f'href="{BACKUPS}"' not in member.request("/admin/plugins")[2],
+            "The Backups card offered its page without the backup permission",
+        )
         grant("backups")
         check(member.request("/admin/settings")[0] == 403, "Backup grant also opened Settings")
         props(member, BACKUPS)

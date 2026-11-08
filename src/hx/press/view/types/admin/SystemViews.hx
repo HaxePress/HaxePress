@@ -13,6 +13,10 @@ typedef ExtensionPackageView = {
     var enabled:Int;
     var last_error:String;
     var setting_count:Int;
+
+    /** The plugin's settings page, or its settings form; empty when it has neither. */
+    var settings_url:String;
+
     var restart_required:Int;
     var built_in:Bool;
     var designed:Bool;
