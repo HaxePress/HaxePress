@@ -5,7 +5,6 @@ import hx.well.config.IConfig;
 import hx.press.middleware.SecurityMiddleware;
 import hx.press.install.InstallationMiddleware;
 import hx.press.middleware.LocaleMiddleware;
-import hx.press.middleware.ContentViewMiddleware;
 #end
 import hx.well.middleware.DatabaseMiddleware;
 import hx.well.middleware.AbstractMiddleware;
@@ -17,14 +16,7 @@ class MiddlewareConfig implements IConfig {
         #if cms_plugin
         return [];
         #else
-        // ContentViewMiddleware is disposed before DatabaseMiddleware frees the connection.
-        return [
-            InstallationMiddleware,
-            DatabaseMiddleware,
-            SecurityMiddleware,
-            LocaleMiddleware,
-            ContentViewMiddleware
-        ];
+        return [InstallationMiddleware, DatabaseMiddleware, SecurityMiddleware, LocaleMiddleware];
         #end
     }
 }

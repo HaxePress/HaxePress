@@ -24,18 +24,45 @@ typedef ContentAdminActivityView = {
     var mcp:Bool;
 }
 
-/** A custom field value prepared for a content list column. */
+/** A visible column of an admin content list, with the link that sorts by it. */
 @:well.view
-typedef ContentAdminColumnView = {
+typedef ContentListColumnView = {
+    var key:String;
+    var label:String;
+
+    /** How its cells show: `title`, `status`, `updated` or `value`. */
+    var cell:String;
+
+    var sortUrl:String;
+
+    /** `ascending` or `descending` when the list is sorted by it, otherwise empty. */
+    var sorted:String;
+}
+
+/** A cell of an admin content list row. `title`, `status` and `updated` cells show the row's own fields. */
+@:well.view
+typedef ContentListCellView = {
+    var kind:String;
     var text:String;
     var translate:Bool;
 }
 
-/** A custom field shown as a content list column. */
+/** The status filters of a content list, keeping its order. */
 @:well.view
-typedef ContentAdminListFieldView = {
+typedef ContentStatusLinksView = {
+    var all:String;
+    var published:String;
+    var draft:String;
+    var scheduled:String;
+    var trash:String;
+}
+
+/** A column in the list's column settings, in the member's order. */
+@:well.view
+typedef ContentColumnSettingView = {
     var key:String;
     var label:String;
+    var visible:Bool;
 }
 
 /** A row of the admin content table. */
@@ -50,7 +77,9 @@ typedef ContentAdminRowView = {
     var category:String;
     var updatedLabel:String;
     var adminBase:String;
-    @:optional var columns:Array<ContentAdminColumnView>;
+
+    /** The cells of the list's visible columns; the dashboard's table has none. */
+    @:optional var cells:Array<ContentListCellView>;
 }
 
 @:well.view

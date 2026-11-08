@@ -26,6 +26,7 @@ import hx.press.model.ScheduledJob;
 import hx.press.model.ThemeDesign;
 import hx.press.model.ThemeAsset;
 import hx.press.model.AdminMcpLink;
+import hx.press.model.AdminPreference;
 import hx.press.model.ThemeAiConnection;
 import hx.press.model.ThemeAiPermission;
 import hx.press.database.ThemeDesignSchema;
@@ -253,6 +254,8 @@ class FixtureProcess {
             case "cms_packages": execute(InstalledPackage.query, command);
             case "scheduled_jobs": execute(ScheduledJob.query, command);
             case "scheduled_backup_files": execute(ScheduledBackupRecord.query, command);
+            case "view_count_totals": execute(ViewTotalRecord.query, command);
+            case "admin_preferences": execute(AdminPreference.query, command);
             case "theme_designs": execute(ThemeDesign.query, command);
             case "theme_assets": execute(ThemeAsset.query, command);
             case "theme_ai_connections": execute(ThemeAiConnection.query, command);

@@ -13,6 +13,10 @@ VIEW = "views/Home.well.html"
 MARKER = f"cms_example_{EXAMPLE}"
 ACCENT = "#234567"
 REMOVED = "theme-gallery"
+# A bundled plugin installed by an earlier build may name a hook the host no longer offers.
+PLUGIN = "plugin-view-count"
+PLUGIN_MARKER = "cms_builtin_view-count"
+REMOVED_HOOK = "content.viewed"
 
 
 def installed(fixtures):
@@ -38,6 +42,11 @@ def prepare(fixtures, work):
     fixtures.delete("settings", [("key", "=", MARKER)])
     # A release before bundled themes were part of the application let the owner remove one.
     fixtures.delete("cms_packages", [("id", "=", REMOVED)])
+    plugin = fixtures.rows("cms_packages", ["manifest"], [("id", "=", PLUGIN)], limit=1)[0]
+    manifest = json.loads(plugin["manifest"])
+    manifest["hooks"] = [REMOVED_HOOK, *manifest.get("hooks", [])]
+    fixtures.update("cms_packages", {"manifest": json.dumps(manifest)}, [("id", "=", PLUGIN)])
+    fixtures.delete("settings", [("key", "=", PLUGIN_MARKER)])
     return {
         "directory": package["directory"],
         "settings": settings,
@@ -69,6 +78,12 @@ def verify(fixtures, work, expected):
     restored = fixtures.rows("cms_packages", ["enabled"], [("id", "=", REMOVED)], limit=1)
     if [row["enabled"] for row in restored] != [0]:
         raise AssertionError("Startup did not reinstall a removed bundled theme as inactive.")
+    plugin = fixtures.rows("cms_packages", ["manifest", "enabled"], [("id", "=", PLUGIN)], limit=1)
+    hooks = json.loads(plugin[0]["manifest"]).get("hooks", []) if plugin else []
+    if not plugin or plugin[0]["enabled"] != 1 or REMOVED_HOOK in hooks:
+        raise AssertionError(
+            "A plugin naming a removed hook was not replaced with its shipped build."
+        )
     return package["directory"]
 
 

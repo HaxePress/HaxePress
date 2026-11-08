@@ -1,0 +1,55 @@
+<props
+  action="String"
+  settings="List<ContentColumnSettingView>"
+  order="String"
+  query="String"
+  status="String"
+  sort="String"
+  direction="String"
+/>
+<details class="column-settings">
+  <summary class="button button-outline">{!! icon('columns') !!}{{ t('Columns') }}</summary>
+  <Island name="column-order" :props="{}" load="eager">
+    <form class="column-settings-panel" method="post" action="{{ action }}">
+      <!-- prettier-ignore -->
+      <p id="column-order-help" class="field-help">{{ t('Drag columns to change their order, or focus a handle and use the arrow keys. Only your own list changes.') }}</p>
+      <input type="hidden" name="order" value="{{ order }}" />
+      <input type="hidden" name="q" value="{{ query }}" />
+      <input type="hidden" name="status" value="{{ status }}" />
+      <input type="hidden" name="sort" value="{{ sort }}" />
+      <input type="hidden" name="dir" value="{{ direction }}" />
+      <ol class="column-settings-list" data-column-list>
+        <li
+          :for="setting in settings"
+          data-column-key="{{ setting.key }}"
+          data-column-label="{{ setting.label }}"
+        >
+          <button
+            class="column-handle"
+            type="button"
+            data-column-handle
+            aria-describedby="column-order-help"
+            aria-label="{{ t('Reorder {column}', column: setting.label) }}"
+          >
+            {!! icon('grip') !!}
+          </button>
+          <label class="column-settings-option"
+            ><input
+              type="checkbox"
+              name="visible_{{ loop.index }}"
+              value="{{ setting.key }}"
+              :checked="setting.visible"
+            /><span>{{ setting.label }}</span></label
+          >
+        </li>
+      </ol>
+      <p class="sr-only" role="status" aria-live="polite" data-column-status></p>
+      <div class="column-settings-actions">
+        <button class="button" type="submit">{{ t('Save columns') }}</button>
+        <button class="button button-outline" type="submit" name="reset" value="1">
+          {{ t('Reset columns') }}
+        </button>
+      </div>
+    </form>
+  </Island>
+</details>

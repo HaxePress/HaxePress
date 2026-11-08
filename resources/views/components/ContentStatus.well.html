@@ -1,0 +1,5 @@
+<props item="ContentAdminRowView" />
+<span class="status {{ item.status }}"
+  >{{ item.status == 'published' ? t('Published') : item.status == 'scheduled' ? t('Scheduled') :
+  item.status == 'trash' ? t('In trash') : t('Draft') }}</span
+>

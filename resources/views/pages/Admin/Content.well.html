@@ -10,8 +10,12 @@
   notice="String"
   pagination="PageLinksView"
   contentType="ContentAdminTypeView"
-  listFields="List<ContentAdminListFieldView>"
-  showCategory="Bool"
+  columns="List<ContentListColumnView>"
+  columnSettings="List<ContentColumnSettingView>"
+  columnOrder="String"
+  sort="String"
+  direction="String"
+  statusLinks="ContentStatusLinksView"
   workingDrafts="List<ContentAdminWorkingDraftView>"
 />
 <AdminLayout :title="t(contentType.name)">
@@ -43,49 +47,52 @@
         class="status-tabs"
         aria-label="{{ t('Filter {items} by status', items: t(contentType.name)) }}"
       >
-        <a :class="status == '' ? 'selected'" href="{{ contentType.adminBase }}"
+        <a :class="status == '' ? 'selected'" href="{{ statusLinks.all }}"
           >{{ t('All {collection}', collection: t(contentType.name)) }} <span>{{ total }}</span></a
         >
-        <a
-          :class="status == 'published' ? 'selected'"
-          href="{{ contentType.adminBase }}?status=published"
+        <a :class="status == 'published' ? 'selected'" href="{{ statusLinks.published }}"
           >{{ t('Published') }} <span>{{ published }}</span></a
         >
-        <a :class="status == 'draft' ? 'selected'" href="{{ contentType.adminBase }}?status=draft"
+        <a :class="status == 'draft' ? 'selected'" href="{{ statusLinks.draft }}"
           >{{ t('Drafts') }} <span>{{ drafts }}</span></a
         >
-        <a
-          :class="status == 'scheduled' ? 'selected'"
-          href="{{ contentType.adminBase }}?status=scheduled"
+        <a :class="status == 'scheduled' ? 'selected'" href="{{ statusLinks.scheduled }}"
           >{{ t('Scheduled') }} <span>{{ scheduled }}</span></a
         >
-        <a :class="status == 'trash' ? 'selected'" href="{{ contentType.adminBase }}?status=trash"
+        <a :class="status == 'trash' ? 'selected'" href="{{ statusLinks.trash }}"
           >{{ t('Trash') }} <span>{{ trash }}</span></a
         >
       </nav>
-      <form class="admin-search" action="{{ contentType.adminBase }}" method="get">
-        {!! icon('search') !!}
-        <label class="sr-only" for="content-search"
-          >{{ t('Search your {items}', items: t(contentType.name)) }}</label
-        >
-        <input
-          id="content-search"
-          type="search"
-          name="q"
-          maxlength="120"
-          placeholder="{{ t('Find content…') }}"
-          value="{{ query }}"
+      <div class="content-toolbar-actions">
+        <form class="admin-search" action="{{ contentType.adminBase }}" method="get">
+          {!! icon('search') !!}
+          <label class="sr-only" for="content-search"
+            >{{ t('Search your {items}', items: t(contentType.name)) }}</label
+          >
+          <input
+            id="content-search"
+            type="search"
+            name="q"
+            maxlength="120"
+            placeholder="{{ t('Find content…') }}"
+            value="{{ query }}"
+          />
+          <input type="hidden" name="status" value="{{ status }}" />
+          <input :if="sort" type="hidden" name="sort" value="{{ sort }}" />
+          <input :if="sort" type="hidden" name="dir" value="{{ direction }}" />
+        </form>
+        <ContentColumnSettings
+          action="{{ contentType.adminBase }}/columns"
+          :settings="columnSettings"
+          :order="columnOrder"
+          :query="query"
+          :status="status"
+          :sort="sort"
+          :direction="direction"
         />
-        <input type="hidden" name="status" value="{{ status }}" />
-      </form>
+      </div>
     </div>
-    <ContentTable
-      :if="items"
-      :items="items"
-      :singular="contentType.singular"
-      :showCategory="showCategory"
-      :fields="listFields"
-    />
+    <ContentListTable :if="items" :items="items" :columns="columns" />
     <div :else class="empty-state">
       {!! icon('file') !!}
       <h2>{{ t('No content') }}</h2>

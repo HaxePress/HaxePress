@@ -65,7 +65,8 @@ class ContentFields {
 
     public static function clearListAliases(record:Dynamic):Void {
         for (key in Reflect.fields(record)) {
-            if (StringTools.startsWith(key, "__cms_field_")) {
+            // Custom fields, plugin columns and sort values the list query selected.
+            if (StringTools.startsWith(key, "__cms_")) {
                 Reflect.deleteField(record, key);
             }
         }

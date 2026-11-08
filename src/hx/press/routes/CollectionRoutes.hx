@@ -21,6 +21,8 @@ class CollectionRoutes {
             request -> ContentController.edit(request, resolve(request)))
             .whereNumber("id");
         Route.post('${prefix}/save', new SaveContentHandler(resolve));
+        Route.post('${prefix}/columns',
+            request -> ContentController.saveColumns(request, resolve(request)));
         Route.post('${prefix}/preview',
             request -> ContentController.preview(request, resolve(request)))
             .attribute("content.preview", true);

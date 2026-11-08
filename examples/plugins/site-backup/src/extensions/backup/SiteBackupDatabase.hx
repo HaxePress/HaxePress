@@ -53,6 +53,7 @@ class SiteBackupDatabase {
     ];
     static final CORE = [
         "admins",
+        "admin_preferences",
         "settings",
         "content_types",
         "cms_packages",

@@ -11,6 +11,9 @@ import hx.press.model.ContentItem;
 import hx.press.content.ContentTypes;
 import hx.press.model.ContentType;
 import hx.press.content.ContentFields;
+import hx.press.content.ContentListColumns;
+import hx.press.content.ContentListColumns.ContentListColumn;
+import hx.press.content.ContentListColumns.ContentListSort;
 
 typedef ContentSummary = {
     > ContentSummaryRecord,
@@ -78,28 +81,28 @@ class ContentData {
         return query;
     }
 
+    /**
+        A page of an admin content list in `sort` order, with the values of
+        the `visible` plugin columns. Pages that read plugin tables are not
+        cached: the content cache does not follow their changes.
+    **/
     public static function page(kind:String, search:String, status:String, author:Int,
-            cursor:Null<PageCursor>):QueryPage<ContentSummary> {
+            cursor:Null<PageCursor>, visible:Array<ContentListColumn>,
+            sort:ContentListSort):QueryPage<ContentSummary> {
+        var load = () -> {
+            var query = filtered(kind, search, status, author);
+            ContentListColumns.apply(query, visible, sort, cursor);
+            var rows:Array<ContentSummary> = query.limit(PAGE_SIZE + 1)
+                .get()
+                .map(model -> cast model.toObject());
+            return Pagination.slice(rows, PAGE_SIZE, cursor);
+        };
+        if (ContentListColumns.readsPlugins(visible, sort)) {
+            return load();
+        }
+        var order = '${sort.column.key}:${sort.descending ? "desc" : "asc"}';
         return ContentCache.remember("items", "cms-list",
-            [kind, search, status, author, Pagination.token(cursor), PAGE_SIZE], () -> {
-                var query = filtered(kind, search, status, author);
-                if (cursor != null && cursor.value != null) {
-                    var comparison = cursor.before ? ">" : "<";
-                    query.where(matches -> {
-                        matches.where("updated_at", comparison, cursor.value).orWhere(sameTime -> {
-                            sameTime.where("updated_at", cursor.value)
-                                .where("id", comparison, cursor.id);
-                        });
-                    });
-                }
-                var direction = cursor != null && cursor.before ? "ASC" : "DESC";
-                var rows:Array<ContentSummary> = query.orderBy("updated_at", direction)
-                    .orderBy("id", direction)
-                    .limit(PAGE_SIZE + 1)
-                    .get()
-                    .map(model -> cast model.toObject());
-                return Pagination.slice(rows, PAGE_SIZE, cursor);
-            });
+            [kind, search, status, author, Pagination.token(cursor), PAGE_SIZE, order], load);
     }
 
     public static function count(kind:String, search:String = "", status:String = "",

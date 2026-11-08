@@ -14,7 +14,7 @@
     "php": "php/module.json",
     "entrypoint": "extensions.viewcount.ViewCountPlugin"
   },
-  "hooks": ["content.viewed", "site.shared", "dashboard.widgets"],
+  "hooks": ["site.shared", "dashboard.widgets"],
   "assets": {
     "views": "views"
   },

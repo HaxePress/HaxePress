@@ -1,10 +1,9 @@
-"""Verify the bundled View Count plugin and the content view counting it uses.
+"""Verify the bundled View Count plugin and the content view counting it does.
 
-After a response, the application counts a visitor's GET of a published
-content page, keeps the counts for a minute and gives them to plugins with
-the `content.viewed` hook. These tests make that job due instead of waiting
-for it. The test client sends no User-Agent, so only requests that send a
-browser's are views.
+After a response, the plugin's middleware counts a visitor's GET of a
+published content page, keeps the counts and writes them with its job once a
+minute. These tests make that job due instead of waiting for it. The test
+client sends no User-Agent, so only requests that send a browser's are views.
 """
 
 import json
@@ -20,7 +19,8 @@ from fixture_store import FixtureStore
 PLUGIN = "/admin/plugins/plugin-view-count"
 PAGE = "/admin/view-counts"
 DATA = f"{PAGE}/data"
-JOB = "core:content-views"
+# The plugin's own job, `<pluginId>:<key>`, that writes the counted views.
+JOB = "d47e7c67-745e-4783-8c9c-1d95c3931ab0:flush"
 BROWSER = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
@@ -41,7 +41,7 @@ def published(fixtures, count):
 
 
 def flush(fixtures):
-    """Makes the job that gives counted views to plugins due now."""
+    """Makes the plugin's job that writes counted views due now."""
     now = int(time.time() * 1000)
     fixtures.update("scheduled_jobs", {"next_epoch": now - 1000}, [("id", "=", JOB)])
 
@@ -215,25 +215,43 @@ def verify_permissions(owner):
     print("PASS Only members with the view count capability see the counts", flush=True)
 
 
-def verify_lifecycle(owner, fixtures, first):
-    first_id, first_path = first
-    check(owner.request(f"{PLUGIN}/disable", "POST", {})[0] == 303, "disable View Count")
-    check(owner.request(PAGE)[0] == 404, "The page remained after the plugin stopped")
-    visit(first_path)
-    flush(fixtures)
-    # Once the job has run, the view made while the plugin was off reached no counter.
+def stored_views(fixtures, content_id):
+    rows = fixtures.rows("view_count_totals", ["views"], [("content_id", "=", content_id)], limit=1)
+    return rows[0]["views"] if rows else 0
+
+
+def job_ran(fixtures):
+    """Waits until the plugin's job has run since `flush` made it due."""
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         job = fixtures.rows("scheduled_jobs", ["next_epoch"], [("id", "=", JOB)], limit=1)[0]
         if job["next_epoch"] > time.time() * 1000:
-            break
+            return
         time.sleep(0.5)
+    raise AssertionError("The plugin's job did not run")
+
+
+def verify_lifecycle(owner, fixtures, first):
+    first_id, first_path = first
+    visit(first_path)
+    check(owner.request(f"{PLUGIN}/disable", "POST", {})[0] == 303, "disable View Count")
+    check(
+        stored_views(fixtures, first_id) == 5,
+        "Stopping the plugin did not write the views it still kept",
+    )
+    check(owner.request(PAGE)[0] == 404, "The page remained after the plugin stopped")
+    visit(first_path)
     check(owner.request(f"{PLUGIN}/enable", "POST", {})[0] == 303, "enable View Count")
-    check(views_of(owner, first_id) == 4, "The counts were lost or a view counted while off")
+    flush(fixtures)
+    job_ran(fixtures)
+    check(views_of(owner, first_id) == 5, "The counts were lost or a view counted while off")
     visit(first_path)
     flush(fixtures)
-    wait_for(lambda: views_of(owner, first_id), 5, "Counting did not resume with the plugin")
-    print("PASS Disabling stops counting and keeps the counts; enabling resumes it", flush=True)
+    wait_for(lambda: views_of(owner, first_id), 6, "Counting did not resume with the plugin")
+    print(
+        "PASS Disabling writes the kept views and stops counting; enabling resumes it",
+        flush=True,
+    )
 
 
 def run():

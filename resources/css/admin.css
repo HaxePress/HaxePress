@@ -1347,6 +1347,133 @@
     outline-offset: 2px;
   }
 
+  .content-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sort-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: inherit;
+  }
+
+  .sort-link:hover,
+  th[aria-sort] .sort-link {
+    color: var(--admin-ink);
+  }
+
+  .sort-mark .icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .column-settings {
+    position: relative;
+  }
+
+  .column-settings > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .column-settings > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .column-settings-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 20;
+    width: min(320px, calc(100vw - 32px));
+    padding: 14px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: var(--admin-surface);
+    box-shadow: 0 12px 28px rgba(23, 43, 77, 0.14);
+    white-space: normal;
+  }
+
+  .column-settings-list {
+    margin: 10px 0 12px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .column-settings-list li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 4px 3px 0;
+    border-radius: 5px;
+    background: var(--admin-surface);
+  }
+
+  .column-settings-list.is-sorting {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  .column-settings-list li.dragging {
+    position: relative;
+    z-index: 1;
+    background: var(--admin-tint);
+    box-shadow: 0 6px 16px rgba(23, 43, 77, 0.16);
+  }
+
+  .column-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--admin-muted);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .column-handle:hover,
+  .column-handle:focus-visible {
+    background: var(--admin-tint);
+    color: var(--admin-action);
+  }
+
+  .column-settings-list.is-sorting .column-handle {
+    cursor: grabbing;
+  }
+
+  .column-handle .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .column-settings-list .column-settings-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--admin-ink);
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  .column-settings-list .column-settings-option input {
+    margin: 0;
+  }
+
+  .column-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .activity-list {
     margin: 0;
     padding: 0 24px;
@@ -2504,6 +2631,7 @@
       font-size: 11px;
     }
 
+    .content-toolbar-actions,
     .admin-search {
       width: 100%;
     }

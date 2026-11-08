@@ -2,19 +2,23 @@ package extensions.viewcount;
 
 import haxe.Json;
 import hx.press.access.Roles;
+import hx.press.content.ContentColumns;
+import hx.press.content.ContentColumns.ContentColumn;
 import hx.press.i18n.I18n;
+import hx.press.plugins.PluginDatabase;
 import hx.press.plugins.PluginEntrypoint;
 import hx.press.plugins.PluginHost;
+import hx.press.plugins.PluginMiddleware;
 import hx.well.route.Route;
 import hx.well.route.RouteElement;
 
 /**
-    Counts visitors' views of published content. The application decides
-    which requests are views and hands them over once a minute with the
-    `content.viewed` hook; this plugin adds them to one row per content
-    item and, when its country setting is on, to one row per content item
-    and country. Countries come from the Cloudflare plugin; without a
-    trusted country a view counts as `UNKNOWN`.
+    Counts visitors' views of published content. Its middleware decides
+    which responses are views (`ViewRules`), collects them (`ViewBuffer`)
+    and a job writes them once a minute to one row per content item and,
+    when its country setting is on, to one row per content item and
+    country. Countries come from the Cloudflare plugin; without a trusted
+    country a view counts as `UNKNOWN`.
 
     Its page lists the most viewed content, `/countries` lists the views by
     country, `/data` and `/countries/data` answer the same as JSON and as
@@ -32,15 +36,30 @@ class ViewCountPlugin implements PluginEntrypoint {
     public static var countingCountries = false;
 
     var routes:Array<RouteElement> = [];
+    var column:ContentColumn;
+    var middleware:PluginMiddleware;
     var host:PluginHost;
 
     public function new() {}
 
     public function onCreate(host:PluginHost, context:String):Void {
         this.host = host;
-        configure(Json.parse(context));
+        var input:Dynamic = Json.parse(context);
+        configure(input);
         ViewCounts.migrate();
+        host.schedule(input.packageInfo.pluginId, ViewBuffer.JOB, ViewBuffer.INTERVAL_SECONDS);
+        middleware = PluginMiddleware.add(ViewCountMiddleware);
         Roles.ensureCapability(CAPABILITY, "See content view counts", "Statistics", NAMESPACE);
+        // Lists of every collection show the count, to members who may see counts.
+        column = ContentColumns.add({
+            key: "views",
+            label: "Views",
+            table: PluginDatabase.table(ViewCounts.SLUG, "totals"),
+            value: "views",
+            kind: "number",
+            empty: "0",
+            capability: CAPABILITY
+        });
         host.admin(() -> {
             routes.push(Route.get("/view-counts", new ViewCountsPage(host))
                 .attribute("cms.navigation", {
@@ -91,20 +110,26 @@ class ViewCountPlugin implements PluginEntrypoint {
     }
 
     public function onDestroy():Void {
+        PluginMiddleware.remove(middleware);
         for (route in routes) {
             Route.unregister(route);
         }
         routes = [];
+        ContentColumns.remove(column);
+        #if target.threaded
+        // Views still in memory are written before the plugin stops.
+        try {
+            ViewBuffer.flush(countingCountries);
+        } catch (error:Dynamic) {
+            trace('Counted views could not be written: ${Std.string(error)}');
+        }
+        #end
     }
 
     public function dispatch(event:String, context:String):String {
         var input:Dynamic = Json.parse(context);
-        if (event == "content.viewed") {
-            var views:Array<Dynamic> = input.data.views;
-            ViewCounts.add(views);
-            if (countries(input)) {
-                CountryViewData.add(views);
-            }
+        if (event == "schedule.run" && input.data.key == ViewBuffer.JOB) {
+            ViewBuffer.flush(countries(input));
             return "{}";
         }
         if (event == "settings.saved") {

@@ -344,11 +344,17 @@ def verify_permissions(owner, fixtures):
         status == 200 and "<h1>Backup / Restore</h1>" in html and 'id="backup-to-restore"' in html,
         "Backup / Restore did not render as server HTML",
     )
-    links = [link for group in page["adminNavigation"] for link in group["links"]]
-    check(all(link["href"] != BACKUPS for link in links), "Backup / Restore is still in the menu")
+    groups = {
+        group["label"]: [link["href"] for link in group["links"]]
+        for group in page["adminNavigation"]
+    }
     check(
-        any(link["href"] == "/admin/plugins" and BACKUPS in link["activePaths"] for link in links),
-        "Plugins is not the current menu entry on the backups page",
+        BACKUPS in groups.get("Extensions", []), "Backup / Restore is not listed under Extensions"
+    )
+    links = [link for group in page["adminNavigation"] for link in group["links"]]
+    check(
+        all(BACKUPS not in link["activePaths"] for link in links),
+        "Another menu entry is current on the backups page",
     )
     listing = owner.request("/admin/plugins")[2]
     check(

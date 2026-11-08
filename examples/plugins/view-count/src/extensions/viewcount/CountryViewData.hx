@@ -38,6 +38,9 @@ class CountryViewData {
     public static inline var PAGE_SIZE = 30;
     public static inline var MAX_LIMIT = 100;
 
+    /** What a view without a trusted country counts as. **/
+    public static inline var UNKNOWN = "UNKNOWN";
+
     /** The package that provides the visitor's country. **/
     public static inline var COUNTRY_SOURCE = "plugin-cloudflare";
 
@@ -48,12 +51,12 @@ class CountryViewData {
 
     /** A country filter or stored country: two uppercase letters or `UNKNOWN`. **/
     public static function validCountry(code:Null<String>):Bool {
-        return code == ContentViews.UNKNOWN_COUNTRY || ContentViews.validCountry(code);
+        return code == UNKNOWN || ContentViews.validCountry(code);
     }
 
     /**
-        Adds one minute's counts from `content.viewed`: one keyed increment
-        per content item and country, for the items that still exist.
+        Adds counted views: one keyed increment per content item and
+        country, for the items that still exist.
     **/
     public static function add(views:Array<Dynamic>):Void {
         var counts:Map<String, Int> = [];
@@ -62,7 +65,7 @@ class CountryViewData {
         for (view in views) {
             var id:Int = view.content.id;
             var reported:String = view.country;
-            var country = validCountry(reported) ? reported : ContentViews.UNKNOWN_COUNTRY;
+            var country = validCountry(reported) ? reported : UNKNOWN;
             var count:Int = view.count;
             var key = '${id}:${country}';
             var previous = counts.get(key) ?? 0;

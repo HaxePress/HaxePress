@@ -171,7 +171,8 @@ def run(app, url):
     )
     check(scheduled.returncode == 0, "the schedule command runs")
     check_mcp(admin, url)
-    check_content_views(app, admin, viewed_at)
+    viewed = check_content_views(app, admin, viewed_at)
+    check_columns(admin, viewed)
 
 
 def check_forks(admin, public):
@@ -269,7 +270,7 @@ def visit_content_views(app, admin):
     check(admin.request(VIEWED, extra_headers=BROWSER)[0] == 200, "a member views the page")
     lines = [
         line
-        for log in (app / "storage/content-views").glob("*.log")
+        for log in (app / "storage/view-count/pending").glob("*.log")
         for line in log.read_text().splitlines()
     ]
     check(
@@ -280,7 +281,7 @@ def visit_content_views(app, admin):
 
 
 def check_content_views(app, admin, visited):
-    """The minute's views reach View Count, by country too, through `content.viewed`."""
+    """The minute's views reach View Count's tables, by country too, through its job."""
     counts = {}
     countries = {}
     expected = {"TR": 2, "UNKNOWN": 1}
@@ -308,12 +309,53 @@ def check_content_views(app, admin, visited):
         f"the country counts used CF-IPCountry only from the trusted connection: {countries}",
     )
     check(
-        not list((app / "storage/content-views").glob("*.log"))
-        and not list((app / "storage/content-views").glob("*.claimed")),
+        not list((app / "storage/view-count/pending").glob("*.log"))
+        and not list((app / "storage/view-count/pending").glob("*.claimed")),
         "the handed over minute files are removed",
     )
     for page in ["/admin/view-counts", "/admin/view-counts/countries"]:
         check(admin.request(page)[0] == 200, f"{page} renders")
+    return counts[VIEWED]["contentId"]
+
+
+def check_columns(admin, viewed):
+    """The content list's columns on PHP: the Views column, sorting by it, hiding and moving."""
+
+    def page(path):
+        status, _, body = admin.request(path, extra_headers=DATA)
+        check(status == 200, f"{path} answers with its data")
+        return json.loads(body)["props"]
+
+    views = "plugin-view-count.views"
+    listing = page("/admin/content")
+    keys = [column["key"] for column in listing["columns"]]
+    check(
+        keys[0] == "title" and views in keys and keys[-1] == "updated",
+        f"the list shows the default columns and View Count's: {keys}",
+    )
+    status, _, html = admin.request("/admin/content")
+    check(status == 200 and 'class="sort-link"' in html, "the list renders sortable headings")
+    ordered = page(f"/admin/content?sort={views}&dir=desc")
+    check(ordered["items"][0]["id"] == viewed, "sorting by views puts the viewed item first")
+    check(
+        ordered["items"][0]["cells"][keys.index(views)]["text"] == "3",
+        "the Views column shows the item's count",
+    )
+    order = [setting["key"] for setting in listing["columnSettings"]]
+    data = {"order": ",".join(order), "move": "status:up"}
+    for index, key in enumerate(order):
+        if key != "category":
+            data[f"visible_{index}"] = key
+    check(admin.request("/admin/content/columns", "POST", data)[0] == 303, "the columns save")
+    arranged = [column["key"] for column in page("/admin/content")["columns"]]
+    check(
+        arranged[:2] == ["status", "title"] and "category" not in arranged,
+        f"the saved columns are moved and hidden: {arranged}",
+    )
+    reset = {"order": ",".join(order), "reset": "1"}
+    check(admin.request("/admin/content/columns", "POST", reset)[0] == 303, "the columns reset")
+    restored = [column["key"] for column in page("/admin/content")["columns"]]
+    check(restored == keys, f"resetting brings the default columns back: {restored}")
 
 
 MODERN = "2026-07-28"

@@ -1,7 +1,6 @@
-package hx.press.content;
+package extensions.viewcount;
 
-import hx.press.packages.PackageData;
-import hx.press.plugins.PluginRuntime;
+import hx.well.facades.DBStatic;
 import hx.well.facades.Storage;
 import hx.well.internal.SecureToken;
 #if target.threaded
@@ -9,30 +8,29 @@ import sys.thread.Mutex;
 #end
 
 /**
-    Collects the views `ContentViews.counted` accepts and gives them to
-    plugins once a minute with the `content.viewed` hook, so a page view
-    writes nothing to the database. Each view adds one to the count of its
-    content item and country.
+    Collects counted views and writes them to the database once a minute,
+    so a page view writes nothing to the database. Each view adds one to
+    the count of its content item and country.
 
-    The JVM keeps the counts in memory and hands them over at shutdown too.
-    PHP serves each request in a new process, so a view appends one line to
-    the file of its minute in `storage/content-views`; a minute is handed
-    over once it has ended and its last writers are done.
+    The JVM keeps the counts in memory and writes them when the plugin
+    stops too. PHP serves each request in a new process, so a view appends
+    one line to the file of its minute on the local disk; a minute is
+    written once it has ended and its last writers are done.
 **/
-class ContentViewBuffer {
-    /** How many counts one `content.viewed` hook receives at most. **/
-    public static inline var BATCH = 500;
-
-    /** The core job that hands the counts to plugins. **/
-    public static inline var JOB = "content-views";
+class ViewBuffer {
+    /** The plugin's job that writes the counts. **/
+    public static inline var JOB = "flush";
 
     public static inline var INTERVAL_SECONDS = 60;
+
+    /** How many counts one transaction writes at most. **/
+    static inline var BATCH = 500;
 
     #if target.threaded
     static final lock = new Mutex();
     static var pending:Map<String, Int> = [];
     #else
-    static inline var FOLDER = "content-views";
+    static inline var FOLDER = "view-count/pending";
     static inline var MINUTE_MS = 60000;
 
     /** Time for the writers of a minute that has ended to finish their line. **/
@@ -42,16 +40,8 @@ class ContentViewBuffer {
     static inline var RECLAIM_MINUTES = 10;
     #end
 
-    /** Whether an active plugin receives `content.viewed`. **/
-    public static function wanted():Bool {
-        return PackageData.forEvent("content.viewed", "plugin").length > 0;
-    }
-
     /** Counts one view of the content item `id` from `country`. **/
     public static function add(id:Int, type:String, country:String):Void {
-        if (!wanted()) {
-            return;
-        }
         var key = '${id}\t${type}\t${country}';
         #if target.threaded
         lock.acquire();
@@ -64,18 +54,37 @@ class ContentViewBuffer {
         #end
     }
 
-    /** Hands the counts collected so far to the plugins. **/
-    public static function flush():Void {
+    /**
+        Writes the counts collected so far: totals per content item, and per
+        country as well when `countries` is set.
+    **/
+    public static function flush(countries:Bool):Void {
+        var views = take();
+        var start = 0;
+        while (start < views.length) {
+            var batch = views.slice(start, start + BATCH);
+            DBStatic.transaction(() -> {
+                ViewCounts.add(batch);
+                if (countries) {
+                    CountryViewData.add(batch);
+                }
+            });
+            start += BATCH;
+        }
+    }
+
+    /** The counts collected so far, as `{content: {id, type}, country, count}`, removed from the buffer. **/
+    static function take():Array<Dynamic> {
         #if target.threaded
         lock.acquire();
-        var taken = pending;
+        var counts = pending;
         pending = [];
         lock.release();
-        send(taken);
+        return views(counts);
         #else
         var disk = Storage.disk("local");
         if (!disk.directoryExists(FOLDER)) {
-            return;
+            return [];
         }
         var now = Date.now().getTime();
         var currentMinute = Math.floor(now / MINUTE_MS);
@@ -115,30 +124,24 @@ class ContentViewBuffer {
                 }
             }
         }
-        send(counts);
+        return views(counts);
         #end
     }
 
-    static function send(counts:Map<String, Int>):Void {
-        var batch:Array<Dynamic> = [];
+    static function views(counts:Map<String, Int>):Array<Dynamic> {
+        var result:Array<Dynamic> = [];
         for (key => count in counts) {
             var parts = key.split("\t");
             var id = parts.length == 3 ? Std.parseInt(parts[0]) : null;
             if (id == null || id <= 0) {
                 continue;
             }
-            batch.push({
+            result.push({
                 content: {id: id, type: parts[1]},
                 country: parts[2],
                 count: count
             });
-            if (batch.length == BATCH) {
-                PluginRuntime.viewed(batch);
-                batch = [];
-            }
         }
-        if (batch.length > 0) {
-            PluginRuntime.viewed(batch);
-        }
+        return result;
     }
 }

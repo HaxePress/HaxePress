@@ -39,8 +39,9 @@ typedef AdminRouteNavigation = {
 class AdminNavigation {
     /**
         The route attribute that makes a plugin's admin page its settings
-        page, `{capability}`. The page stays out of the menu: the plugin's
-        Settings button opens it, and Plugins is the current menu entry there.
+        page, `{capability}`: the plugin's Settings button opens it. A page
+        without `cms.navigation` stays out of the menu, and Plugins is the
+        current menu entry there.
     **/
     public static inline final SETTINGS = "cms.settings";
 
@@ -66,6 +67,17 @@ class AdminNavigation {
         return pages;
     }
 
+    /** Whether a GET route at `path` declares a menu entry. **/
+    static function listed(path:String):Bool {
+        for (route in Route.routes) {
+            if (route.value == path && route.getMethods().contains("GET")
+                && route.getAttribute("cms.navigation", null) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static function groups(request:Request, pluginLinks:Array<Dynamic>,
             grants:Array<String>):Array<AdminNavigationGroup> {
         var groups:Map<String, AdminNavigationGroup> = [];
@@ -74,7 +86,11 @@ class AdminNavigation {
         var contentAccess = CmsAccess.hasAccessibleCollections(grants);
         var permittedPages = settingsPages(capability -> allCapabilities
             || grants.contains(capability));
-        var pluginSettings = [for (path in permittedPages) path];
+        // Settings pages with a menu entry of their own are current there instead.
+        var pluginSettings = [
+            for (path in permittedPages)
+                if (!listed(path)) path
+        ];
 
         function append(group:String, groupPosition:Int, link:AdminNavigationLink):Void {
             if (known.exists(link.href)) {

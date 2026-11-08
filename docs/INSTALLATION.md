@@ -32,7 +32,7 @@ If initialization fails, the main environment file is not replaced. Use an empty
 
 ## Site backups
 
-HaxePress installs the bundled **Backups** plugin on JVM sites using SQLite or MySQL. While the plugin is active, open **Plugins** and choose **Settings** on the **Backups** card to reach **Backup / Restore**. The Owner role has **Manage site backups** by default. Grant the capability separately in **Roles** to allow another administrator to prepare, verify, schedule and download backups. The Settings button needs **Manage themes and plugins** as well; an administrator with only the backup capability opens `/admin/backups` directly.
+HaxePress installs the bundled **Backups** plugin on JVM sites using SQLite or MySQL. While the plugin is active, **Backup / Restore** is listed under **Extensions** in the menu, and **Settings** on the **Backups** card in **Plugins** opens it too. The Owner role has **Manage site backups** by default. Grant the capability separately in **Roles** to allow another administrator to prepare, verify, schedule and download backups. The menu entry needs only that capability; the Settings button is on the Plugins page, which needs **Manage themes and plugins**.
 
 Use **Backup schedules** to set a fixed interval, optional first run, section selection, encryption and retention for each rule. For example, keep the latest five daily content backups and keep a separate weekly encrypted backup with plugins. The browser uses its local time when you pick the first run. The worker uses the saved interval after that and runs one overdue occurrence after downtime.
 

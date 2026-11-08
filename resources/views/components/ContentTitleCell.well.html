@@ -1,0 +1,20 @@
+<props item="ContentAdminRowView" />
+<div class="table-content">
+  <img :if="item.image" src="{{ item.image }}" alt="" loading="lazy" /><span
+    :else
+    class="table-image-placeholder"
+    aria-hidden="true"
+    >{!! icon('image') !!}</span
+  ><span
+    ><strong
+      ><template :if="item.status == 'trash'">{{ item.title }}</template
+      ><a :else href="{{ item.adminBase }}/{{ item.id }}/edit">{{ item.title }}</a></strong
+    ><small
+      >{{ item.url ? item.url : t('Private content') }}<span
+        :if="item.featured"
+        class="featured-text"
+        >{!! icon('sparkles') !!} {{ t('Featured') }}</span
+      ></small
+    ></span
+  >
+</div>

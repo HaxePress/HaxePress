@@ -22,22 +22,29 @@ typedef PageLinks = {
 }
 
 class Pagination {
-    public static function cursor(request:Request, stringKeys:Bool = false):Null<PageCursor> {
+    /**
+        The page cursor of `request`. `maxValue` bounds the sorted value it
+        carries; lists sorted by longer text pass a larger one.
+    **/
+    public static function cursor(request:Request, stringKeys:Bool = false,
+            maxValue:Int = 40):Null<PageCursor> {
         var token = request.query("cursor", "");
-        if (token == "" || token.length > 512)
+        // A UTF-8 character takes up to four bytes, and Base64 adds a third.
+        var maxToken = Std.int(Math.max(512, maxValue * 6 + 128));
+        if (token == "" || token.length > maxToken)
             return null;
         try {
             var parts:Array<Dynamic> = Json.parse(Base64.urlDecode(token).toString());
             if (parts.length != 3 || !Std.isOfType(parts[2], Bool))
                 return null;
             var validKey = stringKeys ? Std.isOfType(parts[1], String)
-                && ~/^[A-Za-z0-9_-]{1,128}$/.match(parts[1]) : Std.isOfType(parts[1], Int)
+                && ~/^[A-Za-z0-9_-]{1,128}(?![\s\S])/.match(parts[1]) : Std.isOfType(parts[1], Int)
                 && parts[1] > 0;
             if (!validKey) {
                 return null;
             }
             if (parts[0] != null
-                && (!Std.isOfType(parts[0], String) || Std.string(parts[0]).length > 40))
+                && (!Std.isOfType(parts[0], String) || Std.string(parts[0]).length > maxValue))
                 return null;
             return {value: parts[0], id: parts[1], before: parts[2]};
         } catch (error:Dynamic) {

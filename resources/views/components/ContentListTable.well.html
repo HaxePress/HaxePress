@@ -1,0 +1,34 @@
+<props items="List<ContentAdminRowView>" columns="List<ContentListColumnView>" />
+<div class="table-scroll">
+  <table class="content-table">
+    <thead>
+      <tr>
+        <th :for="column in columns" :aria-sort="column.sorted ? column.sorted">
+          <a class="sort-link" href="{{ column.sortUrl }}"
+            >{{ column.label }}<span :if="column.sorted == 'ascending'" class="sort-mark"
+              >{!! icon('arrow-up') !!}<span class="sr-only"
+                >{{ t('Sorted ascending') }}</span
+              ></span
+            ><span :if="column.sorted == 'descending'" class="sort-mark"
+              >{!! icon('arrow-down') !!}<span class="sr-only"
+                >{{ t('Sorted descending') }}</span
+              ></span
+            ></a
+          >
+        </th>
+        <th><span class="sr-only">{{ t('Actions') }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr :for="item in items">
+        <td :for="cell in item.cells ?? []" :class="cell.kind == 'updated' ? 'table-date'">
+          <ContentTitleCell :if="cell.kind == 'title'" :item="item" />
+          <ContentStatus :else-if="cell.kind == 'status'" :item="item" />
+          <template :else-if="cell.kind == 'updated'">{{ item.updatedLabel }}</template>
+          <template :else>{{ cell.translate ? t(cell.text) : cell.text }}</template>
+        </td>
+        <td><ContentRowActions :item="item" /></td>
+      </tr>
+    </tbody>
+  </table>
+</div>

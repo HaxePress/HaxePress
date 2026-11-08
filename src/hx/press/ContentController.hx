@@ -7,7 +7,6 @@ import hx.press.Pagination;
 import hx.press.ContentItemData;
 import hx.press.data.ContentItemRecord;
 import hx.press.validation.PositiveInt;
-import hx.press.view.ContentAdminRows;
 import hx.press.view.View;
 import haxe.Json;
 import hx.well.http.AbstractResponse;
@@ -18,6 +17,7 @@ import hx.press.model.ContentRevision;
 import hx.press.model.EditorDraft;
 import hx.press.content.ContentTypes;
 import hx.press.content.ContentFields;
+import hx.press.content.ContentListColumns;
 import hx.press.content.ContentTypeDefinition;
 import hx.press.i18n.I18n;
 import hx.press.packages.ThemeData;
@@ -43,12 +43,20 @@ class ContentController {
         if (!["", "draft", "published", "scheduled", "trash"].contains(status)) {
             status = "";
         }
-        var cursor = Pagination.cursor(request);
-        var page = ContentData.page(kind, search, status, author, cursor);
+        var layout = ContentListColumns.layout(admin.id, type);
+        var sort = ContentListColumns.sort(layout, request.query("sort", ""),
+            request.query("dir", ""));
+        var cursor = ContentListColumns.validCursor(Pagination.cursor(request, false,
+            ContentListColumns.MAX_SORT_VALUE), sort);
+        var page = ContentData.page(kind, search, status, author, cursor, layout.visible, sort);
         var count = ContentData.count(kind, search, status, author);
-        var links = Pagination.links(type.adminBase, ["q" => search, "status" => status], page,
-            cursor, count, document -> document.id,
-            document -> ContentItemData.dateValue(document.updated_at));
+        var listParameters = ["q" => search, "status" => status];
+        if (sort.chosen) {
+            listParameters.set("sort", sort.column.key);
+            listParameters.set("dir", sort.descending ? "desc" : "asc");
+        }
+        var links = Pagination.links(type.adminBase, listParameters, page, cursor, count,
+            document -> document.id, document -> ContentListColumns.sortValue(document, sort));
         var drafts = EditorDraft.query.select(["key", "title", "updated_at"])
             .where("user_id", admin.id)
             .where("kind", kind)
@@ -65,9 +73,33 @@ class ContentController {
             case "deleted": "The content has been permanently deleted.";
             default: "";
         };
-        var listFields = ContentAdminRows.listFields(type);
-        var items = page.items.map(item ->
-            ContentAdminRows.withColumns(ContentItemData.adminSummary(item, type), listFields));
+        var items = page.items.map(item -> {
+            var summary = ContentItemData.adminSummary(item, type);
+            summary.cells = ContentListColumns.cells(item, summary, layout.visible);
+            return summary;
+        });
+        var columns = [
+            for (column in layout.visible)
+                {
+                    key: column.key,
+                    label: column.label,
+                    cell: column.cell,
+                    sortUrl: listUrl(type.adminBase, search, status, column.key,
+                        ContentListColumns.nextDirection(sort, column)),
+                    sorted: sort.column.key == column.key ? sort.descending ? "descending" : "ascending" : ""
+                }
+        ];
+        var columnSettings = [
+            for (column in layout.columns)
+                {
+                    key: column.key,
+                    label: column.label,
+                    visible: !layout.hidden.contains(column.key)
+                }
+        ];
+        var columnOrder = layout.columns.map(column -> column.key).join(",");
+        var sortKey = sort.chosen ? sort.column.key : "";
+        var sortDirection = sort.chosen ? sort.descending ? "desc" : "asc" : "";
         var props = {
             items: items,
             query: search,
@@ -81,11 +113,77 @@ class ContentController {
             notice: notice,
             kind: kind,
             contentType: type,
-            listFields: listFields,
-            showCategory: ContentTypes.supports(type, "categories"),
+            columns: columns,
+            columnSettings: columnSettings,
+            columnOrder: columnOrder,
+            sort: sortKey,
+            direction: sortDirection,
+            statusLinks: {
+                all: listUrl(type.adminBase, "", "", sortKey, sortDirection),
+                published: listUrl(type.adminBase, "", "published", sortKey, sortDirection),
+                draft: listUrl(type.adminBase, "", "draft", sortKey, sortDirection),
+                scheduled: listUrl(type.adminBase, "", "scheduled", sortKey, sortDirection),
+                trash: listUrl(type.adminBase, "", "trash", sortKey, sortDirection)
+            },
             workingDrafts: drafts
         };
         return View.render("Admin/Content", props);
+    }
+
+    /** A list URL with its search, status filter and order. **/
+    static function listUrl(base:String, search:String, status:String, sort:String,
+            direction:String):String {
+        var pairs = [];
+        for (pair in [["q", search], ["status", status], ["sort", sort], ["dir", direction]]) {
+            if (pair[1] != "") {
+                pairs.push('${pair[0]}=${StringTools.urlEncode(pair[1])}');
+            }
+        }
+        return pairs.length == 0 ? base : '${base}?${pairs.join("&")}';
+    }
+
+    /**
+        Saves which list columns the signed-in member sees, and their order,
+        then returns to the list as it was.
+    **/
+    public static function saveColumns(request:Request, kind:String):AbstractResponse {
+        var type = ContentTypes.find(kind);
+        if (type == null) {
+            return SiteController.notFound(request);
+        }
+        if (!CmsAccess.can(type.capability)) {
+            return CmsController.forbidden(request);
+        }
+        if (!request.validate([
+            "order" => [String, Max(4000)],
+            "move" => [String, Max(200)],
+            "reset" => [String, Max(1)],
+            "q" => [String, Max(120)],
+            "status" => [String, Max(20)],
+            "sort" => [String, Max(200)],
+            "dir" => [String, Max(4)]
+        ])) {
+            return ResponseBuilder.asString("Choose valid list columns.", 422);
+        }
+        var admin = CmsAccess.current();
+        var order:String = request.input("order", "");
+        var keys = order == "" ? [] : order.split(",").slice(0, 64);
+        if (request.input("reset", "") == "1") {
+            ContentListColumns.reset(admin.id, type);
+        } else {
+            var visible:Array<String> = [];
+            // Unknown keys are left out when the columns are saved.
+            for (index in 0...keys.length) {
+                var value = Std.string(request.input('visible_${index}', ""));
+                if (value != "") {
+                    visible.push(value);
+                }
+            }
+            ContentListColumns.save(admin.id, type, keys, visible, request.input("move", ""));
+        }
+        var url = listUrl(type.adminBase, request.input("q", ""), request.input("status", ""),
+            request.input("sort", ""), request.input("dir", ""));
+        return ResponseBuilder.asRedirect(url, 303);
     }
 
     public static function newDocument(request:Request, kind:String):AbstractResponse {

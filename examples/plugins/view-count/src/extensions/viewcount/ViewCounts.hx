@@ -66,13 +66,19 @@ class ViewCounts {
                             .cascadeOnDelete();
                     });
                 }
+            }),
+            // Content lists sort by the Views column, and the plugin's page lists the most viewed.
+            new PluginMigration("003_index_total_views", () -> {
+                schema.table(totals, table -> {
+                    table.index(["views", "content_id"]);
+                });
             })
         ]);
     }
 
     /**
-        Adds one minute's counts from `content.viewed`: one keyed increment
-        per content item, for the items that still exist.
+        Adds counted views: one keyed increment per content item, for the
+        items that still exist.
     **/
     public static function add(views:Array<Dynamic>):Void {
         var counts:Map<Int, Int> = [];

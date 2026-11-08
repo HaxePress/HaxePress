@@ -137,7 +137,7 @@ class SafePackageArchive {
     #end
 
     public static function inspect(disk:StorageDisk, root:String):InspectedPackage {
-        var manifest = PackageManifest.parse(disk.get('${root}/${PackageManifest.FILENAME}'));
+        var manifest = PackageManifest.parseUpload(disk.get('${root}/${PackageManifest.FILENAME}'));
         for (asset in [manifest.module, manifest.stylesheet]) {
             if (asset != ""
                 && (!disk.fileExists('${root}/public/${asset}')

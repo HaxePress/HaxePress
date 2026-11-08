@@ -158,42 +158,89 @@ public function onDestroy():Void {
 
 ### Content views
 
-A plugin that counts visits subscribes to `content.viewed` and adds the counts it receives. The application decides what a view is, keeps the counts and hands them over once a minute, so a page view writes nothing to the database:
+The application tells plugins which published content item a page shows and what it knows about the visitor; what counts as a visit, how counts are kept and where they go is each plugin's own choice. A plugin that counts visits adds middleware (see [Middleware](#middleware)), reads the request after `next(request)` returns, so the order of plugin middleware does not matter, and records its count in `dispose`, which HxWell calls after sending the response:
 
 ```haxe
-public function dispatch(event:String, context:String):String {
-    if (event == "content.viewed") {
-        var input:Dynamic = Json.parse(context);
-        var views:Array<Dynamic> = input.data.views;
-        for (view in views) {
-            var id:Int = view.content.id;
-            var count:Int = view.count;
-            PageViews.query.upsertIncrement(["content_id" => id, "views" => count], ["content_id"],
-                ["views"]);
+class VisitMiddleware extends AbstractMiddleware {
+    var id = 0;
+
+    public function handle(request:Request, next:Request->Null<Response>):Null<Response> {
+        var response = next(request);
+        var shown:Dynamic = ContentViews.content(request);
+        if (shown != null && request.method == "GET" && !ContentViews.member(request)) {
+            id = shown.id;
         }
+        return response;
     }
-    return "{}";
+
+    public override function dispose():Void {
+        if (id > 0) {
+            Visits.add(id); // the plugin's own buffer
+        }
+        super.dispose();
+    }
 }
 ```
 
-Each entry of `views` is `{content: {id, type}, country, count}`: the views of one published content item from one country since the last call, at most 500 entries per call. `country` is two uppercase letters, or `UNKNOWN` when no trusted country is known. The hook runs in one transaction of the default connection, so a plugin's writes for the batch commit together; a failure rolls them back and is logged, and the plugin stays active. Content deleted since its views were counted can appear, so a table with a foreign key to `content_items` checks that the IDs still exist. `Model.query.upsertIncrement(data, uniqueBy, increment)` inserts `data`, or adds the supplied values of the `increment` columns to the row with the same `uniqueBy` values, in one statement.
+| Name                            | Use                                                                                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ContentViews.CONTENT`          | Request attribute `cms.content`: `{id, type}` of the published content item the page shows; set while it renders, also for previews.                 |
+| `ContentViews.content(request)` | That value, or null.                                                                                                                                 |
+| `ContentViews.COUNTRY`          | Request attribute `cms.visitor.country`: two uppercase letters, set only by a plugin that trusts the connection's proxy.                             |
+| `ContentViews.country(request)` | That country, or null.                                                                                                                               |
+| `ContentViews.MEMBER_COOKIE`    | `cms_member`, which the administration sets for the whole site while a member is signed in. It grants nothing; public pages have no session to read. |
+| `ContentViews.member(request)`  | Whether that cookie is present.                                                                                                                      |
 
-A view is a GET of a public page that shows a published content item and answers 200. HEAD requests, previews and other administration pages, browsers of signed-in members, clients that do not send a browser's `User-Agent`, crawlers, link previews and speculative loads (`Sec-Purpose`, `Purpose`, `X-Purpose`, `X-Moz`) are left out. The JVM keeps the counts in memory and hands them over at a graceful shutdown too. PHP serves each request in a new process, so a view appends one line to the file of its minute in `storage/content-views`, and a minute is handed over after it has ended; run `schedule:run` from cron so the counts arrive when the site is quiet. Pages served from a cache in front of the site, such as a Cloudflare rule that caches HTML, are not seen.
+The `site.shared` hook receives the same `content` on pages that show a published item, so a plugin can add a block about it. The bundled Cloudflare plugin sets `cms.visitor.country` from `CF-IPCountry` on the connections it trusts, ignoring `XX`, Tor's `T1` and malformed values; a plugin for another trusted proxy can set it the same way. To keep page views from writing to the database, collect counts in memory on the JVM, or append them to a file of the minute with `Storage.append` on PHP, where each request is a new process, and write them from a job (`host.schedule`); `Model.query.upsertIncrement(data, uniqueBy, increment)` inserts `data`, or adds the supplied values of the `increment` columns to the row with the same `uniqueBy` values, in one statement. Pages served from a cache in front of the site, such as a Cloudflare rule that caches HTML, are not seen.
 
-`hx.press.content.ContentViews` holds the same rules for plugins with their own middleware or hooks:
+The bundled View Count plugin (`examples/plugins/view-count`) works this way, and all its rules are in the plugin. `ViewRules` counts a GET of a public page that shows a published content item and answers 200, and leaves out HEAD requests, previews and other administration pages, signed-in members' browsers, clients that do not send a browser's `User-Agent`, crawlers, link previews and speculative loads (`Sec-Purpose`, `Purpose`, `X-Purpose`, `X-Moz`). `ViewBuffer` keeps the counts in memory on the JVM, and writes them when the plugin stops too; on PHP a view appends one line to the file of its minute in `storage/view-count/pending`. The plugin's `flush` job writes them once a minute in transactions of up to 500 counts; run `schedule:run` from cron on PHP so they are written when the site is quiet. It keeps one row per content item. Its page under **View counts** lists the most viewed content, `/admin/view-counts/data` answers the same as JSON (`content`, `cursor`, `limit` up to 100) and as the MCP tool `plugin_view_count_views`, the dashboard shows the total, and its settings can show the count before or after the content of public pages. Its **Count views by country** setting, off by default, keeps one row per content item and country as well, listed under **Views by country** (`/admin/view-counts/countries`) with filters by content and country, `/admin/view-counts/countries/data` (`content`, `country`, `cursor`, `limit`) and the MCP tool `plugin_view_count_country_views`. Countries come only from the Cloudflare plugin: without it, or on a connection it does not trust, a view counts as `UNKNOWN`, and the page says when the setting is off or the Cloudflare plugin is inactive. Its pages need the `view_counts` capability.
 
-| Name                                      | Use                                                                                                                                                  |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ContentViews.CONTENT`                    | Request attribute `cms.content`: `{id, type}` of the published content item the page shows; set while it renders, also for previews.                 |
-| `ContentViews.content(request)`           | That value, or null.                                                                                                                                 |
-| `ContentViews.counted(request, response)` | The content ID when the finished response is a visitor's view, or 0.                                                                                 |
-| `ContentViews.COUNTRY`                    | Request attribute `cms.visitor.country`: two uppercase letters, set only by a plugin that trusts the connection's proxy.                             |
-| `ContentViews.country(request)`           | That country, or `UNKNOWN`.                                                                                                                          |
-| `ContentViews.MEMBER_COOKIE`              | `cms_member`, which the administration sets for the whole site while a member is signed in. It grants nothing; public pages have no session to read. |
+### Content list columns
 
-The `site.shared` hook receives the same `content` on pages that show a published item, so a plugin can add a block about it. The bundled Cloudflare plugin sets `cms.visitor.country` from `CF-IPCountry` on the connections it trusts, ignoring `XX`, Tor's `T1` and malformed values; a plugin for another trusted proxy can set it the same way. Read it after `next(request)` returns, or from `content.viewed`, so the order of plugin middleware does not matter.
+The admin list of every collection shows its own columns (the item, status, category and last update), the custom fields shown in lists and the columns of active plugins. Each member chooses which of them they see with the list's **Columns** control and drags them into order there (or focuses a column's handle and uses the arrow keys), and sorts the list by any visible column from its heading. The choice is kept per member and collection in `admin_preferences`.
 
-The bundled View Count plugin (`examples/plugins/view-count`) keeps one row per content item. Its page under **View counts** lists the most viewed content, `/admin/view-counts/data` answers the same as JSON (`content`, `cursor`, `limit` up to 100) and as the MCP tool `plugin_view_count_views`, the dashboard shows the total, and its settings can show the count before or after the content of public pages. Its **Count views by country** setting, off by default, keeps one row per content item and country as well, listed under **Views by country** (`/admin/view-counts/countries`) with filters by content and country, `/admin/view-counts/countries/data` (`content`, `country`, `cursor`, `limit`) and the MCP tool `plugin_view_count_country_views`. Countries come only from the Cloudflare plugin: without it, or on a connection it does not trust, a view counts as `UNKNOWN`, and the page says when the setting is off or the Cloudflare plugin is inactive. Its pages need the `view_counts` capability.
+A plugin adds a column in `onCreate` and removes it in `onDestroy`:
+
+```haxe
+import hx.press.content.ContentColumns;
+import hx.press.content.ContentColumns.ContentColumn;
+import hx.press.plugins.PluginDatabase;
+
+var column:ContentColumn;
+
+public function onCreate(host:PluginHost, context:String):Void {
+    column = ContentColumns.add({
+        key: "views",
+        label: "Views",
+        table: PluginDatabase.table("view-count", "totals"),
+        value: "views",
+        kind: "number",
+        empty: "0",
+        capability: "view_counts"
+    });
+}
+
+public function onDestroy():Void {
+    ContentColumns.remove(column);
+}
+```
+
+| Field         | Meaning                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| `key`         | Lowercase letters, digits and underscores, unique in the plugin; the column is `<plugin ID>.<key>` |
+| `label`       | The heading, a key in the plugin's catalogue (`namespace` names another)                           |
+| `table`       | A table of the plugin itself (its `PluginDatabase` prefix) with at most one row per item           |
+| `content`     | The column holding the content item's ID; `content_id` when left out                               |
+| `value`       | The column shown and sorted; it must not hold null                                                 |
+| `kind`        | `number` (the default) or `text`                                                                   |
+| `empty`       | What an item without a row shows; `—` when left out                                                |
+| `collections` | The collection keys that show it; every collection when left out                                   |
+| `where`       | Column values the rows must have, such as `{country: "TR"}`                                        |
+| `capability`  | The capability a member needs to see it                                                            |
+
+The list reads a column's value in its own query with a subquery on the plugin's table, so a page reads nothing more than its rows. Sorting by a column happens in SQL, and pages continue with a cursor on the sorted value and the item ID; an item without a row sorts lowest, last when descending and first when ascending. Index `(value, content)` for lists that sort by it. Pages that show or sort by a plugin column are not cached, because the content cache does not follow plugin tables.
+
+A new column is visible until a member hides it, and appears beside the column it follows by default. While its plugin is inactive the column is not offered; members' choices keep its place and visibility for when the plugin returns. The runtime records the columns a plugin adds while it is created, so a failed creation removes them and stopping the plugin removes what `onDestroy` left. The bundled View Count plugin adds its **Views** column this way.
 
 ### Plugin pages
 
@@ -273,7 +320,6 @@ Handlers without this interface retain HxWell's standard 422 response. Permissio
 | `content.render`    | `{ document, content }`                                                                  | Transformed `content`; stored content is unchanged |
 | `content.saving`    | `{ document }`                                                                           | An `error` to reject a manual save                 |
 | `content.saved`     | `{ document }`                                                                           | Notification after saving or scheduled publication |
-| `content.viewed`    | `{ views }`, once a minute; see [Content views](#content-views)                          | Notification; writes commit in one transaction     |
 | `dashboard.widgets` | `{ summary }`                                                                            | Markdown blocks with slot `dashboard`              |
 | `ui.navigation`     | `{ location, capabilities }`                                                             | Safe internal `items` with label/href/icon         |
 | `site.assets`       | Automatically registered for module/styles                                               | Public frontend assets                             |
@@ -322,7 +368,7 @@ Roles.ensureCapability("catalog.export", "Export catalog", "Catalog", "plugin-ca
 NavigationRegions.ensure("catalog_links", "Catalog links", 10);
 ```
 
-Native administration routes can declare `cms.navigation` metadata with `label`, `icon`, `group`, `groupPosition`, `position`, `capability`, optional `exact` and `activePaths`. The host merges these with authorized collection links and the existing `ui.navigation` hook. A plugin page that belongs to the plugin's settings declares `cms.settings` (`{capability}`) instead: it stays out of the menu, the Settings button on the plugin's card opens it in place of the generated settings form, and Plugins is the current menu entry while it is open. The Backups plugin opens Backup / Restore this way. Either attribute's capability also guards the routes below the page for MCP clients. Core route/session/CSRF middleware remains required through `host.admin`.
+Native administration routes can declare `cms.navigation` metadata with `label`, `icon`, `group`, `groupPosition`, `position`, `capability`, optional `exact` and `activePaths`. The host merges these with authorized collection links and the existing `ui.navigation` hook. A plugin page that belongs to the plugin's settings declares `cms.settings` (`{capability}`): the Settings button on the plugin's card opens it in place of the generated settings form. With `cms.settings` alone the page stays out of the menu and Plugins is the current menu entry while it is open; with `cms.navigation` as well it also has its own menu entry. Backup / Restore declares both, so it is listed under Extensions and opened by the Backups card's Settings button. Either attribute's capability also guards the routes below the page for MCP clients. Core route/session/CSRF middleware remains required through `host.admin`.
 
 ## Models, migrations and state
 

@@ -5,8 +5,6 @@ import hx.press.validation.ValidationResponder;
 import hx.well.template.StatusTemplate;
 import hx.press.ContentCache;
 import hx.well.database.Connection;
-import hx.well.facades.DBStatic;
-import hx.press.content.ContentViewBuffer;
 import hx.well.facades.Storage;
 import hx.well.http.ResponseBuilder;
 import hx.well.http.AbstractResponse;
@@ -20,6 +18,8 @@ import hx.press.i18n.I18n;
 import hx.press.MediaStorage;
 import hx.press.http.BodyLimits;
 import hx.press.media.MediaLocks;
+import hx.press.content.ContentColumns;
+import hx.press.content.ContentColumns.ContentColumn;
 import hx.press.packages.PackageData;
 import hx.press.packages.PackageManager;
 import hx.press.packages.PackageData.PackageRecord;
@@ -47,6 +47,7 @@ private class LivePlugin {
     public var module:PluginModule;
     public var routes:Array<RouteElement> = [];
     public var middlewares:Array<PluginMiddleware> = [];
+    public var columns:Array<ContentColumn> = [];
     public var record:PackageRecord;
 
     public function new(record:PackageRecord, module:PluginModule) {
@@ -134,14 +135,17 @@ class PluginRuntime {
         }
         var module:PluginModule = null;
         var middlewares:Array<PluginMiddleware> = [];
+        var columns:Array<ContentColumn> = [];
         try {
             var artifact = PackageManifest.serverArtifact(manifest);
             var routes = Route.batch(() -> {
                 var path = Storage.disk("extensions")
                     .path('${PackageStorage.installed(record.directory)}/${artifact}');
                 module = new PluginModule(path, manifest.entrypoint);
-                middlewares = PluginMiddleware.collect(() -> {
-                    module.create(new DefaultPluginHost(record.plugin_id), context(record, {}));
+                columns = ContentColumns.collect(record.id, record.slug, () -> {
+                    middlewares = PluginMiddleware.collect(() -> {
+                        module.create(new DefaultPluginHost(record.plugin_id), context(record, {}));
+                    });
                 });
             }, route -> {
                 route.attribute("hx.press.plugin", record.id);
@@ -154,12 +158,16 @@ class PluginRuntime {
             var live = new LivePlugin(record, module);
             live.routes = routes;
             live.middlewares = middlewares;
+            live.columns = columns;
             hostLocks.set(moduleKey, manifest.locks);
             modules.set(moduleKey, live);
             locks.release(moduleKey);
         } catch (error:Dynamic) {
             for (middleware in middlewares) {
                 PluginMiddleware.remove(middleware);
+            }
+            for (column in columns) {
+                ContentColumns.remove(column);
             }
             if (module != null) {
                 try {
@@ -189,9 +197,12 @@ class PluginRuntime {
         } catch (error:Dynamic) {
             failure = error;
         }
-        // Middleware the plugin did not remove in onDestroy stops with it.
+        // Middleware and list columns the plugin did not remove in onDestroy stop with it.
         for (middleware in live.middlewares) {
             PluginMiddleware.remove(middleware);
+        }
+        for (column in live.columns) {
+            ContentColumns.remove(column);
         }
         Route.batch(() -> {
             for (route in live.routes) {
@@ -216,12 +227,6 @@ class PluginRuntime {
     }
 
     public static function shutdown():Void {
-        // Counted views still in memory reach the plugins before they stop.
-        try {
-            ContentViewBuffer.flush();
-        } catch (error:Dynamic) {
-            trace('Content views could not be handed over: ${Std.string(error)}');
-        }
         ready = false;
         var runningPlugins = modules.copy();
         for (live in runningPlugins) {
@@ -440,25 +445,6 @@ class PluginRuntime {
     public static function saved(document:Dynamic):Void {
         for (record in PackageData.forEvent("content.saved")) {
             invoke(record, "content.saved", {document: document});
-        }
-    }
-
-    /**
-        Gives plugins a batch of counted content views. Each plugin's hook
-        runs in one transaction of the default connection, so its writes for
-        the batch commit together. A failure rolls back that plugin's writes
-        and is logged; it does not turn the plugin off.
-    **/
-    public static function viewed(views:Array<Dynamic>):Void {
-        var data = {views: views};
-        for (record in PackageData.forEvent("content.viewed", "plugin")) {
-            try {
-                DBStatic.transaction(() -> {
-                    invoke(record, "content.viewed", data, true);
-                });
-            } catch (error:Dynamic) {
-                trace('${record.id} could not record content views: ${Std.string(error)}');
-            }
         }
     }
 

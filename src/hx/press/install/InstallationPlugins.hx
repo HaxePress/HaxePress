@@ -4,6 +4,8 @@ package hx.press.install;
 import haxe.Exception;
 import hx.press.CmsVersion;
 import hx.press.http.BodyLimits;
+import hx.press.content.ContentColumns;
+import hx.press.content.ContentColumns.ContentColumn;
 import hx.press.packages.BuiltInPlugins;
 import hx.press.packages.PackageManifest;
 import hx.press.packages.PackageManifest.ManifestData;
@@ -32,6 +34,7 @@ private class StagedPlugin {
     public final module:PluginModule;
     public var routes:Array<RouteElement> = [];
     public var middlewares:Array<PluginMiddleware> = [];
+    public var columns:Array<ContentColumn> = [];
 
     public function new(id:String, root:String, manifest:ManifestData, module:PluginModule) {
         this.id = id;
@@ -157,8 +160,10 @@ class InstallationPlugins {
             PluginViews.stage(id, extensions, '${root}/${manifest.views}', '${ASSET_PATH}/${id}/');
         }
         plugin.routes = Route.batch(() -> {
-            plugin.middlewares = PluginMiddleware.collect(() -> {
-                module.create(new InstallationPluginHost(), context(plugin, {}));
+            plugin.columns = ContentColumns.collect(id, manifest.slug, () -> {
+                plugin.middlewares = PluginMiddleware.collect(() -> {
+                    module.create(new InstallationPluginHost(), context(plugin, {}));
+                });
             });
         }, route -> {
             route.attribute("hx.press.plugin", id);
@@ -248,6 +253,9 @@ class InstallationPlugins {
                 }
                 for (middleware in plugin.middlewares) {
                     PluginMiddleware.remove(middleware);
+                }
+                for (column in plugin.columns) {
+                    ContentColumns.remove(column);
                 }
                 PluginViews.unstage(plugin.id);
             }

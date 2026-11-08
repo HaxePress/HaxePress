@@ -145,5 +145,13 @@
   "The image was restored.": "The image was restored.",
   "The image was deleted permanently.": "The image was deleted permanently.",
   "Move this image to the trash before deleting it permanently.": "Move this image to the trash before deleting it permanently.",
-  "Another file already uses this image's name.": "Another file already uses this image's name."
+  "Another file already uses this image's name.": "Another file already uses this image's name.",
+  "Columns": "Columns",
+  "Save columns": "Save columns",
+  "Reset columns": "Reset columns",
+  "Sorted ascending": "Sorted ascending",
+  "Sorted descending": "Sorted descending",
+  "Drag columns to change their order, or focus a handle and use the arrow keys. Only your own list changes.": "Drag columns to change their order, or focus a handle and use the arrow keys. Only your own list changes.",
+  "Reorder {column}": "Reorder {column}",
+  "Moved {column} to position {position} of {count}.": "Moved {column} to position {position} of {count}."
 }

@@ -88,7 +88,6 @@ class PackageManifest {
         "content.render",
         "content.saving",
         "content.saved",
-        "content.viewed",
         "dashboard.widgets",
         "ui.navigation",
         "i18n.catalogues",
@@ -130,7 +129,21 @@ class PackageManifest {
         return true;
     }
 
+    /**
+        Reads the manifest of an installed package. A hook a later version of
+        the host no longer offers is left out, so the package keeps working
+        without it. Uploaded packages are read with `parseUpload`.
+    **/
     public static function parse(source:String):ManifestData {
+        return read(source, false);
+    }
+
+    /** Reads an uploaded package's manifest, which must name only the hooks this host offers. **/
+    public static function parseUpload(source:String):ManifestData {
+        return read(source, true);
+    }
+
+    static function read(source:String, uploaded:Bool):ManifestData {
         if (source.length > 65536) {
             throw new Exception("The package manifest is too large.");
         }
@@ -168,8 +181,14 @@ class PackageManifest {
                 throw new Exception("A package can subscribe to at most 16 hooks.");
             }
             for (event in requested) {
-                if (!Std.isOfType(event, String) || !events.contains(event)) {
+                if (!Std.isOfType(event, String)) {
                     throw new Exception("The package subscribes to an unsupported hook.");
+                }
+                if (!events.contains(event)) {
+                    if (uploaded) {
+                        throw new Exception("The package subscribes to an unsupported hook.");
+                    }
+                    continue;
                 }
                 if (!hooks.contains(event)) {
                     hooks.push(event);

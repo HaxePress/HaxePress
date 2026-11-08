@@ -1,0 +1,38 @@
+<props item="ContentAdminRowView" />
+<div class="table-actions">
+  <a
+    :if="item.status != 'trash'"
+    class="icon-button"
+    href="{{ item.adminBase }}/{{ item.id }}/edit"
+    aria-label="{{ t('Edit {title}', title: item.title) }}"
+    >{!! icon('edit') !!}</a
+  >
+  <a
+    :if="item.status == 'published' and item.url"
+    class="icon-button"
+    href="{{ item.url }}"
+    aria-label="{{ t('Read {title}', title: item.title) }}"
+    >{!! icon('external') !!}</a
+  >
+  <form
+    :if="can('publish') or item.status == 'draft' or item.status == 'trash'"
+    action="{{ item.adminBase }}/{{ item.id }}/{{ item.status == 'trash' ? 'permanent-delete' : 'trash' }}"
+    method="post"
+  >
+    <button
+      class="icon-button danger"
+      type="submit"
+      aria-label="{{ t('Delete {title}', title: item.title) }}"
+      data-well-confirm="{{ item.status == 'trash' ? t('Delete this content permanently? This action cannot be undone.') : t('Move this content to the trash? You can restore it later.') }}"
+    >
+      {!! icon('trash') !!}
+    </button>
+  </form>
+  <form
+    :if="item.status == 'trash'"
+    action="{{ item.adminBase }}/{{ item.id }}/restore"
+    method="post"
+  >
+    <button class="button button-outline" type="submit">{{ t('Restore') }}</button>
+  </form>
+</div>

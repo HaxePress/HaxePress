@@ -55,6 +55,7 @@ parser.add_argument(
         "cms_structure",
         "cms_lifecycle",
         "cloudflare",
+        "content_columns",
         "view_count",
         "view_count_countries",
         "plugin_database",
@@ -246,6 +247,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                     "cms_structure",
                     "cms_lifecycle",
                     "cloudflare",
+                    "content_columns",
                     "view_count",
                     "view_count_countries",
                     "plugin_database",
@@ -347,7 +349,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
             wait_ready(port, process)
             verify_example_unchanged(fixtures, example_directory)
             print(
-                "PASS Startup replaces a bundled theme whose shipped archive changed under the same version, keeping its settings, reinstalls a removed one, and leaves them alone afterwards",
+                "PASS Startup replaces a bundled theme whose shipped archive changed under the same version, keeping its settings, reinstalls a removed one, replaces a plugin that names a removed hook, and leaves them alone afterwards",
                 flush=True,
             )
             stop(process)

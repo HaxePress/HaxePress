@@ -71,6 +71,9 @@ class ViewIslands {
                 ]),
             // Keeps server-rendered package setting controls in step (color toggle and picker).
             new IslandSignature("package-settings", TRecord([])),
+            // Reorders a content list's columns by dragging or with the arrow keys.
+            new IslandSignature("column-order", TRecord([]),
+                ["Moved {column} to position {position} of {count}."]),
             new IslandSignature("share",
                 TRecord([new FieldInfo("title", TString), new FieldInfo("toast", TBool)]),
                 ["Link copied to clipboard.", "Copy this link: {url}"]),

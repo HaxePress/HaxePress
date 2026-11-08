@@ -22,6 +22,7 @@ import hx.press.navigation.NavigationRegions;
 import hx.press.database.ThemeDesignSchema;
 import hx.press.database.ThemeAiSchema;
 import hx.press.database.AdminMcpSchema;
+import hx.press.database.AdminPreferenceSchema;
 import hx.press.database.ThemeAssetSchema;
 
 class DatabaseProvider extends AbstractProvider {
@@ -50,6 +51,7 @@ class DatabaseProvider extends AbstractProvider {
         ThemeAiSchema.up();
         AdminMcpSchema.up();
         ThemeAssetSchema.up();
+        AdminPreferenceSchema.up();
         NavigationRegions.initialize();
         SiteSettingsStore.initialize();
         ManagedCategories.run();
