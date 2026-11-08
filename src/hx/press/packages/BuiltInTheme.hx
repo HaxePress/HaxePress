@@ -1,7 +1,6 @@
 package hx.press.packages;
 
 import haxe.Exception;
-import haxe.Json;
 import haxe.Resource;
 import hx.press.CategoryData;
 import hx.press.ContentCache;
@@ -76,7 +75,7 @@ class BuiltInTheme {
             "author" => manifest.author,
             "directory" => "",
             "manifest" => source,
-            "settings" => Json.stringify(settings),
+            "settings" => PackageSettings.serialize(settings),
             "enabled" => enabled,
             "setting_count" => manifest.fields.length,
             "last_error" => "",

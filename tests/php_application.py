@@ -156,6 +156,9 @@ def run(app, url):
         "content text is escaped",
     )
 
+    check_forks(admin, public)
+    check_cloudflare(admin)
+
     views = list((app / "storage/cache/views").rglob("*.php"))
     check(len(views) > 0, "compiled templates are kept as PHP files")
     check(
@@ -167,6 +170,69 @@ def run(app, url):
     )
     check(scheduled.returncode == 0, "the schedule command runs")
     check_mcp(admin, url)
+
+
+def check_forks(admin, public):
+    """Bundled themes stay with the application; their forks render and leave on their own."""
+    status, _, body = admin.request("/admin/themes/theme-notebook/uninstall", "POST", {})
+    check(status == 422 and "cannot be removed" in body, "a bundled theme cannot be removed")
+    for theme in ["theme-notebook", "theme-simple"]:
+        status, headers, _ = admin.request(f"/admin/themes/{theme}/fork", "POST", {})
+        check(status == 303 and "notice=forked" in headers["location"], f"{theme} forks")
+    listing = admin.request("/admin/themes")[2]
+    copies = sorted(
+        set(re.findall(r"/admin/themes/(theme-[a-z0-9-]+-copy-[a-z0-9]+)/fork", listing))
+    )
+    check(len(copies) == 2, f"both forks are listed: {copies}")
+    for copy in copies:
+        check(
+            admin.request(f"/admin/themes/{copy}/enable", "POST", {})[0] == 303, f"{copy} activates"
+        )
+        status, _, home = public.request("/")
+        check(status == 200 and "PHP HaxePress" in home, f"{copy} renders the home page")
+        status, headers, _ = admin.request(f"/admin/themes/{copy}/download", binary=True)
+        check(status == 200 and headers["content-type"] == "application/zip", f"{copy} downloads")
+    check(
+        admin.request("/admin/themes/theme-simple/enable", "POST", {})[0] == 303, "Simple returns"
+    )
+    for copy in copies:
+        status = admin.request(f"/admin/themes/{copy}/uninstall", "POST", {})[0]
+        check(status == 303, f"{copy} is removed")
+
+
+def check_cloudflare(admin):
+    """The bundled Cloudflare plugin's middleware sets the address the sign-in limit sees."""
+    from e2e import Client
+
+    plugin = "/admin/plugins/plugin-cloudflare"
+    forwarded = "198.51.100.20"
+    visitor = Client()
+
+    def sign_in(address):
+        visitor.request("/admin/login")
+        values = {"email": "nobody@example.test", "password": "not the password"}
+        headers = {"CF-Connecting-IP": address}
+        return visitor.request("/admin/login", "POST", values, extra_headers=headers)[0]
+
+    def tunnel(enabled):
+        values = {"tunnel": "true" if enabled else "false"}
+        status = admin.request(f"{plugin}/settings", "POST", values)[0]
+        check(status == 303, f"the Cloudflare settings save: {status}")
+
+    check(f"{plugin}/disable" in admin.request("/admin/plugins")[2], "Cloudflare is enabled")
+    tunnel(True)
+    for _ in range(5):
+        check(sign_in(forwarded) == 401, "a forwarded sign-in fails")
+    check(sign_in(forwarded) == 429, "the forwarded address is limited")
+    check(sign_in("198.51.100.21") == 401, "another forwarded address has its own limit")
+    tunnel(False)
+    check(sign_in(forwarded) == 401, "connections from outside Cloudflare keep their address")
+    tunnel(True)
+    check(admin.request(f"{plugin}/disable", "POST", {})[0] == 303, "Cloudflare disables")
+    check(sign_in(forwarded) == 401, "the middleware stops with the plugin")
+    check(admin.request(f"{plugin}/enable", "POST", {})[0] == 303, "Cloudflare enables")
+    check(sign_in(forwarded) == 429, "the middleware returns with the plugin")
+    tunnel(False)
 
 
 MODERN = "2026-07-28"

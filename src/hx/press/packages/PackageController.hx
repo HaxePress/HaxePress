@@ -28,6 +28,8 @@ import hx.press.model.InstalledPackage;
 import hx.press.ContentCache;
 import haxe.crypto.Md5;
 import hx.well.internal.SecureToken;
+import hx.press.model.ThemeDesign;
+import hx.press.themes.ThemeFork;
 import hx.press.themes.ThemeDesignData;
 
 class PackageController {
@@ -56,6 +58,7 @@ class PackageController {
             case "enabled": kind == "theme" ? "Your website now uses this theme." : "The plugin is active.";
             case "disabled": "The plugin has been deactivated.";
             case "removed": "The package has been removed.";
+            case "forked": "The theme was copied. Updates leave the copy as it is; download it to change its files.";
             default: "";
         };
         var serverLimit:Int = Config.get("http.max_content_length");
@@ -67,8 +70,11 @@ class PackageController {
         var packages = page.items.map(item -> {
             var props:Dynamic = Reflect.copy(item);
             props.built_in = BuiltInTheme.isBuiltIn(item.id)
-                || BuiltInPlugins.isBuiltIn(item.id, item.plugin_id);
+                || BuiltInPlugins.isBuiltIn(item.id, item.plugin_id)
+                || PackageBundles.isBundledTheme(item.id, item.author);
             props.designed = publishStates.exists(item.id);
+            props.downloadable = kind == "theme"
+                && ThemeFork.downloadable(item.id, publishStates.exists(item.id));
             props.unpublished = publishStates.get(item.id) == true;
             return props;
         });
@@ -196,6 +202,42 @@ class PackageController {
         } catch (error:Dynamic) {
             return index(request, kind, Std.string(error), 422);
         }
+    }
+
+    /** Copies a theme into one the site owns; a copied design opens in the editor. **/
+    public static function fork(request:Request):AbstractResponse {
+        if (!CmsAccess.can("extensions")) {
+            return CmsController.forbidden(request);
+        }
+        var id = request.route("id");
+        var source = PackageData.one(id);
+        if (source == null || source.kind != "theme") {
+            return SiteController.notFound(request);
+        }
+        var admin = CmsAccess.current();
+        var name = I18n.t("{name} copy", ["name" => source.name]).substr(0, 100);
+        try {
+            var copy = ThemeFork.fork(id, name, admin.id, admin.name);
+            var designed = ThemeDesign.query.where("id", copy).exists();
+            var location = designed ? '/admin/themes/${copy}/design' : '/admin/themes?notice=forked';
+            return ResponseBuilder.asRedirect(location, 303);
+        } catch (error:Dynamic) {
+            return index(request, "theme", Std.string(error), 422);
+        }
+    }
+
+    /** The installed files of a packaged theme, so a copy can be changed and uploaded again. **/
+    public static function download(request:Request):AbstractResponse {
+        if (!CmsAccess.can("extensions")) {
+            return CmsController.forbidden(request);
+        }
+        var id = request.route("id");
+        var source = PackageData.one(id);
+        var designed = ThemeDesign.query.where("id", id).exists();
+        if (source == null || source.kind != "theme" || !ThemeFork.downloadable(id, designed)) {
+            return SiteController.notFound(request);
+        }
+        return ThemeFork.download(id);
     }
 
     public static function settings(request:Request, kind:String, error:String = "",

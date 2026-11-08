@@ -6,6 +6,8 @@
 --macro haxe.macro.Context.getType("hx.press.plugins.PluginHost")
 --macro haxe.macro.Context.getType("hx.press.plugins.PluginDatabase")
 --macro haxe.macro.Context.getType("hx.press.plugins.PluginMigration")
+--macro haxe.macro.Context.getType("hx.press.plugins.PluginMiddleware")
+--macro haxe.macro.Context.getType("hx.well.middleware.AbstractMiddleware")
 --macro haxe.macro.Context.getType("hx.press.content.ContentTypes")
 --macro haxe.macro.Context.getType("hx.press.content.ContentFields")
 --macro haxe.macro.Context.getType("hx.press.media.MediaReferences")

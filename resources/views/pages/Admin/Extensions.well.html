@@ -210,6 +210,9 @@
         <p :if="item.built_in" class="built-in-theme-note">
           {!! icon('lock') !!} {{ kind == 'theme' ? t('Built-in theme') : t('Bundled plugin') }}
         </p>
+        <p :if="item.built_in and kind == 'theme'" class="field-help">
+          {{ t('Updates replace this theme. Fork it to make a copy you can change.') }}
+        </p>
         <Alert error :message="item.last_error" />
         <Alert
           :if="item.restart_required == 1"
@@ -232,6 +235,23 @@
             class="button button-outline"
             href="{{ base }}/{{ item.id }}/preview"
             >{{ t('Preview') }}</a
+          >
+          <button
+            :if="kind == 'theme'"
+            class="button button-outline"
+            type="submit"
+            formaction="{{ base }}/{{ item.id }}/fork"
+            title="{{ t('Make a copy of this theme that updates leave as it is') }}"
+            data-well-busy="{{ t('Forking…') }}"
+          >
+            {!! icon('copy') !!}{{ t('Fork') }}
+          </button>
+          <a
+            :if="item.downloadable"
+            class="button button-outline"
+            href="{{ base }}/{{ item.id }}/download"
+            title="{{ t('Download the theme files as a ZIP') }}"
+            >{!! icon('download') !!}{{ t('Download') }}</a
           >
           <button
             :if="not item.enabled"

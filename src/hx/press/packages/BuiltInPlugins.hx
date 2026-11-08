@@ -27,6 +27,11 @@ class BuiltInPlugins {
             identity: "7a6695a4-bc82-4d96-8df6-14a6435837bb",
             entrypoint: "extensions.newsletter.NewsletterPlugin"
         },
+        {
+            slug: "cloudflare",
+            identity: "e36ea9f4-dfb0-4c29-ad55-113f3abe5aca",
+            entrypoint: "extensions.cloudflare.CloudflarePlugin"
+        },
         #if jvm
         {
             slug: "site-backup",

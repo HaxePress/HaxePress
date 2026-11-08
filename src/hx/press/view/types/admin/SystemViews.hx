@@ -17,6 +17,9 @@ typedef ExtensionPackageView = {
     var built_in:Bool;
     var designed:Bool;
 
+    /** A packaged theme whose installed files can be downloaded as a ZIP. */
+    var downloadable:Bool;
+
     /** A designed theme whose saved changes are not published yet. */
     var unpublished:Bool;
 

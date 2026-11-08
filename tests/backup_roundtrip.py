@@ -24,7 +24,7 @@ TRANSIENT = [
 ]
 # Backups leave out the markers that vouch for bundled plugin files, so a restored site
 # installs its own copies of these plugins on first start.
-BUNDLED = {"plugin-rss", "plugin-newsletter", "plugin-site-backup"}
+BUNDLED = {"plugin-rss", "plugin-newsletter", "plugin-cloudflare", "plugin-site-backup"}
 REINSTALLED = ["activity_logs", "cms_packages", "package_hooks"]
 # Archive entries that describe the backup rather than hold a stored file.
 METADATA = ("database/", "content/", "backup.", "content.index.json")

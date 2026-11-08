@@ -22,6 +22,8 @@ from installation import SetupClient, SetupServer
 BACKUPS = "/admin/backups"
 SCHEDULES = f"{BACKUPS}/schedules"
 BACKUP_PLUGIN = "/admin/plugins/plugin-site-backup"
+# A restored site installs the bundled plugins when the backup leaves plugins out.
+BUNDLED_PLUGINS = ["rss", "newsletter", "cloudflare", "site-backup"]
 CMS_VERSION = json.loads((Path(__file__).resolve().parents[1] / "cms.json").read_text())["version"]
 VERIFY = f"{BACKUPS}/verify"
 RESTORE = "/admin/install/restore"
@@ -716,7 +718,7 @@ def restore(
                     )
                 check(
                     restored.count("cms_packages", [("kind", "=", "plugin")])
-                    == (expected_plugins or 3),
+                    == (expected_plugins or len(BUNDLED_PLUGINS)),
                     "Restored plugins differ",
                 )
                 check(

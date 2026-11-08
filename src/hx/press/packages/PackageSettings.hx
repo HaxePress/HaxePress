@@ -9,6 +9,12 @@ import hx.well.facades.Crypt;
 class PackageSettings {
     public static function stored(source:String):Map<String, String> {
         var parsed:Dynamic = Json.parse(source);
+        // Earlier PHP builds stored a Map's internal storage, {"data": {...}}.
+        // Settings hold only text, so an object under "data" is that wrapper.
+        var wrapped:Dynamic = Reflect.field(parsed, "data");
+        if (wrapped != null && Reflect.isObject(wrapped) && !Std.isOfType(wrapped, String)) {
+            parsed = wrapped;
+        }
         var values:Map<String, String> = [];
         for (key in Reflect.fields(parsed)) {
             var value = Reflect.field(parsed, key);
@@ -17,6 +23,23 @@ class PackageSettings {
             }
         }
         return values;
+    }
+
+    /** Settings as JSON text: an object of strings on every target. **/
+    public static function serialize(values:Map<String, String>):String {
+        return Json.stringify(object(values));
+    }
+
+    /**
+        Settings as an anonymous object, which JSON writes as an object on
+        every target. PHP writes a Map's internal storage instead.
+    **/
+    public static function object(values:Map<String, String>):Dynamic {
+        var result:Dynamic = {};
+        for (key => value in values) {
+            Reflect.setField(result, key, value);
+        }
+        return result;
     }
 
     public static function defaults(manifest:ManifestData):Map<String, String> {

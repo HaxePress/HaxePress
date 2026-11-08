@@ -14,6 +14,11 @@ import sys
 import tempfile
 import time
 from content_cache import stamps, verify as verify_content_cache
+from example_upgrade import (
+    prepare as prepare_example_upgrade,
+    verify as verify_example_upgrade,
+    verify_unchanged as verify_example_unchanged,
+)
 from migrations import prepare as prepare_migrations, verify as verify_migrations
 from fixture_store import FixtureStore, CONTENT_COLUMNS, TEST_BINARY
 from build import build
@@ -40,6 +45,7 @@ parser.add_argument(
         "easy_builder",
         "theme_export",
         "theme_assets",
+        "theme_forks",
         "theme_mcp",
         "admin_mcp",
         "websocket_lifecycle",
@@ -48,6 +54,7 @@ parser.add_argument(
         "cms_management",
         "cms_structure",
         "cms_lifecycle",
+        "cloudflare",
         "plugin_database",
         "media_dependencies",
         "site_identity",
@@ -227,6 +234,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                     "easy_builder",
                     "theme_export",
                     "theme_assets",
+                    "theme_forks",
                     "theme_mcp",
                     "admin_mcp",
                     "websocket_lifecycle",
@@ -235,6 +243,7 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                     "cms_management",
                     "cms_structure",
                     "cms_lifecycle",
+                    "cloudflare",
                     "plugin_database",
                     "media_dependencies",
                     "site_identity",
@@ -324,6 +333,19 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
             wait_ready(port, process)
             verify_migrations(fixtures, expected_migrations)
             print("PASS Repeated startup preserves completed ORM migrations", flush=True)
+            stop(process)
+            expected_example = prepare_example_upgrade(fixtures, work)
+            process = subprocess.Popen(COMMAND, cwd=work, stdout=log, stderr=subprocess.STDOUT)
+            wait_ready(port, process)
+            example_directory = verify_example_upgrade(fixtures, work, expected_example)
+            stop(process)
+            process = subprocess.Popen(COMMAND, cwd=work, stdout=log, stderr=subprocess.STDOUT)
+            wait_ready(port, process)
+            verify_example_unchanged(fixtures, example_directory)
+            print(
+                "PASS Startup replaces a bundled theme whose shipped archive changed under the same version, keeping its settings, reinstalls a removed one, and leaves them alone afterwards",
+                flush=True,
+            )
             stop(process)
             # An active theme built for the former browser renderer, as an older release left it.
             legacy_manifest = {

@@ -209,6 +209,8 @@ class AdminRoutes extends RouteGroup {
             Route.get("/extension-assets/{id}/{generation}/{asset}",
                 new ExtensionAssetHandler(true))
                 .where("asset", ".+");
+            Route.post("/themes/{id}/fork", request -> PackageController.fork(request));
+            Route.get("/themes/{id}/download", request -> PackageController.download(request));
             Route.get("/themes/{id}/preview", request -> PackageController.preview(request));
             Route.get("/themes/{id}/preview/frame",
                 request -> PackageController.previewContent(request, "/"))

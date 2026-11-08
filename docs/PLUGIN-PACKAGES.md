@@ -136,6 +136,26 @@ The host batches route registration and tracks ownership. Stopping a module remo
 
 A plugin's administration page renders the standard `Admin/PluginPage` view: `Pages.render("Admin/PluginPage", {pluginPage: page})`, with `import hx.press.view.Pages;` (the SDK exports it for every target; the JVM host renders the page). `page` holds a `title`, `description`, `total`, `columns` (`key`, `label`), `rows`, `actions` (`label`, `href`, optional `download`), an optional `rowAction` (`label`, `path` with `{id}`, `confirm`), `pagination` from `Pagination.links` and a `noun`. Texts are keys in the plugin's `namespace`. The page is rendered on the server inside the administration layout; the newsletter example's subscriber list shows the whole shape.
 
+### Middleware
+
+A plugin can run HxWell middleware on every request. Add it in `onCreate` and remove it in `onDestroy`, like routes:
+
+```haxe
+import hx.press.plugins.PluginMiddleware;
+
+var middleware:PluginMiddleware;
+
+public function onCreate(host:PluginHost, context:String):Void {
+    middleware = PluginMiddleware.add(ExampleMiddleware);
+}
+
+public function onDestroy():Void {
+    PluginMiddleware.remove(middleware);
+}
+```
+
+`ExampleMiddleware` extends `hx.well.middleware.AbstractMiddleware`. Plugin middleware runs after the application's global middleware and before route middleware, in the order plugins added it; HxWell creates an instance for each request and disposes it afterwards, so keep shared state in immutable or static values. The runtime records the middleware a plugin adds while it is created: a failed creation removes it, and stopping a plugin removes whatever `onDestroy` left. A request keeps the list it started with, so a removal applies to the requests that start after it. The bundled Cloudflare plugin (`examples/plugins/cloudflare`) uses this to set `request.ip` from `CF-Connecting-IP` on connections from Cloudflare.
+
 ### Plugin pages
 
 A plugin can also ship its own pages as Wellout templates. Name the folder in the manifest as `"assets": {"views": "views"}` and render a template from one of the plugin's routes with `Pages.view("Reports", props)`, which renders `views/Reports.well.html`. Plugin templates are looked up first, then the application's components, so a page can use `AdminLayout`, `Alert` or `Pagination`. `t()` reads the plugin's catalogue first, `packageAsset("reports.css")` links a file from the package's `public/` folder, and a page adds its stylesheet in `<well:head>`.

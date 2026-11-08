@@ -12,7 +12,6 @@ import hx.press.packages.PackageManifest.ManifestData;
 import hx.press.packages.SafePackageArchive.InspectedPackage;
 import hx.press.plugins.PluginRuntime;
 import haxe.Exception;
-import haxe.Json;
 import haxe.io.Bytes;
 import hx.well.facades.DBStatic;
 import hx.well.internal.SecureToken;
@@ -101,6 +100,7 @@ class PackageManager {
 
     static function requireUploadable(id:String, manifest:ManifestData, bundled:Bool):Void {
         BuiltInTheme.requireUploadable(id);
+        PackageBundles.requireUploadable(id, bundled);
         if (manifest.kind != "plugin") {
             return;
         }
@@ -216,7 +216,7 @@ class PackageManager {
                 }
             }
             var enabled = wasEnabled ? 1 : 0;
-            var serialized = Json.stringify(settings);
+            var serialized = PackageSettings.serialize(settings);
             if (enabled == 1) {
                 try {
                     PackageSettings.ready(manifest, serialized);
@@ -376,7 +376,7 @@ class PackageManager {
             PackageManifest.requireCompatible(manifest);
             var settings = PackageSettings.prepare(manifest, packageData.settings, input, clear);
             var configured:PackageRecord = cast Reflect.copy(packageData);
-            configured.settings = Json.stringify(settings);
+            configured.settings = PackageSettings.serialize(settings);
             if (packageData.enabled == 1) {
                 PackageSettings.ready(manifest, configured.settings);
                 if (PluginRuntime.ready) {
@@ -409,6 +409,10 @@ class PackageManager {
             var packageData = record(id);
             if (BuiltInPlugins.isBuiltIn(id, packageData.plugin_id)) {
                 throw new Exception("Bundled plugins can be deactivated in the Plugins panel.");
+            }
+            if (PackageBundles.isBundledTheme(id,
+                PackageManifest.parse(packageData.manifest).author)) {
+                throw new Exception("Bundled themes are part of HaxePress and cannot be removed.");
             }
             if (packageData.kind == "theme" && packageData.enabled == 1) {
                 throw new Exception("Activate another theme before removing this theme.");

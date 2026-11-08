@@ -44,6 +44,7 @@ typedef PluginBlock = {
 private class LivePlugin {
     public var module:PluginModule;
     public var routes:Array<RouteElement> = [];
+    public var middlewares:Array<PluginMiddleware> = [];
     public var record:PackageRecord;
 
     public function new(record:PackageRecord, module:PluginModule) {
@@ -84,8 +85,8 @@ class PluginRuntime {
                 namespace: record.slug,
                 tablePrefix: PluginDatabase.prefix(record.slug)
             },
-            settings: configured,
-            site: SiteSettingsStore.settings(),
+            settings: PackageSettings.object(configured),
+            site: PackageSettings.object(SiteSettingsStore.settings()),
             data: data
         };
     }
@@ -130,13 +131,16 @@ class PluginRuntime {
             return;
         }
         var module:PluginModule = null;
+        var middlewares:Array<PluginMiddleware> = [];
         try {
             var artifact = PackageManifest.serverArtifact(manifest);
             var routes = Route.batch(() -> {
                 var path = Storage.disk("extensions")
                     .path('${PackageStorage.installed(record.directory)}/${artifact}');
                 module = new PluginModule(path, manifest.entrypoint);
-                module.create(new DefaultPluginHost(record.plugin_id), context(record, {}));
+                middlewares = PluginMiddleware.collect(() -> {
+                    module.create(new DefaultPluginHost(record.plugin_id), context(record, {}));
+                });
             }, route -> {
                 route.attribute("hx.press.plugin", record.id);
                 var handler = route.getHandler();
@@ -147,10 +151,14 @@ class PluginRuntime {
             });
             var live = new LivePlugin(record, module);
             live.routes = routes;
+            live.middlewares = middlewares;
             hostLocks.set(moduleKey, manifest.locks);
             modules.set(moduleKey, live);
             locks.release(moduleKey);
         } catch (error:Dynamic) {
+            for (middleware in middlewares) {
+                PluginMiddleware.remove(middleware);
+            }
             if (module != null) {
                 try {
                     Route.batch(() -> module.destroy());
@@ -178,6 +186,10 @@ class PluginRuntime {
             Route.batch(() -> live.module.destroy());
         } catch (error:Dynamic) {
             failure = error;
+        }
+        // Middleware the plugin did not remove in onDestroy stops with it.
+        for (middleware in live.middlewares) {
+            PluginMiddleware.remove(middleware);
         }
         Route.batch(() -> {
             for (route in live.routes) {

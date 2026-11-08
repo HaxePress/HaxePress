@@ -1,0 +1,6 @@
+{
+  "Cloudflare": "Cloudflare",
+  "Cloudflare Tunnel runs on this server": "Bu sunucuda Cloudflare Tunnel çalışıyor",
+  "Turn on when cloudflared on this server forwards the visitors. Leave off when they reach the site through Cloudflare's proxy.": "Ziyaretçileri bu sunucudaki cloudflared iletiyorsa açın. Ziyaretçiler siteye Cloudflare proxy’si üzerinden ulaşıyorsa kapalı bırakın.",
+  "Uses the visitor address from CF-Connecting-IP on requests that come through Cloudflare.": "Cloudflare üzerinden gelen isteklerde ziyaretçinin adresini CF-Connecting-IP başlığından alır."
+}

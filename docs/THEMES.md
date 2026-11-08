@@ -38,7 +38,19 @@ The browser Cache API retains at most 32 PNGs for 30 minutes. Keys include the t
 
 Simple is part of HaxePress. Its manifest and English/Turkish catalogues are compiled as Haxe resources from `resources/themes/simple/`; its CSS is bundled into the application from `resources/css/themes/simple.css`. It has no installed package directory and needs no theme ZIP or external theme stylesheet. Fresh installations work without a package download directory.
 
-The stable `theme-simple` identity is protected by the package service. Upload inspection and installation reject replacement ZIPs, and uninstall is rejected even while another theme is active. The panel marks it as a built-in theme and omits the uninstall control. Protection is derived from the application identity rather than an uploaded manifest flag. Other themes keep their normal installation, activation, settings and uninstall behavior.
+The stable `theme-simple` identity is protected by the package service. Upload inspection and installation reject replacement ZIPs, and uninstall is rejected even while another theme is active. The panel marks it as a built-in theme and omits the uninstall control. Protection is derived from the application identity rather than an uploaded manifest flag.
+
+Fieldnotes, Notebook and Gallery are bundled themes and belong to the application the same way. Every start installs a missing one and replaces one whose shipped archive in `public/packages` differs from the archive it was installed from, keeping its settings and activation; the setting `cms_example_<id>` records that archive's SHA-256 digest. Uploads cannot replace them and they cannot be removed. Their IDs are protected only while the installed theme is HaxePress's own, so a theme that already occupied one of these IDs is left alone. Other themes keep their normal installation, activation, settings and uninstall behavior.
+
+## Forks
+
+**Fork** (`POST /admin/themes/{id}/fork`) copies any theme into a new, inactive theme named “{name} copy”, authored by the administrator who forked it. Updates never touch a fork, so forking is how a bundled theme is changed:
+
+- A packaged theme is copied file for file into a new slug, `<slug>-copy-<8 hex digits>`, staged and inspected like an upload and installed with the original's settings.
+- The built-in Simple theme becomes a packaged theme whose `views` hold the application templates Simple renders (`Home`, `ContentIndex`, `ContentDetail`, `Page`, `About`, `NotFound`, `SiteLayout` and `ContentCard`) with Simple's catalogues, so it renders the same pages until it is changed.
+- A visual design is copied with its draft, its published version and its theme images, whose URLs move to the copy's ID; the copy opens in the editor.
+
+**Download** (`GET /admin/themes/{id}/download`) streams a packaged theme's installed files as a ZIP that installs as the same theme. A fork downloaded, changed and uploaded again replaces the fork and keeps its compatible settings.
 
 Startup registers or updates the built-in definition while retaining its compatible settings, activation state and installation date. Existing active themes remain selected. Repeated startup leaves unchanged built-in records and cache generations alone. The default's catalogue hook points at its embedded translations; it does not refer to a package file tree.
 

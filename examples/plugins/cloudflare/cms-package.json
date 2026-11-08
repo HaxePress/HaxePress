@@ -1,0 +1,31 @@
+{
+  "apiVersion": 4,
+  "cmsVersion": "2.16.0",
+  "kind": "plugin",
+  "pluginId": "e36ea9f4-dfb0-4c29-ad55-113f3abe5aca",
+  "slug": "cloudflare",
+  "name": "Cloudflare",
+  "version": "2.16.0",
+  "description": "Uses the visitor address from CF-Connecting-IP on requests that come through Cloudflare.",
+  "author": "HaxePress",
+  "server": {
+    "jar": "server.jar",
+    "cppia": "server.cppia",
+    "php": "php/module.json",
+    "entrypoint": "extensions.cloudflare.CloudflarePlugin"
+  },
+  "hooks": [],
+  "fields": [
+    {
+      "key": "tunnel",
+      "label": "Cloudflare Tunnel runs on this server",
+      "kind": "boolean",
+      "defaultValue": "false",
+      "help": "Turn on when cloudflared on this server forwards the visitors. Leave off when they reach the site through Cloudflare's proxy."
+    }
+  ],
+  "translations": {
+    "en": "lang/en.json",
+    "tr": "lang/tr.json"
+  }
+}

@@ -198,7 +198,13 @@ def build(application, public_root=None):
             raise RuntimeError(f"The SDK export is missing {contract}")
     source_sdk = output / (f"{sdk_name}.zip")
     with ZipFile(source_sdk, "w", compression=ZIP_DEFLATED) as archive:
-        for contract in [*contracts, "PhpPluginBuild", "PluginDatabase", "PluginMigration"]:
+        for contract in [
+            *contracts,
+            "PhpPluginBuild",
+            "PluginDatabase",
+            "PluginMigration",
+            "PluginMiddleware",
+        ]:
             path = Path("src/hx/press/plugins") / (f"{contract}.hx")
             archive.write(ROOT / path, path)
         public_sources = [

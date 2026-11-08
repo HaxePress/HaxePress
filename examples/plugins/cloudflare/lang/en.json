@@ -1,0 +1,6 @@
+{
+  "Cloudflare": "Cloudflare",
+  "Cloudflare Tunnel runs on this server": "Cloudflare Tunnel runs on this server",
+  "Turn on when cloudflared on this server forwards the visitors. Leave off when they reach the site through Cloudflare's proxy.": "Turn on when cloudflared on this server forwards the visitors. Leave off when they reach the site through Cloudflare's proxy.",
+  "Uses the visitor address from CF-Connecting-IP on requests that come through Cloudflare.": "Uses the visitor address from CF-Connecting-IP on requests that come through Cloudflare."
+}

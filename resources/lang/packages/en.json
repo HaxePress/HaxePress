@@ -26,5 +26,15 @@
   "Bundled plugins can be deactivated in the Plugins panel.": "Bundled plugins can be deactivated in the Plugins panel.",
   "Plugin ZIPs must declare a stable pluginId UUID.": "Plugin ZIPs must declare a stable pluginId UUID.",
   "A plugin update must keep its installed plugin ID.": "A plugin update must keep its installed plugin ID.",
-  "This plugin ID already belongs to another installed package.": "This plugin ID already belongs to another installed package."
+  "This plugin ID already belongs to another installed package.": "This plugin ID already belongs to another installed package.",
+  "Bundled themes are updated with HaxePress. Fork the theme to change it.": "Bundled themes are updated with HaxePress. Fork the theme to change it.",
+  "Bundled themes are part of HaxePress and cannot be removed.": "Bundled themes are part of HaxePress and cannot be removed.",
+  "Updates replace this theme. Fork it to make a copy you can change.": "Updates replace this theme. Fork it to make a copy you can change.",
+  "Make a copy of this theme that updates leave as it is": "Make a copy of this theme that updates leave as it is",
+  "Forking…": "Forking…",
+  "Fork": "Fork",
+  "Download the theme files as a ZIP": "Download the theme files as a ZIP",
+  "Download": "Download",
+  "{name} copy": "{name} copy",
+  "The theme was copied. Updates leave the copy as it is; download it to change its files.": "The theme was copied. Updates leave the copy as it is; download it to change its files."
 }

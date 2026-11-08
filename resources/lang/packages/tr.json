@@ -26,5 +26,15 @@
   "Bundled plugins can be deactivated in the Plugins panel.": "Birlikte gelen eklentileri Eklentiler panelinden devre dışı bırakabilirsiniz.",
   "Plugin ZIPs must declare a stable pluginId UUID.": "Eklenti ZIP dosyaları sabit bir pluginId UUID içermelidir.",
   "A plugin update must keep its installed plugin ID.": "Eklenti güncellemesi kurulu eklenti kimliğini korumalıdır.",
-  "This plugin ID already belongs to another installed package.": "Bu eklenti kimliği başka bir kurulu pakete ait."
+  "This plugin ID already belongs to another installed package.": "Bu eklenti kimliği başka bir kurulu pakete ait.",
+  "Bundled themes are updated with HaxePress. Fork the theme to change it.": "Birlikte gelen temalar HaxePress ile güncellenir. Değiştirmek için temayı forklayın.",
+  "Bundled themes are part of HaxePress and cannot be removed.": "Birlikte gelen temalar HaxePress’in parçasıdır ve kaldırılamaz.",
+  "Updates replace this theme. Fork it to make a copy you can change.": "Güncellemeler bu temayı yeniler. Değiştirebileceğiniz bir kopya için temayı forklayın.",
+  "Make a copy of this theme that updates leave as it is": "Bu temanın güncellemelerin dokunmadığı bir kopyasını oluşturun",
+  "Forking…": "Forklanıyor…",
+  "Fork": "Forkla",
+  "Download the theme files as a ZIP": "Tema dosyalarını ZIP olarak indirin",
+  "Download": "İndir",
+  "{name} copy": "{name} kopyası",
+  "The theme was copied. Updates leave the copy as it is; download it to change its files.": "Tema kopyalandı. Güncellemeler kopyaya dokunmaz; dosyalarını değiştirmek için indirin."
 }

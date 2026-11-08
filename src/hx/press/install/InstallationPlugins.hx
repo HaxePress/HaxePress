@@ -9,6 +9,7 @@ import hx.press.packages.PackageManifest;
 import hx.press.packages.PackageManifest.ManifestData;
 import hx.press.packages.SafePackageArchive;
 import hx.press.plugins.PluginHost;
+import hx.press.plugins.PluginMiddleware;
 import hx.press.plugins.PluginModule;
 import hx.press.plugins.PluginRuntime;
 import hx.press.view.PluginViews;
@@ -30,6 +31,7 @@ private class StagedPlugin {
     public final manifest:ManifestData;
     public final module:PluginModule;
     public var routes:Array<RouteElement> = [];
+    public var middlewares:Array<PluginMiddleware> = [];
 
     public function new(id:String, root:String, manifest:ManifestData, module:PluginModule) {
         this.id = id;
@@ -155,7 +157,9 @@ class InstallationPlugins {
             PluginViews.stage(id, extensions, '${root}/${manifest.views}', '${ASSET_PATH}/${id}/');
         }
         plugin.routes = Route.batch(() -> {
-            module.create(new InstallationPluginHost(), context(plugin, {}));
+            plugin.middlewares = PluginMiddleware.collect(() -> {
+                module.create(new InstallationPluginHost(), context(plugin, {}));
+            });
         }, route -> {
             route.attribute("hx.press.plugin", id);
             var handler = route.getHandler();
@@ -241,6 +245,9 @@ class InstallationPlugins {
                 for (route in plugin.routes) {
                     BodyLimits.unregister(route);
                     Route.unregister(route);
+                }
+                for (middleware in plugin.middlewares) {
+                    PluginMiddleware.remove(middleware);
                 }
                 PluginViews.unstage(plugin.id);
             }

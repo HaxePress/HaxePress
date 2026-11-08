@@ -222,7 +222,7 @@ class ThemeDesignPackage {
         }
     }
 
-    static function rewrite(value:Dynamic, replacements:Map<String, String>,
+    public static function rewrite(value:Dynamic, replacements:Map<String, String>,
             depth:Int = 0):Dynamic {
         if (depth > 64) {
             throw new Exception("The theme package contains excessively nested JSON.");
