@@ -3,6 +3,7 @@ package hx.press.install;
 import hx.press.handler.install.CheckDatabaseHandler;
 import hx.press.handler.install.FinishInstallationHandler;
 import hx.press.handler.install.ReviewInstallationHandler;
+import hx.press.handler.install.UnlockInstallationHandler;
 import hx.press.middleware.AdminSessionMiddleware;
 import hx.well.middleware.CsrfMiddleware;
 import hx.well.middleware.SessionMiddleware;
@@ -23,6 +24,8 @@ class InstallationRoutes {
     }
 
     public static function register():Void {
+        // Entering the setup key needs no session: it is how a locked browser gets in.
+        Route.post("/admin/install/unlock", new UnlockInstallationHandler());
         Route.path("/admin/install").middleware(middlewares()).group(() -> {
             Route.get("", InstallationController.page);
             Route.post("/database", new CheckDatabaseHandler());

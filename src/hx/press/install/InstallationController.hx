@@ -26,10 +26,13 @@ class InstallationController {
     public static inline var ADMINISTRATOR_KEY = "haxepress.install.administrator";
     static final drivers = ["sqlite", "mysql"];
 
-    public static function locked(request:Request):Response {
+    public static function locked(request:Request, error:String = "", status:Int = 403):Response {
         var install = view(0, "sqlite", null, null, null);
         install.blocked = true;
         install.message = InstallationState.blockedReason();
+        install.keyError = error;
+        install.keyAvailable = InstallationKey.configured() != ""
+            && !InstallationState.legacyFailure;
         var props = {
             setup: {
                 blocked: true,
@@ -40,7 +43,7 @@ class InstallationController {
         };
         shareLocale();
         return View.render("Admin/Install", props)
-            .status(403)
+            .status(status)
             .header("Cache-Control", "private, no-store");
     }
 
@@ -132,6 +135,8 @@ class InstallationController {
                 administrator == null ? "" : administrator.admin_name),
             adminEmail: text(submitted, "admin_email",
                 administrator == null ? "" : administrator.admin_email),
+            keyAvailable: false,
+            keyError: "",
             panels: []
         };
     }

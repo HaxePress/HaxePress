@@ -322,9 +322,71 @@ def verify_environment_bootstrap():
     )
 
 
+def verify_setup_key():
+    """The setup key opens the installer through a proxy or tunnel, and nothing else does."""
+    with tempfile.TemporaryDirectory(prefix="haxepress-install-key-") as name:
+        server = SetupServer(Path(name), None)
+        try:
+            environment = (server.work / ".env").read_text()
+            key = next(
+                line.split("=", 1)[1].strip().strip("'\"")
+                for line in environment.splitlines()
+                if line.startswith("INSTALL_KEY=")
+            )
+            check(len(base64.b64decode(key)) == 32, "The setup key is not 32 random bytes")
+            server.log.flush()
+            check(
+                key in (server.work / "runtime.log").read_text(),
+                "Starting HaxePress did not print the setup key",
+            )
+            tunnel = {"X-Forwarded-For": "203.0.113.9", "CF-Connecting-IP": "203.0.113.9"}
+            client = SetupClient(server.url)
+            status, _, data = client.request("/admin/install", headers=tunnel, data=True)
+            check(
+                status == 403 and data["props"]["install"]["keyAvailable"],
+                "A tunnelled connection was not offered the setup key",
+            )
+            status, headers, _ = client.request(
+                "/admin/install/unlock", {"key": "not-the-key"}, headers=tunnel, csrf=False
+            )
+            check(status == 403 and "set-cookie" not in headers, "A wrong setup key was accepted")
+            forged = SetupClient(server.url)
+            forged.cookies["haxepress_install"] = "0" * 64
+            check(
+                forged.request("/admin/install", headers=tunnel, data=True)[0] == 403,
+                "A forged setup cookie opened the installer",
+            )
+            status, headers, _ = client.request(
+                "/admin/install/unlock", {"key": key}, headers=tunnel, csrf=False
+            )
+            check(
+                status == 303
+                and headers.get("location") == "/admin/install"
+                and "haxepress_install" in client.cookies,
+                f"The setup key did not unlock setup: {status}",
+            )
+            status, _, data = client.request("/admin/install", headers=tunnel, data=True)
+            check(
+                status == 200 and not data["props"]["setup"]["blocked"] and client.csrf,
+                "The setup key did not open setup through a tunnel",
+            )
+            guesses = SetupClient(server.url)
+            statuses = [
+                guesses.request(
+                    "/admin/install/unlock", {"key": f"guess-{index}"}, headers=tunnel, csrf=False
+                )[0]
+                for index in range(12)
+            ]
+            check(429 in statuses, f"Guessing the setup key was not limited: {statuses}")
+        finally:
+            server.close()
+    print("PASS Setup key: created, printed, unlocks setup through a tunnel, limited", flush=True)
+
+
 def run():
     verify_environment_bootstrap()
     verify_trust_rules()
+    verify_setup_key()
     for configured in (None, "", "192.0.2.11", "deadbeef"):
         with tempfile.TemporaryDirectory(prefix="haxepress-install-loopback-") as name:
             server = SetupServer(Path(name), configured)
@@ -540,6 +602,10 @@ def run():
             check(
                 password not in config and inputs["admin_email"] not in config,
                 "The installer kept administrator credentials in .env",
+            )
+            check(
+                re.search(r"^INSTALL_KEY=['\"]?[^'\"\s]", config, re.M) is None,
+                "The installer kept its setup key in .env",
             )
             check(
                 (server.work / "data/setup.sqlite").is_file()

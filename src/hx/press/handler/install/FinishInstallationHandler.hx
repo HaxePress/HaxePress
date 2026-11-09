@@ -140,6 +140,8 @@ class FinishInstallationHandler extends AbstractHandler implements ValidationRes
                 "ADMIN_NAME" => "",
                 "ADMIN_EMAIL" => "",
                 "ADMIN_PASSWORD" => "",
+                // The setup key opened the installer; an installed site keeps none.
+                "INSTALL_KEY" => "",
                 "CMS_SEED_DEMO" => inputs.get("sample_content") == "1" ? "true" : "false"
             ];
             phase = "configuration permissions";

@@ -10,6 +10,12 @@ INSTALL_TRUSTED_IPS=192.0.2.10,::1
 
 The built-in exception is exactly `127.0.0.1`, including its IPv4-mapped representation. Other `127.*` addresses and IPv6 `::1` still need an explicit entry; wildcard and hostname entries do not grant trust. A disallowed peer receives a locked warning before a session or fresh database connection is created. Client-submitted settings and forwarded identity headers cannot grant trust, including through a loopback proxy. Use a direct connection or an SSH tunnel for installation. The gate checks the actual peer address; it is not a generic reverse-proxy identity resolver.
 
+### Setup key
+
+A site that is not installed also opens setup with its setup key, from any connection: through a Cloudflare Tunnel, a reverse proxy or a remote address. It is made like `APP_KEY`, 32 random bytes in Base64: `php setup.php` creates it with `.env` and prints it, and the JVM application creates it on its first start when `.env` has none and prints it each time it starts while the site is not installed. It is saved in `.env` as `INSTALL_KEY`, so `grep INSTALL_KEY .env` shows it again; you can also set your own.
+
+The locked page asks for the key. Entering it sets a cookie for `/admin/install` for two hours, an HMAC of the key with `APP_KEY`, which no other key or site can produce; the key is compared in constant time, and a connection can try ten keys a minute. Finishing installation removes `INSTALL_KEY` from `.env`, and an installed site clears any it finds when it starts.
+
 The wizard is at `/admin/install`, so setup sessions keep the existing `/admin` cookie scope. Native session and CSRF middleware run only after the IP guard. Ordinary application routes, database migrations, plugins, scheduled jobs and MCP startup remain unavailable until installation completes. Static build assets still load so the locked screen is usable.
 
 ## Database

@@ -373,3 +373,16 @@
     gap: 4px;
   }
 }
+
+.setup-key-form {
+  display: grid;
+  gap: 4px;
+  max-width: 460px;
+  margin: 0 0 28px;
+}
+.setup-key-form .setup-error {
+  margin: 8px 0 0;
+}
+.setup-key-form .button {
+  justify-self: start;
+}

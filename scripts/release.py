@@ -32,28 +32,49 @@ if [ ! -f .env ]; then
   umask 077
   sed "s|^APP_KEY=.*|APP_KEY=$key|" .env.example > .env
   echo "Created .env with a new APP_KEY."
-  echo "Open http://127.0.0.1:3000/admin/install on this computer to install HaxePress."
+  echo "Open /admin/install to install HaxePress. HaxePress prints its setup key below."
 fi
 exec java --enable-native-access=ALL-UNNAMED -jar hxwell.jar start
 """
 
 SETUP_PHP = """<?php
-// Creates .env from .env.example with a new random APP_KEY. Run once: php setup.php
+// Creates .env from .env.example with a new random APP_KEY and setup key. Run once: php setup.php
+// Later runs keep .env and show the setup key while the site is not installed.
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
     exit;
 }
 chdir(__DIR__);
-if (file_exists('.env')) {
-    echo ".env already exists and was kept.\\n";
+umask(077);
+$created = !file_exists('.env');
+$settings = file_get_contents($created ? '.env.example' : '.env');
+if ($created) {
+    $settings = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=' . base64_encode(random_bytes(32)), $settings);
+}
+if (preg_match('/^APP_INSTALLED=[\\x27"]?true[\\x27"]?\\s*$/m', $settings)) {
+    echo ".env already exists and was kept. HaxePress is installed.\\n";
     exit(0);
 }
-$key = base64_encode(random_bytes(32));
-$settings = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=' . $key, file_get_contents('.env.example'));
-umask(077);
-file_put_contents('.env', $settings);
-chmod('.env', 0600);
-echo "Created .env with a new APP_KEY. Keep it private.\\n";
+$key = '';
+if (preg_match('/^INSTALL_KEY=[\\x27"]?([^\\x27"\\s]*)[\\x27"]?\\s*$/m', $settings, $match)) {
+    $key = $match[1];
+}
+if ($key === '') {
+    // The setup key is made like APP_KEY: 32 random bytes in Base64.
+    $key = base64_encode(random_bytes(32));
+    $line = 'INSTALL_KEY=' . $key;
+    $settings = preg_match('/^INSTALL_KEY=.*$/m', $settings)
+        ? preg_replace('/^INSTALL_KEY=.*$/m', $line, $settings)
+        : rtrim($settings, "\\n") . "\\n" . $line . "\\n";
+    file_put_contents('.env', $settings);
+    chmod('.env', 0600);
+} elseif ($created) {
+    file_put_contents('.env', $settings);
+    chmod('.env', 0600);
+}
+echo $created ? "Created .env with a new APP_KEY. Keep it private.\\n" : ".env already exists and was kept.\\n";
+echo "Open /admin/install and enter this setup key:\\n  " . $key . "\\n";
+echo "It is saved in .env as INSTALL_KEY and is removed when installation finishes.\\n";
 """
 
 # Apache refuses private/ even when the document root is set to the whole folder by mistake.
@@ -84,12 +105,13 @@ HaxePress {cms} (plugin API {api}) built for PHP with HxWell's PHP driver.
 ## Install
 
 1. Unpack this archive and run `php setup.php` in its folder. It creates
-   `.env` from `.env.example` with a new `APP_KEY`; keep that file private.
+   `.env` from `.env.example` with a new `APP_KEY` and prints a setup key;
+   keep that file private.
 2. Make `private/database/` and `private/storage/` (both created on first
    use) and `.env` writable by PHP.
-3. The installer accepts direct connections from 127.0.0.1 only. On a
-   remote server, add your IP address to `INSTALL_TRUSTED_IPS` in `.env`.
-4. Open `/admin/install` on your site and follow the installer.
+3. Open `/admin/install` on your site and enter the setup key. Running
+   `php setup.php` again, or `grep INSTALL_KEY .env`, shows it until
+   installation finishes. Direct connections from 127.0.0.1 need no key.
 5. Run due scheduled tasks, such as scheduled publishing, every minute:
    `* * * * * cd /path/to/haxepress && php hxwell.boot.php schedule:run`.
    Without cron they also run after page requests.
@@ -135,8 +157,10 @@ HaxePress {cms} (plugin API {api}) built for the JVM.
    `.env.example` to `.env`, set `APP_KEY` to 32 random bytes in Base64
    (`openssl rand -base64 32`) and run
    `java --enable-native-access=ALL-UNNAMED -jar hxwell.jar start`.
-3. Open http://127.0.0.1:3000/admin/install on the same computer and follow
-   the installer. Other addresses need `INSTALL_TRUSTED_IPS` in `.env`.
+3. Open `/admin/install` and follow the installer. From any other computer,
+   such as through a Cloudflare Tunnel, enter the setup key HaxePress prints
+   when it starts; `grep INSTALL_KEY .env` shows it until installation
+   finishes. http://127.0.0.1:3000 on the same computer needs no key.
 
 Only `public/` is served. Everything else the site keeps lives in `private/`:
 the database in `private/database`, uploaded files, installed plugins and

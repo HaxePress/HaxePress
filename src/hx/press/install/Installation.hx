@@ -110,6 +110,7 @@ class Installation {
                 "ADMIN_NAME" => "",
                 "ADMIN_EMAIL" => "",
                 "ADMIN_PASSWORD" => "",
+                "INSTALL_KEY" => "",
                 "CMS_SEED_DEMO" => "false"
             ];
             prepared = InstallationEnv.prepareRestore(values, appKey);

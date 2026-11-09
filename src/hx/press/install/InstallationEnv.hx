@@ -58,25 +58,60 @@ class InstallationEnv {
     /** The settings that create the first administrator when no account exists yet. **/
     public static final ADMINISTRATOR = ["ADMIN_NAME", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
 
+    /** Settings an installed site no longer keeps: the first administrator and the setup key. **/
+    static final INSTALLATION = ADMINISTRATOR.concat([InstallationKey.SETTING]);
+
     /**
-        Clears the first administrator's name, e-mail and password from .env
-        once the account exists. The database holds the account and the
+        Sets values in .env, replacing their lines or adding them, and keeps
+        every other line. The file is replaced at once.
+    **/
+    public static function update(values:Map<String, String>):Void {
+        var disk = Storage.disk("configuration");
+        var source = disk.fileExists(".env") ? disk.get(".env") : "";
+        var remaining = values.copy();
+        var lines = [];
+        var setting = ~/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/;
+        for (line in source.split("\n")) {
+            if (setting.match(line) && values.exists(setting.matched(1))) {
+                var key = setting.matched(1);
+                if (remaining.exists(key)) {
+                    lines.push('${key}=${quoted(remaining.get(key))}');
+                    remaining.remove(key);
+                }
+            } else {
+                lines.push(line);
+            }
+        }
+        if (lines.length > 0 && lines[lines.length - 1] == "") {
+            lines.pop();
+        }
+        for (key => value in remaining) {
+            lines.push('${key}=${quoted(value)}');
+        }
+        var path = '.env.install-${SecureToken.generate(16)}';
+        disk.put(path, '${lines.join("\n")}\n', "private");
+        disk.move(path, ".env");
+    }
+
+    /**
+        Clears the first administrator's name, e-mail and password, and the
+        setup key, from .env once the account exists. The database holds the account and the
         only, hashed copy of its password; earlier installers also left them
         in .env. Nothing is read when the loaded settings hold none of them.
     **/
     public static function forgetAdministrator():Void {
-        var present = ADMINISTRATOR.filter(key -> Environment.env(key, "") != "");
+        var present = INSTALLATION.filter(key -> Environment.env(key, "") != "");
         if (present.length == 0) {
             return;
         }
-        for (key in ADMINISTRATOR) {
+        for (key in INSTALLATION) {
             Environment.set(key, "");
         }
         var disk = Storage.disk("configuration");
         if (!disk.fileExists(".env")) {
             return;
         }
-        var setting = ~/^\s*(ADMIN_NAME|ADMIN_EMAIL|ADMIN_PASSWORD)\s*=\s*(.*?)\s*$/;
+        var setting = ~/^\s*(ADMIN_NAME|ADMIN_EMAIL|ADMIN_PASSWORD|INSTALL_KEY)\s*=\s*(.*?)\s*$/;
         var changed = false;
         var lines = [];
         for (line in disk.get(".env").split("\n")) {

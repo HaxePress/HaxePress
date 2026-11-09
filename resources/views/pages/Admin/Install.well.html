@@ -40,13 +40,38 @@
           <div class="setup-lock-symbol">{!! icon('lock') !!}</div>
           <h1>Setup is locked</h1>
           <p class="setup-intro">{{ install.message }}</p>
+          <form
+            :if="install.keyAvailable"
+            class="setup-key-form"
+            action="/admin/install/unlock"
+            method="post"
+          >
+            <div class="setup-field">
+              <label for="setup-key">Setup key</label>
+              <input
+                id="setup-key"
+                name="key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength="200"
+                required
+                autofocus
+              />
+              <p :if="install.keyError" class="setup-error" role="alert">{{ install.keyError }}</p>
+              <p>
+                Run <code>grep INSTALL_KEY .env</code> on the server, or look for the key in the
+                output of the command that started HaxePress.
+              </p>
+            </div>
+            <button type="submit" class="button">Unlock setup</button>
+          </form>
           <div class="setup-notice">
-            <strong>Server configuration required</strong>
+            <strong>On the server itself</strong>
             <p>
-              Allow your IP address in the server’s <code>INSTALL_TRUSTED_IPS</code> setting. Setup
-              stays unavailable until this check passes.
+              Connections from <code>127.0.0.1</code>, and from the addresses in
+              <code>INSTALL_TRUSTED_IPS</code>, open setup without the key.
             </p>
-            <p>Use a direct connection or an SSH tunnel for installation.</p>
           </div>
         </template>
         <template :else>

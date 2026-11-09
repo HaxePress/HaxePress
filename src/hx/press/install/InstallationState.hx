@@ -26,6 +26,7 @@ class InstallationState {
         }
         pending = true;
         if (installed == "false") {
+            InstallationKey.ensure();
             return;
         }
         var driver = Environment.env("DB_DRIVER", "sqlite");
@@ -38,9 +39,11 @@ class InstallationState {
                 read_only: true
             });
             if (!disk.fileExists(Path.withoutDirectory(filename))) {
+                InstallationKey.ensure();
                 return;
             }
         } else if (Environment.env("DB_DATABASE", "") == "") {
+            InstallationKey.ensure();
             return;
         }
         try {
@@ -51,6 +54,9 @@ class InstallationState {
         } catch (_:Dynamic) {
             Connection.free();
             legacyFailure = true;
+        }
+        if (pending && !legacyFailure) {
+            InstallationKey.ensure();
         }
     }
 
@@ -101,8 +107,19 @@ class InstallationState {
         return false;
     }
 
+    /**
+        Whether a request may use the installer: it entered the setup key, or
+        it comes straight from a trusted address. Forwarded identity headers
+        cannot establish trust, so connections through a proxy or tunnel use
+        the key.
+    **/
     public static function allowed(request:Request):Bool {
-        // Forwarded identity headers cannot establish first-install trust.
+        if (legacyFailure) {
+            return false;
+        }
+        if (InstallationKey.unlocked(request)) {
+            return true;
+        }
         if (request.header("Forwarded") != null || request.header("X-Forwarded-For") != null
             || request.header("X-Real-IP") != null) {
             return false;
@@ -115,12 +132,8 @@ class InstallationState {
             return
                 "The existing database could not be verified. Correct the server database settings before continuing.";
         }
-        if (StringTools.trim(Environment.env("INSTALL_TRUSTED_IPS", "")) == "") {
-            return
-                "Configure INSTALL_TRUSTED_IPS on the server and restart HaxePress before starting setup.";
-        }
         return
-            "This connection is not allowed to start setup. Use an IP address listed in INSTALL_TRUSTED_IPS.";
+            "Enter the setup key to continue. HaxePress printed it when it started and saved it in .env as INSTALL_KEY.";
     }
 
     public static function complete():Void {

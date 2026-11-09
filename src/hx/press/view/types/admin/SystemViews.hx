@@ -152,6 +152,12 @@ typedef InstallSetupView = {
     var adminName:String;
     var adminEmail:String;
 
+    /** Whether the locked page offers the setup key form. **/
+    var keyAvailable:Bool;
+
+    /** Why the entered setup key was refused, or an empty string. **/
+    var keyError:String;
+
     /** Steps installation plugins offer here, such as restoring a backup. **/
     var panels:Array<SafeHtml>;
 }
