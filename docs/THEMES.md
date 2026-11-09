@@ -40,7 +40,7 @@ Simple is part of HaxePress. Its manifest and English/Turkish catalogues are com
 
 The stable `theme-simple` identity is protected by the package service. Upload inspection and installation reject replacement ZIPs, and uninstall is rejected even while another theme is active. The panel marks it as a built-in theme and omits the uninstall control. Protection is derived from the application identity rather than an uploaded manifest flag.
 
-Fieldnotes, Notebook and Gallery are bundled themes and belong to the application the same way. Every start installs a missing one and replaces one whose shipped archive in `public/packages` differs from the archive it was installed from, keeping its settings and activation; the setting `cms_example_<id>` records that archive's SHA-256 digest. Uploads cannot replace them and they cannot be removed. Their IDs are protected only while the installed theme is HaxePress's own, so a theme that already occupied one of these IDs is left alone. Other themes keep their normal installation, activation, settings and uninstall behavior.
+Fieldnotes, Notebook and Gallery are bundled themes and belong to the application the same way. Every start installs a missing one and replaces one whose shipped archive in `private/packages` differs from the archive it was installed from, keeping its settings and activation; the setting `cms_example_<id>` records that archive's SHA-256 digest. Uploads cannot replace them and they cannot be removed. Their IDs are protected only while the installed theme is HaxePress's own, so a theme that already occupied one of these IDs is left alone. Other themes keep their normal installation, activation, settings and uninstall behavior.
 
 ## Forks
 

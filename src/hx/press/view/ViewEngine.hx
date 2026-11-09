@@ -52,7 +52,7 @@ class ViewEngine {
 
     /**
         Where a set keeps its compiled templates between processes: Wellout's
-        PHP files in `storage/cache/views` on PHP, which starts the
+        PHP files in `private/storage/cache/views` on PHP, which starts the
         application for each request; none on the JVM, which compiles each
         template once per process. `version` names the set and the sources
         of its templates; this build is part of it.

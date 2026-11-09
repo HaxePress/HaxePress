@@ -14,7 +14,7 @@ The wizard is at `/admin/install`, so setup sessions keep the existing `/admin` 
 
 ## Database
 
-SQLite accepts a local `.sqlite` filename inside the `data` disk (`DATA_PATH`, by default `data/`), not an arbitrary filesystem path. The database stays apart from `storage/`, which holds uploaded files, caches and sessions. MySQL accepts host, port, an existing empty database and credentials; the JVM runtime includes a pinned Connector/J driver. The native Schema API lists tables, then creates and drops a bounded probe table to verify DDL permissions. Nonempty databases are rejected rather than overwritten.
+SQLite accepts a local `.sqlite` filename inside the `data` disk (`DATA_PATH`, by default `private/database`), not an arbitrary filesystem path. The database stays apart from `private/storage`, which holds uploaded files, installed plugins and themes, caches and sessions. Nothing under `private/` is served over HTTP; only `public/` is. MySQL accepts host, port, an existing empty database and credentials; the JVM runtime includes a pinned Connector/J driver. The native Schema API lists tables, then creates and drops a bounded probe table to verify DDL permissions. Nonempty databases are rejected rather than overwritten.
 
 A successful check stores its configuration in the server-side setup session for ten minutes. Database passwords are never returned in page props or JSON summaries. The final step verifies the connection again; a browser-provided “verified” field has no effect.
 

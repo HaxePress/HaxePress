@@ -11,7 +11,7 @@ using Std;
 class SessionConfig implements IConfig {
     public function new() {}
 
-    public var path:String = Environment.env("SESSION_PATH", "storage/sessions");
+    public var path:String = Environment.env("SESSION_PATH", "private/storage/sessions");
     public var lifetime:Int = Environment.env("SESSION_LIFETIME", "120").parseInt();
 
     public var guards:StringMap<Class<IAuthenticatable>> = ["admin" => Admin];

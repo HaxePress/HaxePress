@@ -4,7 +4,8 @@
 Run `make build` first, then `python3 scripts/release.py <tag> <output folder>`.
 The output holds the application built for the JVM and for PHP, one archive
 each. The plugins and themes of this build are inside both archives, in
-`public/packages`, and are not released as files of their own.
+`private/packages`, which the web server never serves, and are not released
+as files of their own.
 """
 
 import argparse
@@ -55,6 +56,10 @@ chmod('.env', 0600);
 echo "Created .env with a new APP_KEY. Keep it private.\\n";
 """
 
+# Apache refuses private/ even when the document root is set to the whole folder by mistake.
+PRIVATE_HTACCESS = """Require all denied
+"""
+
 # Vite names built files after their content, so Apache may let browsers keep them for a year.
 BUILT_ASSET_CACHE = """
 <IfModule mod_headers.c>
@@ -80,8 +85,8 @@ HaxePress {cms} (plugin API {api}) built for PHP with HxWell's PHP driver.
 
 1. Unpack this archive and run `php setup.php` in its folder. It creates
    `.env` from `.env.example` with a new `APP_KEY`; keep that file private.
-2. Make `data/` and `storage/` (both created on first use) and `.env` writable
-   by PHP.
+2. Make `private/database/` and `private/storage/` (both created on first
+   use) and `.env` writable by PHP.
 3. The installer accepts direct connections from 127.0.0.1 only. On a
    remote server, add your IP address to `INSTALL_TRUSTED_IPS` in `.env`.
 4. Open `/admin/install` on your site and follow the installer.
@@ -89,9 +94,12 @@ HaxePress {cms} (plugin API {api}) built for PHP with HxWell's PHP driver.
    `* * * * * cd /path/to/haxepress && php hxwell.boot.php schedule:run`.
    Without cron they also run after page requests.
 
-The database lives in `data/` and uploaded files in `storage/`. Keep `.env`,
-`data/` and `storage/` when you upgrade; replace everything else. Compiled
-templates are kept in `storage/cache/views` as PHP files.
+Only `public/` is served. Everything else the site keeps lives in `private/`:
+the database in `private/database`, uploaded files, installed plugins and
+themes in `private/storage`, and the plugins and themes of this release in
+`private/packages`. Keep `.env`, `private/database` and `private/storage`
+when you upgrade; replace everything else. Compiled templates are kept in
+`private/storage/cache/views` as PHP files.
 
 ## AI connections (MCP)
 
@@ -105,7 +113,7 @@ needs the JVM build.
 ## Plugins and themes
 
 The plugins and themes of this release are inside this archive, in
-`public/packages`. Install them from Plugins and Themes in the
+`private/packages`. Install them from Plugins and Themes in the
 administration panel; each plugin contains its JVM, CPPIA and PHP builds.
 """
 
@@ -130,14 +138,17 @@ HaxePress {cms} (plugin API {api}) built for the JVM.
 3. Open http://127.0.0.1:3000/admin/install on the same computer and follow
    the installer. Other addresses need `INSTALL_TRUSTED_IPS` in `.env`.
 
-The database lives in `data/` and uploaded files in `storage/`; the site
-creates both. Keep `.env`, `data/` and `storage/` when you upgrade; replace
+Only `public/` is served. Everything else the site keeps lives in `private/`:
+the database in `private/database`, uploaded files, installed plugins and
+themes in `private/storage` (the site creates both), and the plugins and
+themes of this release in `private/packages`. Keep `.env`,
+`private/database` and `private/storage` when you upgrade; replace
 everything else.
 
 ## Plugins and themes
 
 The plugins and themes of this release are inside this archive, in
-`public/packages`. Install them from Plugins and Themes in the
+`private/packages`. Install them from Plugins and Themes in the
 administration panel; each plugin contains its JVM, CPPIA and PHP builds.
 """
 
@@ -193,6 +204,28 @@ def add_tree(archive, source, name, keep=lambda path: True):
             add_file(archive, path, f"{name}/{relative.as_posix()}")
 
 
+def add_public(archive, folder):
+    """The web root: built assets, fonts and images, without any package archive."""
+    public = APPLICATION / "public"
+    add_tree(
+        archive,
+        public,
+        f"{folder}/public",
+        keep=lambda path: path.relative_to(public).parts[0] != "packages",
+    )
+
+
+def add_private(archive, folder, shipped):
+    """This build's packages and the seed content; the site adds database/ and storage/."""
+    add_tree(
+        archive,
+        APPLICATION / "private/packages",
+        f"{folder}/private/packages",
+        keep=lambda path: path.name in shipped,
+    )
+    add_tree(archive, ROOT / "private/seeds", f"{folder}/private/seeds")
+
+
 def application(version, cms, current, output):
     jar = APPLICATION / "hxwell.jar"
     if not jar.is_file():
@@ -203,14 +236,8 @@ def application(version, cms, current, output):
     with ZipFile(target, "w") as archive:
         add_file(archive, jar, f"{folder}/hxwell.jar")
         add_tree(archive, APPLICATION / "lib", f"{folder}/lib")
-        # Only this build's packages: the bundled plugins install from public/packages.
-        add_tree(
-            archive,
-            APPLICATION / "public",
-            f"{folder}/public",
-            keep=lambda path: path.parent.name != "packages" or path.name in shipped,
-        )
-        add_tree(archive, ROOT / "database", f"{folder}/database")
+        add_public(archive, folder)
+        add_private(archive, folder, shipped)
         add_file(archive, ROOT / "cms.json", f"{folder}/cms.json")
         add_file(archive, ROOT / ".env.example", f"{folder}/.env.example")
         add_text(archive, START, f"{folder}/start.sh", executable=True)
@@ -219,6 +246,10 @@ def application(version, cms, current, output):
         names = archive.namelist()
     if any(name.endswith("/.env") for name in names):
         raise SystemExit("The application archive must not contain an .env file.")
+    if any(
+        f"{folder}/private/{data}/" in name for name in names for data in ("database", "storage")
+    ):
+        raise SystemExit("The application archive must not contain a site's database or storage.")
     return target
 
 
@@ -234,16 +265,12 @@ def php_application(version, cms, current, output):
         add_tree(archive, PHP_APPLICATION / "lib", f"{folder}/lib")
         add_tree(archive, PHP_APPLICATION / "res", f"{folder}/res")
         # The same site assets as the JVM build, served through PHP's front controller.
-        add_tree(
-            archive,
-            APPLICATION / "public",
-            f"{folder}/public",
-            keep=lambda path: path.parent.name != "packages" or path.name in shipped,
-        )
+        add_public(archive, folder)
         add_file(archive, PHP_APPLICATION / "public/index.php", f"{folder}/public/index.php")
         rewrites = (PHP_APPLICATION / "public/.htaccess").read_text()
         add_text(archive, f"{rewrites.rstrip()}\n{BUILT_ASSET_CACHE}", f"{folder}/public/.htaccess")
-        add_tree(archive, ROOT / "database", f"{folder}/database")
+        add_private(archive, folder, shipped)
+        add_text(archive, PRIVATE_HTACCESS, f"{folder}/private/.htaccess")
         add_file(archive, ROOT / "cms.json", f"{folder}/cms.json")
         add_file(archive, ROOT / ".env.example", f"{folder}/.env.example")
         add_text(archive, SETUP_PHP, f"{folder}/setup.php")
@@ -252,6 +279,10 @@ def php_application(version, cms, current, output):
         names = archive.namelist()
     if any(name.endswith("/.env") for name in names):
         raise SystemExit("The application archive must not contain an .env file.")
+    if any(
+        f"{folder}/private/{data}/" in name for name in names for data in ("database", "storage")
+    ):
+        raise SystemExit("The application archive must not contain a site's database or storage.")
     return target
 
 

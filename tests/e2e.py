@@ -599,6 +599,13 @@ def run():
             "/media/.hidden.jpg",
             f"/media/{'a' * 32}.jpg",
             "/storage/cms.sqlite",
+            # Shipped plugin and theme archives live outside the web root and are never served.
+            "/packages/rss-2.16.0.zip",
+            "/packages/notebook-2.16.0.zip",
+            "/packages/cms-plugin-api-4.jar",
+            "/private/packages/rss-2.16.0.zip",
+            "/private/seeds/seed.json",
+            "/private/database/cms.sqlite",
         ]:
             check(public.request(path)[0] in (403, 404), f"unsafe storage path exposed: {path}")
         # A missing image gets the site's own 404 page, like any other missing page.

@@ -27,9 +27,9 @@ make build
 make run
 ```
 
-Open [the installation wizard](http://127.0.0.1:3000/admin/install). Choose SQLite or MySQL, verify an empty writable database, set your site and administrator details, then finish. SQLite creates its file in the `data/` folder (`DATA_PATH`), apart from the uploaded files and caches in `storage/`. MySQL requires an existing empty database and a user with schema permissions. Sample content is optional.
+Open [the installation wizard](http://127.0.0.1:3000/admin/install). Choose SQLite or MySQL, verify an empty writable database, set your site and administrator details, then finish. SQLite creates its file in `private/database` (`DATA_PATH`), apart from the uploaded files and caches in `private/storage`. MySQL requires an existing empty database and a user with schema permissions. Sample content is optional.
 
-The wizard saves the database settings in `.env` with private file permissions, creates the administrator in the database with only a hash of the password, and disables itself after completion. `.env` keeps no administrator credentials; startup clears any that earlier versions left there. Keep the real `.env`, `data/` and `storage/` outside Git. Existing installations with administrator records are detected and preserved. See [installation](docs/INSTALLATION.md).
+The wizard saves the database settings in `.env` with private file permissions, creates the administrator in the database with only a hash of the password, and disables itself after completion. `.env` keeps no administrator credentials; startup clears any that earlier versions left there. Keep the real `.env` and the `private/database` and `private/storage` folders outside Git. Existing installations with administrator records are detected and preserved. See [installation](docs/INSTALLATION.md).
 
 After setup, open [the site](http://127.0.0.1:3000/) or [administration](http://127.0.0.1:3000/admin). Later administrator changes live in the database; changing the initial bootstrap variables does not reset existing accounts.
 
@@ -40,7 +40,7 @@ python3 scripts/hxwell.py build jvm
 python3 scripts/run.py
 ```
 
-The launcher starts the JVM HTTP application, which renders every page and serves the site's MCP server (admin and theme tools) itself; no Node.js process runs with the site. Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `DATA_PATH`, `STORAGE_PATH`, `CACHE_PATH` and `SESSION_PATH` in `.env`. The default database is `data/cms.sqlite`; `storage/` holds uploaded files, caches and sessions. [MCP setup](docs/THEME-MCP.md)
+The launcher starts the JVM HTTP application, which renders every page and serves the site's MCP server (admin and theme tools) itself; no Node.js process runs with the site. Configure `HOST`, `PORT`, `MAX_CONNECTIONS`, `WORKERS`, `DB_PATH`, `DATA_PATH`, `STORAGE_PATH`, `CACHE_PATH` and `SESSION_PATH` in `.env`. Only `public/` is served over HTTP; everything else the site keeps is under `private/`. The default database is `private/database/cms.sqlite`, `private/storage` holds uploaded files, installed plugins and themes, caches and sessions, `private/packages` the plugin and theme archives shipped with the build (`PACKAGES_PATH`), and `private/seeds` the sample content. [MCP setup](docs/THEME-MCP.md)
 
 ## Definition-driven CMS
 
@@ -85,7 +85,7 @@ Application/plugin/Haxe test file access uses `Storage` and configured disks. Me
 
 ## Extension authors
 
-See [the API 4 package contract](docs/PLUGIN-PACKAGES.md) for native lifecycle, routes, storage, migrations, models, JSON state, themes and translations. `make build` generates the SDK and ZIP packages under `Export/packages/` and publishes download copies under `public/packages/`.
+See [the API 4 package contract](docs/PLUGIN-PACKAGES.md) for native lifecycle, routes, storage, migrations, models, JSON state, themes and translations. `make build` generates the SDK and ZIP packages under `Export/packages/` and copies them to `private/packages/`, where the application installs them from; nothing serves them over HTTP.
 
 The source is organized as follows:
 
@@ -118,7 +118,7 @@ php -S 127.0.0.1:3010 index.php
 PHP starts the application for each request, so the PHP build:
 
 - runs migrations once per build and records it in the database;
-- keeps compiled Wellout templates in `storage/cache/views` with Wellout's `PhpTemplateStore`, as PHP files that opcache serves; each file returns the template's operation tree as a PHP array, never code from a template, and output is still escaped by the same renderer;
+- keeps compiled Wellout templates in `private/storage/cache/views` with Wellout's `PhpTemplateStore`, as PHP files that opcache serves; each file returns the template's operation tree as a PHP array, never code from a template, and output is still escaped by the same renderer;
 - writes output with native PHP string functions;
 - runs due scheduled tasks after responses and from `php hxwell.boot.php schedule:run`, which cron can call every minute;
 - sends errors to PHP's error log.
@@ -132,15 +132,15 @@ Publishing a release on GitHub runs the Release workflow (`.github/workflows/rel
 - `haxepress-<version>-jvm.zip`, the application for Java 21+, with `start.sh`, which creates `.env` with a new `APP_KEY` on first run;
 - `haxepress-<version>-php.zip`, the application for PHP 8.1+, with `setup.php`, which creates `.env` with a new `APP_KEY`, and a README for web servers and cron.
 
-Nothing else is attached. The plugins and themes of that build, where each plugin contains its JVM, CPPIA and PHP builds, are inside both archives in `public/packages` and install from the administration panel.
+Nothing else is attached. The plugins and themes of that build, where each plugin contains its JVM, CPPIA and PHP builds, are inside both archives in `private/packages` and install from the administration panel.
 
 The workflow checks that each installation of either archive creates its own private `APP_KEY` (`tests/release_keys.py`) and serves both packaged applications before it attaches them. The release tag names the download; the CMS and plugin API versions inside come from `cms.json`. To rebuild a release's files, run the workflow by hand with its tag.
 
 ## Upgrading an existing installation
 
-Back up `.env`, the database and managed `storage/` data before upgrading. The legacy naming migration renames the old content/tag tables and reference column through Schema APIs, preserves IDs/content/relationships, normalizes the old content type, working-copy keys and revision snapshots, and updates factory defaults only when they still match the original values. Existing custom site text is retained. The structure migration replaces the global slug constraint with `(content_type, slug)`, renames menu references to `content_id`, and adds registry/value/grant tables. Old public URLs redirect to canonical routes.
+Back up `.env`, `private/database` and `private/storage` before upgrading; a release archive holds neither, so unpacking it over the site replaces the application and keeps the site's data. The legacy naming migration renames the old content/tag tables and reference column through Schema APIs, preserves IDs/content/relationships, normalizes the old content type, working-copy keys and revision snapshots, and updates factory defaults only when they still match the original values. Existing custom site text is retained. The structure migration replaces the global slug constraint with `(content_type, slug)`, renames menu references to `content_id`, and adds registry/value/grant tables. Old public URLs redirect to canonical routes.
 
-Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Bundled themes and the Reading Companion sample are also replaced whenever the archive shipped with a release differs from the one they were installed from, even when the version number is the same; a removed bundled theme is installed again. Templates escape everything printed with `{{ }}`; print icons, rendered Markdown and other HTML helpers with `{!! !!}`. A third-party theme written for 0.0.1 that prints them with `{{ }}` shows their markup as text until it is updated. Third-party native plugins must be rebuilt for the exact CMS 2.16.0 / API 4 release. Themes provide Wellout views. Browser renderer themes are no longer supported: they are rejected on upload and removed on startup, and the shipped example themes are replaced with their Wellout builds. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. PHP sites before this release stored plugin and theme settings in a form they could not read back, so saved settings did not take effect; this release reads that form and writes plain objects, so those saved settings apply after the upgrade. Keep custom `DB_PATH` values. New installations keep SQLite in `data/`; an installation that left `DB_PATH` out with its database at the earlier default, `storage/cms.sqlite`, keeps using that file. To move it, stop the site, move the database file and any `-wal` and `-shm` files beside it into `data/`, and set `DB_PATH`.
+Bundled older packages are replaced with API 4 builds while retaining settings, activation and the selected theme. Bundled themes and the Reading Companion sample are also replaced whenever the archive shipped with a release differs from the one they were installed from, even when the version number is the same; a removed bundled theme is installed again. Templates escape everything printed with `{{ }}`; print icons, rendered Markdown and other HTML helpers with `{!! !!}`. A third-party theme written for 0.0.1 that prints them with `{{ }}` shows their markup as text until it is updated. Third-party native plugins must be rebuilt for the exact CMS 2.16.0 / API 4 release. Themes provide Wellout views. Browser renderer themes are no longer supported: they are rejected on upload and removed on startup, and the shipped example themes are replaced with their Wellout builds. The SDK includes the shared `ValidationResponder` interface for native handler validation failures. Detail and page templates receive `item`; custom templates include a standard `templateFallback`. Plugin-owned data and migration histories remain in place. PHP sites before this release stored plugin and theme settings in a form they could not read back, so saved settings did not take effect; this release reads that form and writes plain objects, so those saved settings apply after the upgrade. Keep custom `DB_PATH` values.
 
 ## Verification
 

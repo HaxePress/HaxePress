@@ -264,7 +264,7 @@ def main():
             link.symlink_to(path, target_is_directory=True)
         (entry / ".current").write_text(f"{version}\n")
     for name in ("sessions", "cache"):
-        (ROOT / "storage" / name).mkdir(parents=True, exist_ok=True)
+        (ROOT / "private/storage" / name).mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
             maven,

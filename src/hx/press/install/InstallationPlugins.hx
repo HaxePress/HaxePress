@@ -112,7 +112,7 @@ class InstallationPlugins {
         if (!InstallationState.pending || staged.length > 0) {
             return;
         }
-        var archives = Storage.disk("public");
+        var archives = Storage.disk("bundled");
         var extensions = Storage.disk("extensions");
         for (bundle in BuiltInPlugins.bundles()) {
             var archive = BuiltInPlugins.archive(bundle);

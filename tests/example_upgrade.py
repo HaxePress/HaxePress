@@ -7,7 +7,7 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC_ROOT = Path(os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
+PACKAGES_ROOT = Path(os.environ.get("CMS_TEST_PACKAGES_PATH", ROOT / "private/packages"))
 EXAMPLE = "theme-notebook"
 VIEW = "views/Home.well.html"
 MARKER = f"cms_example_{EXAMPLE}"
@@ -61,7 +61,7 @@ def verify(fixtures, work, expected):
     if package["directory"] == expected["directory"]:
         raise AssertionError("Startup kept an example whose shipped archive changed.")
     version = json.loads((ROOT / "cms.json").read_text())["version"]
-    archive = PUBLIC_ROOT / f"packages/notebook-{version}.zip"
+    archive = PACKAGES_ROOT / f"notebook-{version}.zip"
     with zipfile.ZipFile(archive) as shipped:
         view = shipped.read(VIEW)
     replaced = work / "storage/extensions/installed" / package["directory"] / VIEW

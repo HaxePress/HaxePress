@@ -25,6 +25,7 @@ from build import build
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_ROOT = Path(os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
+PACKAGES_ROOT = Path(os.environ.get("CMS_TEST_PACKAGES_PATH", ROOT / "private/packages"))
 parser = argparse.ArgumentParser(description="Run isolated JVM integration suites.")
 parser.add_argument(
     "--only",
@@ -174,8 +175,12 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
     for folder in ("sessions", "cache"):
         (work / "storage" / folder).mkdir(parents=True, exist_ok=True)
     (work / "data").mkdir()
-    for folder in ("public", "database"):
-        source = PUBLIC_ROOT if folder == "public" else ROOT / folder
+    (work / "private").mkdir()
+    for folder, source in [
+        ("public", PUBLIC_ROOT),
+        ("private/packages", PACKAGES_ROOT),
+        ("private/seeds", ROOT / "private/seeds"),
+    ]:
         (work / folder).symlink_to(source, target_is_directory=True)
     password = secrets.token_urlsafe(18)
     values = {
@@ -191,6 +196,8 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
         "WORKERS": "16",
         "DB_DRIVER": "sqlite",
         "DB_PATH": str(work / "data/cms.sqlite"),
+        "DATA_PATH": str(work / "data"),
+        "STORAGE_PATH": str(work / "storage"),
         "SESSION_PATH": str(work / "storage/sessions"),
         "CACHE_PATH": str(work / "storage/cache"),
         "ADMIN_EMAIL": "integration-admin@example.com",

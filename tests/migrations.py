@@ -44,7 +44,7 @@ def prepare(fixtures):
         if record["reading_minutes"] == 0:
             record["reading_minutes"] = max(1, (record["content"].count(" ") + 200) // 200)
 
-    seed_file = Path(__file__).resolve().parents[1] / "database/seed.json"
+    seed_file = Path(__file__).resolve().parents[1] / "private/seeds/seed.json"
     seeds = json.loads(seed_file.read_text())
     category_names = {
         " ".join(record["category"].split()) for record in records + seeds if record["category"]

@@ -15,7 +15,7 @@ from fixture_store import FixtureStore
 from validation import post_json
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC_ROOT = Path(os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
+PACKAGES_ROOT = Path(os.environ.get("CMS_TEST_PACKAGES_PATH", ROOT / "private/packages"))
 BUNDLED = ["fieldnotes", "notebook", "gallery"]
 ACCENT = "#345678"
 DYNAMIC = re.compile(r'nonce="[^"]+"|value="[^"]{20,}"|content="[^"]{20,}"')
@@ -115,7 +115,7 @@ def verify(owner, public, store):
             check(f"/admin/themes/{theme}/uninstall" not in listing, f"{theme} offers removal")
             status, _, body = owner.request(f"/admin/themes/{theme}/uninstall", "POST", {})
             check(status == 422 and "cannot be removed" in body, f"{theme} was removed")
-        shipped = (PUBLIC_ROOT / f"packages/notebook-{version}.zip").read_bytes()
+        shipped = (PACKAGES_ROOT / f"notebook-{version}.zip").read_bytes()
         status, _, body = owner.request(
             "/admin/themes/upload", "POST", raw=shipped, content_type="application/zip"
         )

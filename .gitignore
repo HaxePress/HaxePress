@@ -24,9 +24,11 @@
 *.rej
 *~
 Export/
-storage/*
-!storage/.gitkeep
+storage/
 data/
+private/database/
+private/packages/
+private/storage/
 .DS_Store
 *.n
 node_modules/

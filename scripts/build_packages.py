@@ -163,8 +163,12 @@ def build_plugin(plugin, output, api_info, application=None):
     return package
 
 
-def build(application, public_root=None):
+def build(application, public_root=None, packages_root=None):
     public_root = Path(public_root or os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
+    # The archives the application installs from; outside the web root, so nobody downloads them.
+    packages_root = Path(
+        packages_root or os.environ.get("CMS_TEST_PACKAGES_PATH", ROOT / "private/packages")
+    )
     output = ROOT / "Export/packages"
     output.mkdir(parents=True, exist_ok=True)
     release = json.loads((ROOT / "cms.json").read_text())
@@ -240,10 +244,8 @@ def build(application, public_root=None):
             raise RuntimeError(f"Rebuild {manifest['slug']} for this exact CMS release")
         package = build_plugin(plugin, output, api_info, application)
         packages.append(package)
-    public_packages = public_root / "packages"
-    public_packages.mkdir(parents=True, exist_ok=True)
-    for artifact in [sdk, source_sdk, *packages]:
-        shutil.copy2(artifact, public_packages / artifact.name)
+    packages_root.mkdir(parents=True, exist_ok=True)
+    shipped = [sdk, source_sdk, *packages]
     subprocess.run(
         ["node", "scripts/build_themes.mjs"],
         cwd=ROOT,
@@ -260,16 +262,18 @@ def build(application, public_root=None):
             for asset in sorted(theme.rglob("*")):
                 if asset.is_file():
                     archive.write(asset, asset.relative_to(theme))
-        shutil.copy2(package, public_packages / package.name)
-    if public_root.resolve() == (ROOT / "public").resolve():
-        deployment = ROOT / "Export/jvm/public/packages"
+        shipped.append(package)
+    for artifact in shipped:
+        shutil.copy2(artifact, packages_root / artifact.name)
+    if packages_root.resolve() == (ROOT / "private/packages").resolve():
+        deployment = ROOT / "Export/jvm/private/packages"
         deployment.mkdir(parents=True, exist_ok=True)
-        for artifact in public_packages.iterdir():
+        for artifact in shipped:
             shutil.copy2(artifact, deployment / artifact.name)
-        if (public_root / "themes").is_dir():
-            shutil.copytree(
-                public_root / "themes", ROOT / "Export/jvm/public/themes", dirs_exist_ok=True
-            )
+    if public_root.resolve() == (ROOT / "public").resolve() and (public_root / "themes").is_dir():
+        shutil.copytree(
+            public_root / "themes", ROOT / "Export/jvm/public/themes", dirs_exist_ok=True
+        )
     print(
         (
             f"Built CMS {release['version']} native plugin SDK and {str(len(packages))}"
@@ -288,5 +292,6 @@ if __name__ == "__main__":
         default=Path(os.environ.get("CMS_TEST_APPLICATION", ROOT / "Export/jvm/hxwell.jar")),
     )
     parser.add_argument("--public-root", type=Path)
+    parser.add_argument("--packages-root", type=Path)
     arguments = parser.parse_args()
-    build(arguments.application, arguments.public_root)
+    build(arguments.application, arguments.public_root, arguments.packages_root)

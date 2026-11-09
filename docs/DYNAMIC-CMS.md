@@ -4,17 +4,17 @@ The application has been reviewed across content storage, queries, routing, perm
 
 ## Architecture boundaries
 
-| Area | Definition source | Execution boundary |
-| --- | --- | --- |
-| Collections | Stored content type key, labels, features, constraints and paths | Shared guarded collection routes, controllers and workflow |
-| Custom fields | Typed field definitions on the collection | Native validation, scoped values, projections and query-builder predicates |
-| Lists | Core metadata plus explicitly listed scalar fields | Cursor pages; specific query caches; bounded SQL projections |
-| Public addresses | Collection definitions and retained old paths | Native routes take precedence; the public handler resolves stored paths at request time |
-| Rendering | Named detail/archive/home templates | Partial theme implementations with standard CMS fallback views |
-| Plugin data | Stable owner identifiers and native model/Schema APIs | Creation/destruction lifecycle; inactive owners retain stored data |
-| Navigation | Route metadata, content definitions and managed menus | Server-filtered administration navigation and public navigation regions |
-| Roles | Capability grants | Request-time checks and explicit administrator sessions |
-| Media | Storage disks and shared reference/upload policy | Bounded uploads, streamed responses and referenced-file protection |
+| Area             | Definition source                                                | Execution boundary                                                                      |
+| ---------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Collections      | Stored content type key, labels, features, constraints and paths | Shared guarded collection routes, controllers and workflow                              |
+| Custom fields    | Typed field definitions on the collection                        | Native validation, scoped values, projections and query-builder predicates              |
+| Lists            | Core metadata plus explicitly listed scalar fields               | Cursor pages; specific query caches; bounded SQL projections                            |
+| Public addresses | Collection definitions and retained old paths                    | Native routes take precedence; the public handler resolves stored paths at request time |
+| Rendering        | Named detail/archive/home templates                              | Partial theme implementations with standard CMS fallback views                          |
+| Plugin data      | Stable owner identifiers and native model/Schema APIs            | Creation/destruction lifecycle; inactive owners retain stored data                      |
+| Navigation       | Route metadata, content definitions and managed menus            | Server-filtered administration navigation and public navigation regions                 |
+| Roles            | Capability grants                                                | Request-time checks and explicit administrator sessions                                 |
+| Media            | Storage disks and shared reference/upload policy                 | Bounded uploads, streamed responses and referenced-file protection                      |
 
 Core resource limits, authentication/session checks, CSRF, Storage path containment and allowed scalar representations remain server-enforced invariants. Content definitions configure the CMS; trusted native plugins provide additional executable behavior.
 
@@ -45,7 +45,6 @@ The bundled Content/Page, Category/Tag and Header/Footer definitions remain usef
 
 CMS 2.1.0 uses native plugin/theme API 4. The native ORM/export graph changed, and detail/page templates share the `item` contract. Native packages must be rebuilt against this exact release and its compatibility patches. Matching bundled upgrades retain package settings, activation, selected theme and stored data.
 
-
-Local deployment backups are stored under the ignored `storage/backups/` directory. Live preservation results are recorded in `outputs/dynamic-live-verification.json`; production build and package logs use the `dynamic-production-*` prefix.
+Local deployment backups are stored under the ignored `private/storage/backups/` directory. Live preservation results are recorded in `outputs/dynamic-live-verification.json`; production build and package logs use the `dynamic-production-*` prefix.
 
 The running local JVM also passes existing-credential login, dynamic collection/schema/role/menu screens, session-free public content, RSS and legacy links. Evidence: `outputs/dynamic-live-smoke.json`. Original record/file comparisons are in `outputs/dynamic-live-verification.json`.

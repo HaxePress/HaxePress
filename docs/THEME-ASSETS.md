@@ -1,6 +1,6 @@
 # Theme-owned images
 
-The visual editor's image picker and upload controls use **Theme images**. Confirmed JPEG, PNG and GIF files belong to a specific theme and are stored through the configured `theme_assets` Storage disk at `storage/themes/<theme-id>/`. Metadata lives in `theme_assets`, with a foreign key to the owning design. Saved WebP images retain their existing URLs.
+The visual editor's image picker and upload controls use **Theme images**. Confirmed JPEG, PNG and GIF files belong to a specific theme and are stored through the configured `theme_assets` Storage disk at `private/storage/themes/<theme-id>/`. Metadata lives in `theme_assets`, with a foreign key to the owning design. Saved WebP images retain their existing URLs.
 
 Images can appear in normal blocks, reusable components, responsive/interaction styles, CSS backgrounds and imported HTML/CSS. Values use immutable `/theme-assets/<theme-id>/ta_<token>.<extension>` URLs. The distinct filename namespace keeps theme-owned files outside the generic site-media dependency scanner. Native validation rejects another theme's image or a missing owned asset. Existing site-media references remain readable for older designs and dynamic content bindings.
 
@@ -22,12 +22,12 @@ Package ZIPs allow up to 64 MB, with separate per-file, expanded-size and file-c
 
 The authenticated MCP/browser APIs add:
 
-| Tool | Permission | Purpose |
-| --- | --- | --- |
-| `search_theme_assets` | Read design | Search this theme's bounded image library. |
-| `read_theme_asset_image` | Read design | View an owned image by its library ID. |
-| `upload_theme_image` | Edit design | Stage canonical Base64 image data and return the image, upload ID and SHA-256. |
-| `verify_theme_image` | Edit design | Confirm a displayed and hash-checked image with its ID, hash and measured dimensions. Returns the saved theme image URL. |
+| Tool                     | Permission  | Purpose                                                                                                                  |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `search_theme_assets`    | Read design | Search this theme's bounded image library.                                                                               |
+| `read_theme_asset_image` | Read design | View an owned image by its library ID.                                                                                   |
+| `upload_theme_image`     | Edit design | Stage canonical Base64 image data and return the image, upload ID and SHA-256.                                           |
+| `verify_theme_image`     | Edit design | Confirm a displayed and hash-checked image with its ID, hash and measured dimensions. Returns the saved theme image URL. |
 
 Site-media browsing keeps its separate media permission. Theme-owned assets are part of the design and do not require access to the general media library. Images uploaded through these tools join the same theme export. The editor and AI still use the same native design validator, ownership checks and save path.
 

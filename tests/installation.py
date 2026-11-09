@@ -23,6 +23,7 @@ from fixture_store import FixtureStore, TEST_BINARY
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = Path(os.environ.get("CMS_TEST_PUBLIC_PATH", ROOT / "public"))
+PACKAGES = Path(os.environ.get("CMS_TEST_PACKAGES_PATH", ROOT / "private/packages"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from setup import prepare_environment
 
@@ -95,7 +96,9 @@ class SetupServer:
         work.chmod(0o700)
         (work / "storage").mkdir()
         (work / "public").symlink_to(PUBLIC, target_is_directory=True)
-        (work / "database").symlink_to(ROOT / "database", target_is_directory=True)
+        (work / "private").mkdir()
+        (work / "private/packages").symlink_to(PACKAGES, target_is_directory=True)
+        (work / "private/seeds").symlink_to(ROOT / "private/seeds", target_is_directory=True)
         prepare_environment(work)
         initial_key_line = next(
             line for line in (work / ".env").read_text().splitlines() if line.startswith("APP_KEY=")
@@ -114,6 +117,7 @@ class SetupServer:
             "DB_DRIVER": "sqlite",
             "DB_PATH": str(work / "storage/untouched.sqlite"),
             "STORAGE_PATH": str(work / "storage"),
+            "DATA_PATH": str(work / "data"),
             "CACHE_PATH": str(work / "storage/cache"),
             "SESSION_PATH": str(work / "storage/sessions"),
             "WELL_DATA_RESPONSES": "1",

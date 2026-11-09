@@ -15,5 +15,5 @@ class HttpConfig implements IConfig {
 
     public var public_path:String = Environment.env("PUBLIC_PATH", "public");
 
-    public var cache_path:String = Environment.env("CACHE_PATH", "storage/cache");
+    public var cache_path:String = Environment.env("CACHE_PATH", "private/storage/cache");
 }

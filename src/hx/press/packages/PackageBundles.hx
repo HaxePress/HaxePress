@@ -10,7 +10,7 @@ import hx.press.CmsVersion;
 import hx.press.packages.PackageManifest.ManifestData;
 
 /**
-    The packages shipped in `public/packages`. Bundled themes belong to the
+    The packages shipped in `packages/`, outside the web root. Bundled themes belong to the
     application: they are always installed, follow the archives of the
     running build and cannot be replaced or removed; a fork is changed
     instead. The example plugin is optional, and once installed it follows
@@ -47,7 +47,7 @@ class PackageBundles {
 
     /** Installs every bundled theme, or replaces it when the shipped archive changed. **/
     static function ensureThemes():Void {
-        var disk = Storage.disk("public");
+        var disk = Storage.disk("bundled");
         for (slug in themes) {
             var id = 'theme-${slug}';
             var path = archive(slug);
@@ -72,7 +72,7 @@ class PackageBundles {
 
     /** Replaces the installed example plugin when the shipped archive changed. **/
     static function upgradePlugins():Void {
-        var disk = Storage.disk("public");
+        var disk = Storage.disk("bundled");
         for (bundle in plugins) {
             var id = 'plugin-${bundle.slug}';
             var path = archive(bundle.slug);
@@ -93,9 +93,9 @@ class PackageBundles {
         }
     }
 
-    /** The archive of a bundled package on the public disk, built with this version. **/
+    /** The archive of a bundled package on the `bundled` disk, built with this version. **/
     static function archive(slug:String):String {
-        return 'packages/${slug}-${CmsVersion.version}.zip';
+        return '${slug}-${CmsVersion.version}.zip';
     }
 
     /** The setting that holds the digest of the archive a bundled package was installed from. **/
@@ -129,7 +129,7 @@ class PackageBundles {
         cleaned too.
     **/
     static function retireRendererThemes():Void {
-        var disk = Storage.disk("public");
+        var disk = Storage.disk("bundled");
         var legacy = InstalledPackage.query.select(["id", "slug", "author", "manifest", "enabled"])
             .where("kind", "theme")
             .whereLike("manifest", '%"renderer"%')

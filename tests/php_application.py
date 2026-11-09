@@ -53,6 +53,13 @@ def unpack(work):
     with zipfile.ZipFile(archive) as files:
         names = files.namelist()
         check(not any(name.endswith("/.env") for name in names), "the archive has no .env")
+        check(
+            "haxepress-0.0.0/private/packages/rss-2.16.0.zip" in names
+            and "haxepress-0.0.0/private/seeds/seed.json" in names
+            and "haxepress-0.0.0/private/.htaccess" in names
+            and not any("/public/packages/" in name for name in names),
+            "the archive keeps its packages and seed content in private/",
+        )
         files.extractall(work)
     return work / "haxepress-0.0.0"
 
@@ -106,8 +113,9 @@ def run(app, url):
         ".env keeps no administrator credentials",
     )
     check(
-        (app / "data/cms.sqlite").is_file() and not list((app / "storage").rglob("*.sqlite")),
-        "the database is in data/, apart from storage/",
+        (app / "private/database/cms.sqlite").is_file()
+        and not list((app / "private/storage").rglob("*.sqlite")),
+        "the database is in private/database, apart from private/storage",
     )
 
     public = Client()
@@ -115,6 +123,13 @@ def run(app, url):
     check(status == 200 and "PHP HaxePress" in home, "the home page renders")
     check(public.request("/about")[0] == 200, "the about page renders")
     check(public.request("/content/welcome-to-haxepress")[0] == 200, "a content page renders")
+    for path in [
+        "/packages/rss-2.16.0.zip",
+        "/private/packages/rss-2.16.0.zip",
+        "/private/seeds/seed.json",
+        "/private/database/cms.sqlite",
+    ]:
+        check(public.request(path)[0] == 404, f"{path} is not served")
     status, _, feed = public.request("/rss.xml")
     check(status == 200 and "<rss" in feed, "the bundled RSS plugin serves its feed")
     check(public.request("/admin")[0] == 303, "the administration needs a sign-in")
@@ -160,7 +175,7 @@ def run(app, url):
     check_forks(admin, public)
     check_cloudflare(admin)
 
-    views = list((app / "storage/cache/views").rglob("*.php"))
+    views = list((app / "private/storage/cache/views").rglob("*.php"))
     check(len(views) > 0, "compiled templates are kept as PHP files")
     check(
         all(view.read_text().split("\n", 2)[2].startswith("return array (") for view in views),
@@ -270,7 +285,7 @@ def visit_content_views(app, admin):
     check(admin.request(VIEWED, extra_headers=BROWSER)[0] == 200, "a member views the page")
     lines = [
         line
-        for log in (app / "storage/view-count/pending").glob("*.log")
+        for log in (app / "private/storage/view-count/pending").glob("*.log")
         for line in log.read_text().splitlines()
     ]
     check(
@@ -309,8 +324,8 @@ def check_content_views(app, admin, visited):
         f"the country counts used CF-IPCountry only from the trusted connection: {countries}",
     )
     check(
-        not list((app / "storage/view-count/pending").glob("*.log"))
-        and not list((app / "storage/view-count/pending").glob("*.claimed")),
+        not list((app / "private/storage/view-count/pending").glob("*.log"))
+        and not list((app / "private/storage/view-count/pending").glob("*.claimed")),
         "the handed over minute files are removed",
     )
     for page in ["/admin/view-counts", "/admin/view-counts/countries"]:

@@ -47,7 +47,7 @@ class PackageStorage {
     /** Accept legacy staged-upload paths while keeping all operations disk-relative. */
     public static function relative(path:String):String {
         var normalized = Path.normalize(path);
-        var storage = Environment.env("STORAGE_PATH", "storage");
+        var storage = Environment.env("STORAGE_PATH", "private/storage");
         var extensions = Path.normalize('${storage}/extensions');
         var legacy = '${extensions}/';
         var absolute = '${root()}/';

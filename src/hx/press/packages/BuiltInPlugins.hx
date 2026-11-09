@@ -51,9 +51,9 @@ class BuiltInPlugins {
         return defaults.copy();
     }
 
-    /** The archive of a bundled plugin on the public disk, built with this version. **/
+    /** The archive of a bundled plugin on the `bundled` disk, built with this version. **/
     public static function archive(bundle:BundledPlugin):String {
-        return 'packages/${bundle.slug}-${CmsVersion.version}.zip';
+        return '${bundle.slug}-${CmsVersion.version}.zip';
     }
 
     public static function isBuiltIn(id:String, pluginId:Null<String>):Bool {
@@ -78,7 +78,7 @@ class BuiltInPlugins {
     }
 
     public static function ensure():Void {
-        var disk = Storage.disk("public");
+        var disk = Storage.disk("bundled");
         for (bundle in defaults) {
             var id = 'plugin-${bundle.slug}';
             var path = archive(bundle);
