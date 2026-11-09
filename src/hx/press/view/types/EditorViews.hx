@@ -50,6 +50,50 @@ typedef EditorItemView = {
 
     var tags:Array<TagView>;
     var fields:Map<String, Dynamic>;
+    var language:String;
+    var all_languages:Bool;
+}
+
+@:well.view
+typedef EditorLanguageView = {
+    var code:String;
+    var name:String;
+    var direction:String;
+    var enabled:Bool;
+}
+
+/** Another language's item of the same translation group. **/
+@:well.view
+typedef EditorTranslationView = {
+    var id:Int;
+    var language:String;
+    var name:String;
+    var title:String;
+    var status:String;
+    var editUrl:String;
+}
+
+@:well.view
+typedef EditorMissingLanguageView = {
+    var code:String;
+    var name:String;
+    var url:String;
+}
+
+/**
+    The languages of the editor: empty choices on a site with one language,
+    which shows no language controls.
+**/
+@:well.view
+typedef EditorLanguagesView = {
+    var choices:Array<EditorLanguageView>;
+    var translations:Array<EditorTranslationView>;
+    var missing:Array<EditorMissingLanguageView>;
+
+    /** The item a new translation translates, or 0. **/
+    var translationOf:Int;
+
+    var sourceTitle:String;
 }
 
 /** A private working copy of the editor's values. */
@@ -87,4 +131,5 @@ typedef ContentEditorView = {
     var canPublish:Bool;
     var notice:String;
     var mediaRules:EditorMediaRulesView;
+    var languages:EditorLanguagesView;
 }

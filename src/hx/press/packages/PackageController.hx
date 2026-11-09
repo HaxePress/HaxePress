@@ -334,7 +334,10 @@ class PackageController {
             return redirect;
         }
         var previewBase = '/admin/themes/${theme.id}/preview/frame';
-        var previewUrl = '${previewBase}?lang=${StringTools.urlEncode(I18n.locale())}';
+        // The preview shows the public site, in the language the page asks for or the default one.
+        var requested = request.query("lang", "");
+        var previewed = I18n.known(requested) ? requested : I18n.defaultLocale();
+        var previewUrl = '${previewBase}?lang=${StringTools.urlEncode(previewed)}';
         var manifest = PackageManifest.parse(theme.manifest);
         var fields = manifest.fields.filter(field -> field.kind != "secret");
         var saved:Map<String, String> = [];

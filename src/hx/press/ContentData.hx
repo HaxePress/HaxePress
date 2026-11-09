@@ -34,6 +34,9 @@ class ContentData {
         "image_alt",
         "status",
         "featured",
+        "language",
+        "translation_group",
+        "all_languages",
         "reading_minutes",
         "published_at",
         "updated_at",
@@ -45,8 +48,11 @@ class ContentData {
     public static final editorColumns = summaryColumns.concat(["content", "seo_title", "seo_description", "previous_status", "created_at"]);
 
     static function filtered(kind:String, search:String, status:String, author:Int,
-            capabilities:Array<String> = null):QueryBuilder<ContentItem> {
+            capabilities:Array<String> = null, language:String = ""):QueryBuilder<ContentItem> {
         var query = ContentItem.query.select(summaryColumns);
+        if (language != "") {
+            query.where("language", language);
+        }
         if (kind != "") {
             query.where("content_type", kind);
             var type = ContentTypes.find(kind);
@@ -87,10 +93,10 @@ class ContentData {
         cached: the content cache does not follow their changes.
     **/
     public static function page(kind:String, search:String, status:String, author:Int,
-            cursor:Null<PageCursor>, visible:Array<ContentListColumn>,
-            sort:ContentListSort):QueryPage<ContentSummary> {
+            cursor:Null<PageCursor>, visible:Array<ContentListColumn>, sort:ContentListSort,
+            language:String = ""):QueryPage<ContentSummary> {
         var load = () -> {
-            var query = filtered(kind, search, status, author);
+            var query = filtered(kind, search, status, author, null, language);
             ContentListColumns.apply(query, visible, sort, cursor);
             var rows:Array<ContentSummary> = query.limit(PAGE_SIZE + 1)
                 .get()
@@ -101,15 +107,23 @@ class ContentData {
             return load();
         }
         var order = '${sort.column.key}:${sort.descending ? "desc" : "asc"}';
-        return ContentCache.remember("items", "cms-list",
-            [kind, search, status, author, Pagination.token(cursor), PAGE_SIZE, order], load);
+        return ContentCache.remember("items", "cms-list", [
+            kind,
+            search,
+            status,
+            author,
+            Pagination.token(cursor),
+            PAGE_SIZE,
+            order,
+            language
+        ], load);
     }
 
     public static function count(kind:String, search:String = "", status:String = "",
-            author:Int = 0, capabilities:Array<String> = null):Int {
+            author:Int = 0, capabilities:Array<String> = null, language:String = ""):Int {
         return ContentCache.remember("items", "cms-count",
-            [kind, search, status, author, capabilities, ContentTypes.revision()],
-            () -> filtered(kind, search, status, author, capabilities).count());
+            [kind, search, status, author, capabilities, ContentTypes.revision(), language],
+            () -> filtered(kind, search, status, author, capabilities, language).count());
     }
 
     public static function recent(author:Int,

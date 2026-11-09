@@ -1,0 +1,202 @@
+<props
+  notice="String"
+  siteLanguages="List<AdminLanguageView>"
+  languageForm="AdminLanguageFormView"
+  homePage="AdminContentChoiceView?"
+  suggestions="List<AdminLanguageSuggestionView>"
+  limit="Int"
+/>
+<AdminLayout :title="t('Languages')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Languages') }}</h1>
+      <p>
+        {{ t('The default language has no address prefix. Every other language is published under
+        its code, such as /de/.') }}
+      </p>
+    </div>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('language')" />
+  <div class="categories-grid">
+    <section class="admin-card category-collection" aria-labelledby="language-list-title">
+      <div class="admin-card-heading">
+        <div>
+          <h2 id="language-list-title">
+            {{ t('Site languages') }} <span class="count-badge">{{ size(siteLanguages) }}</span>
+          </h2>
+          <p>
+            {{ t('Visitors never see a disabled language; its content and translations are kept.')
+            }}
+          </p>
+        </div>
+      </div>
+      <ul class="category-list language-list">
+        <li
+          :for="language in siteLanguages"
+          :class="languageForm.originalCode == language.code ? 'editing'"
+        >
+          <div class="category-details">
+            <strong lang="{{ language.code }}" dir="{{ language.direction }}"
+              >{{ language.name }}</strong
+            >
+            <span>
+              <code>{{ language.address }}</code>
+              <span :if="language.isDefault" class="status-badge published"
+                >{{ t('Default') }}</span
+              >
+              <span :if="not language.enabled" class="status-badge draft">{{ t('Disabled') }}</span>
+              <span :if="language.homeTitle"
+                >{{ t('Homepage: {title}', title: language.homeTitle) }}</span
+              >
+            </span>
+          </div>
+          <div class="category-actions">
+            <form :if="language.moveUp" action="/admin/languages/order" method="post">
+              <input type="hidden" name="order" value="{{ language.moveUp }}" />
+              <button
+                type="submit"
+                class="icon-button"
+                aria-label="{{ t('Move {name} up', name: language.name) }}"
+              >
+                {!! icon('arrow-up') !!}
+              </button>
+            </form>
+            <form :if="language.moveDown" action="/admin/languages/order" method="post">
+              <input type="hidden" name="order" value="{{ language.moveDown }}" />
+              <button
+                type="submit"
+                class="icon-button"
+                aria-label="{{ t('Move {name} down', name: language.name) }}"
+              >
+                {!! icon('arrow-down') !!}
+              </button>
+            </form>
+            <form :if="not language.isDefault" action="/admin/languages/default" method="post">
+              <input type="hidden" name="code" value="{{ language.code }}" />
+              <button
+                type="submit"
+                class="button button-outline"
+                data-well-confirm="{{ t('Make {name} the default language? Its addresses lose their prefix and the current default language moves under its code.', name: language.name) }}"
+              >
+                {{ t('Make default') }}
+              </button>
+            </form>
+            <a
+              class="icon-button"
+              aria-label="{{ t('Edit {name}', name: language.name) }}"
+              href="{{ url('/admin/languages', edit: language.code) }}#language-code"
+              >{!! icon('edit') !!}</a
+            >
+            <form action="/admin/languages/{{ language.code }}/delete" method="post">
+              <button
+                type="submit"
+                class="icon-button danger"
+                aria-label="{{ t('Delete {name}', name: language.name) }}"
+                :disabled="language.isDefault"
+                :title="language.isDefault ? t('Choose another default language before deleting this one.') : t('Delete language')"
+                data-well-confirm="{{ t('Delete “{name}”? A language that content or navigation uses cannot be deleted.', name: language.name) }}"
+              >
+                {!! icon('trash') !!}
+              </button>
+            </form>
+          </div>
+        </li>
+      </ul>
+    </section>
+    <section class="admin-card settings-card category-form" aria-labelledby="language-form-title">
+      <h2 id="language-form-title">
+        {{ languageForm.originalCode ? t('Edit language') : t('Add a language') }}
+      </h2>
+      <p :if="not languageForm.originalCode and size(siteLanguages) >= limit">
+        {{ t('A site can publish in at most 32 languages.') }}
+      </p>
+      <form action="/admin/languages/save" method="post">
+        <input
+          type="hidden"
+          name="original_code"
+          value="{{ old('original_code') ?? languageForm.originalCode }}"
+        />
+        <label for="language-code">{{ t('Language code') }}</label>
+        <input
+          id="language-code"
+          name="code"
+          required
+          maxlength="35"
+          list="language-suggestions"
+          placeholder="{{ t('For example, de or pt-BR') }}"
+          value="{{ old('code') ?? languageForm.code }}"
+          :autofocus="languageForm.originalCode ? true : false"
+        />
+        <datalist id="language-suggestions">
+          <option :for="suggestion in suggestions" value="{{ suggestion.code }}">
+            {{ suggestion.name }}
+          </option>
+        </datalist>
+        <p class="field-help">
+          {{ t('A language, then an optional script and region. The code is also the address
+          prefix.') }}
+        </p>
+        <label for="language-name">{{ t('Name') }}</label>
+        <input
+          id="language-name"
+          name="name"
+          required
+          maxlength="60"
+          placeholder="{{ t('For example, Deutsch') }}"
+          value="{{ old('name') ?? languageForm.name }}"
+        />
+        <p class="field-help">{{ t('Write the name in the language itself.') }}</p>
+        <label for="language-direction">{{ t('Writing direction') }}</label>
+        <select id="language-direction" name="direction">
+          <option value="ltr" :selected="languageForm.direction != 'rtl'">
+            {{ t('Left to right') }}
+          </option>
+          <option value="rtl" :selected="languageForm.direction == 'rtl'">
+            {{ t('Right to left') }}
+          </option>
+        </select>
+        <label class="checkbox-label">
+          <input type="hidden" name="enabled" value="0" />
+          <input type="checkbox" name="enabled" value="1" :checked="languageForm.enabled" />
+          {{ t('Public: visitors can read this language') }}
+        </label>
+        <label for="language-home">{{ t('Homepage (optional)') }}</label>
+        <div
+          class="content-picker"
+          data-picker-url="/admin/content-options"
+          data-picker-items="items"
+          data-picker-value="id"
+          data-picker-label="title"
+          data-picker-error="{{ t('Published content could not be loaded.') }}"
+        >
+          <label class="sr-only" for="language-home-search"
+            >{{ t('Search published content') }}</label
+          >
+          <input
+            id="language-home-search"
+            type="search"
+            maxlength="100"
+            placeholder="{{ t('Search published content') }}"
+          />
+          <select id="language-home" name="home_page_id">
+            <option value="0">{{ t('The site’s homepage') }}</option>
+            <option :if="homePage" value="{{ homePage.id }}" selected>{{ homePage.title }}</option>
+          </select>
+        </div>
+        <p class="field-help">
+          {{ t('Without a choice, the language shows the translation of the site’s homepage.') }}
+        </p>
+        <div class="category-form-actions">
+          <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+            {!! icon(languageForm.originalCode ? 'check' : 'plus') !!}{{ languageForm.originalCode ?
+            t('Save changes') : t('Add language') }}
+          </button>
+          <a :if="languageForm.originalCode" class="button button-outline" href="/admin/languages"
+            >{{ t('Cancel') }}</a
+          >
+        </div>
+      </form>
+    </section>
+  </div>
+</AdminLayout>

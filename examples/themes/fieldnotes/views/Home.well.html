@@ -23,7 +23,7 @@
           <a
             class="category-pill living"
             href="{{ url(featured.archiveUrl, category: featured.category) }}"
-            >{{ featured.category }}</a
+            >{{ featured.categoryLabel }}</a
           ><span
             >{!! icon('clock') !!} {{ t('{count} min read', count: featured.readMinutes) }}</span
           >

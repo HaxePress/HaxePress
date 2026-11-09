@@ -1,0 +1,29 @@
+--- a/src/hx/well/route/Route.hx
++++ b/src/hx/well/route/Route.hx
+@@ -33,6 +33,13 @@
+     public static var routes:Array<RouteElement> = [];
+     public static var routeByName:Map<String, RouteElement> = new Map();
+     public static var publicHandler:AbstractHandler = new PublicHandler();
++
++    /**
++        Runs on every request before its route is resolved, so an
++        application can serve the same routes under a path prefix, such as
++        a language, by changing the request's path.
++    **/
++    public static var rewrite:Null<Request->Void> = null;
+     static final routeWrites = new Mutex();
+     static final pending = new ThreadLocal<RouteChanges>();
+ 
+--- a/src/hx/well/http/HttpHandler.hx
++++ b/src/hx/well/http/HttpHandler.hx
+@@ -84,6 +84,10 @@
+                 var error = cast(request, BadRequest).e;
+                 if(error is AbortException) throw error;
+                 throw new AbortException(400, null, error);
++            }
++
++            if(Route.rewrite != null) {
++                Route.rewrite(request);
+             }
+ 
+             // WebSocket upgrade detection

@@ -1,5 +1,6 @@
 package hx.press.handler;
 
+import hx.press.i18n.Languages;
 import haxe.io.Path;
 import hx.press.SiteController;
 import hx.press.content.ContentTypes;
@@ -47,7 +48,9 @@ class SitePublicHandler extends PublicHandler {
             ];
             var previewBase:String = request.getAttribute("hx.press.preview.base", "");
             var slugPath = slug == "" ? "" : '/${slug}';
-            var location = '${previewBase}${type.publicBase}${slugPath}';
+            var target = '${type.publicBase}${slugPath}';
+            var location = previewBase == "" ? Languages.path(Languages.current(),
+                target) : '${previewBase}${target}';
             if (query.length > 0) {
                 location += '?${query.join("&")}';
             }

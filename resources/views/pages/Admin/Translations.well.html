@@ -1,0 +1,242 @@
+<props
+  notice="String"
+  filter="AdminTranslationFilterView"
+  progress="List<AdminTranslationLanguageView>"
+  sources="List<AdminTranslationSourceView>"
+  items="List<AdminTranslationItemView>"
+  pagination="PageLinksView"
+  single="Bool"
+  canRescan="Bool"
+  returnTo="String"
+  ids="String"
+/>
+<AdminLayout :title="t('Translations')">
+  <div class="admin-page-heading">
+    <div>
+      <h1>{{ t('Translations') }}</h1>
+      <p :if="single">
+        {{ t('Every text of the site, its theme and its plugins. Change any wording here; your
+        version replaces the one they ship.') }}
+      </p>
+      <p :else>
+        {{ t('Every text of the site, its theme and its plugins in each site language. A translation
+        made here replaces the one they ship, and texts without one show their source wording.') }}
+      </p>
+    </div>
+    <form :if="canRescan" action="/admin/translations/rescan" method="post">
+      <input type="hidden" name="return_to" value="{{ returnTo }}" />
+      <button class="button button-outline" type="submit" data-well-busy="{{ t('Listing…') }}">
+        {!! icon('refresh') !!}{{ t('List texts again') }}
+      </button>
+    </form>
+  </div>
+  <Alert :message="notice" />
+  <Alert error :message="error('translations')" />
+  <nav :if="not single" class="translation-languages" aria-label="{{ t('Languages') }}">
+    <a
+      :for="language in progress"
+      :class="language.code == filter.language ? 'selected'"
+      href="{{ language.href }}"
+      lang="{{ language.code }}"
+    >
+      <strong>{{ language.name }}</strong>
+      <span :if="language.isDefault" class="status-badge published">{{ t('Default') }}</span>
+      <span :if="not language.enabled" class="status-badge draft">{{ t('Disabled') }}</span>
+      <span
+        class="translation-progress"
+        role="img"
+        aria-label="{{ t('{percent}% translated',
+      percent: language.percent) }}"
+        ><span style="width: {{ language.percent }}%"></span
+      ></span>
+      <small
+        >{{ t('{translated} of {total}', translated: language.translated, total: language.total)
+        }}</small
+      >
+    </a>
+  </nav>
+  <section class="admin-card">
+    <form class="translation-filters" action="/admin/translations" method="get">
+      <input type="hidden" name="language" value="{{ filter.language }}" />
+      <label
+        >{{ t('Source') }}
+        <select name="source" data-well-autosubmit>
+          <option
+            :for="choice in sources"
+            value="{{ choice.value }}"
+            :selected="choice.value == filter.source"
+          >
+            {{ choice.label }}
+          </option>
+        </select></label
+      >
+      <label
+        >{{ t('Status') }}
+        <select name="status" data-well-autosubmit>
+          <option value="all" :selected="filter.status == 'all'">{{ t('All texts') }}</option>
+          <option :if="not single" value="missing" :selected="filter.status == 'missing'">
+            {{ t('Missing') }}
+          </option>
+          <option :if="not single" value="translated" :selected="filter.status == 'translated'">
+            {{ t('Translated') }}
+          </option>
+          <option value="edited" :selected="filter.status == 'edited'">
+            {{ t('Changed on this site') }}
+          </option>
+          <option value="review" :selected="filter.status == 'review'">
+            {{ t('Needs review') }}
+          </option>
+          <option value="unused" :selected="filter.status == 'unused'">
+            {{ t('No longer used') }}
+          </option>
+        </select></label
+      >
+      <label
+        >{{ t('Shown in') }}
+        <select name="audience" data-well-autosubmit>
+          <option value="site" :selected="filter.audience == 'site'">{{ t('The site') }}</option>
+          <option value="admin" :selected="filter.audience == 'admin'">
+            {{ t('The administration') }}
+          </option>
+          <option value="all" :selected="filter.audience == 'all'">{{ t('Both') }}</option>
+        </select></label
+      >
+      <div class="admin-search">
+        {!! icon('search') !!}
+        <label class="sr-only" for="translation-search">{{ t('Search texts') }}</label>
+        <input
+          id="translation-search"
+          type="search"
+          name="q"
+          maxlength="80"
+          placeholder="{{ t('Find a text…') }}"
+          value="{{ filter.query }}"
+        />
+      </div>
+      <noscript
+        ><button class="button button-outline" type="submit">{{ t('Filter') }}</button></noscript
+      >
+    </form>
+    <form :if="items" action="/admin/translations/save-batch" method="post">
+      <input type="hidden" name="language" value="{{ filter.language }}" />
+      <input type="hidden" name="return_to" value="{{ returnTo }}" />
+      <input type="hidden" name="ids" value="{{ ids }}" />
+      <ol class="translation-list">
+        <li :for="item in items" class="translation-row status-{{ item.status }}">
+          <div class="translation-source">
+            <p class="translation-meta">
+              <span>{{ item.sourceName }}</span>
+              <span :if="item.status == 'missing'" class="status-badge draft"
+                >{{ t('Missing') }}</span
+              >
+              <span :if="item.status == 'translated'" class="status-badge published"
+                >{{ t('Shipped translation') }}</span
+              >
+              <span :if="item.status == 'edited'" class="status-badge published"
+                >{{ t('Changed on this site') }}</span
+              >
+              <span :if="item.status == 'review'" class="status-badge draft"
+                >{{ t('Needs review') }}</span
+              >
+              <span :if="item.status == 'unused'" class="status-badge"
+                >{{ t('No longer used') }}</span
+              >
+              <a href="/admin/translations/{{ item.id }}">{{ t('All languages') }}</a>
+            </p>
+            <template :if="item.plural">
+              <p lang="{{ item.sourceLanguage }}">
+                <small>{{ t('One') }}</small> {{ item.sourceOne }}
+              </p>
+              <p lang="{{ item.sourceLanguage }}">
+                <small>{{ t('Other') }}</small> {{ item.sourceOther }}
+              </p>
+            </template>
+            <p :else lang="{{ item.sourceLanguage }}">{{ item.source }}</p>
+            <p :if="item.placeholders" class="translation-placeholders">
+              <code :for="name in item.placeholders">{{ name }}</code>
+            </p>
+            <p :if="item.shippedText" class="field-help">
+              {{ t('Shipped: {text}', text: item.shippedText) }}
+            </p>
+          </div>
+          <div class="translation-value" lang="{{ filter.language }}">
+            <p :if="item.sourceEditable" class="field-help">
+              {{ t('This is the source wording. Edit it where the text belongs.') }}
+            </p>
+            <template :else-if="item.plural">
+              <input
+                type="hidden"
+                name="original_{{ item.id }}"
+                value="{{ item.valueOne }}&#10;{{ item.valueOther }}"
+              />
+              <label
+                ><span class="sr-only">{{ t('One') }}</span>
+                <textarea
+                  name="one_{{ item.id }}"
+                  rows="2"
+                  maxlength="4000"
+                  placeholder="{{ item.shippedOne ? item.shippedOne : item.sourceOne }}"
+                >
+{{ item.valueOne }}</textarea>
+              </label>
+              <label
+                ><span class="sr-only">{{ t('Other') }}</span>
+                <textarea
+                  name="other_{{ item.id }}"
+                  rows="2"
+                  maxlength="4000"
+                  placeholder="{{ item.shippedOther ? item.shippedOther : item.sourceOther }}"
+                >
+{{ item.valueOther }}</textarea>
+              </label>
+            </template>
+            <template :else>
+              <input type="hidden" name="original_{{ item.id }}" value="{{ item.value }}" />
+              <label
+                ><span class="sr-only">{{ t('Translation') }}</span>
+                <textarea
+                  name="value_{{ item.id }}"
+                  rows="2"
+                  maxlength="4000"
+                  placeholder="{{ item.shipped ? item.shipped : item.source }}"
+                >
+{{ item.value }}</textarea>
+              </label>
+            </template>
+            <div :if="not item.sourceEditable" class="translation-actions">
+              <button
+                class="button button-outline"
+                type="submit"
+                name="only"
+                value="{{ item.id }}"
+                data-well-busy="{{ t('Saving…') }}"
+              >
+                {{ t('Save') }}
+              </button>
+              <button
+                :if="item.value or item.valueOne"
+                class="button button-outline"
+                type="submit"
+                name="remove"
+                value="{{ item.id }}"
+              >
+                {{ item.shippedText ? t('Use the shipped translation') : t('Remove') }}
+              </button>
+            </div>
+          </div>
+        </li>
+      </ol>
+      <div class="translation-save-all">
+        <button class="button" type="submit" data-well-busy="{{ t('Saving…') }}">
+          {!! icon('check') !!}{{ t('Save every change on this page') }}
+        </button>
+      </div>
+    </form>
+    <div :else class="empty-state">
+      {!! icon('globe') !!}
+      <h2>{{ t('No texts') }}</h2>
+      <p>{{ t('No texts match these filters.') }}</p>
+    </div>
+  </section>
+  <Pagination :links="pagination" :count="size(items)" :noun="t('texts')" />
+</AdminLayout>

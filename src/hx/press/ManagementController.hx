@@ -1,5 +1,7 @@
 package hx.press;
 
+import hx.press.i18n.SiteTexts;
+import hx.press.i18n.Languages;
 import hx.press.content.ContentLocks;
 import hx.press.AdminController;
 import hx.press.SiteController;
@@ -45,6 +47,7 @@ typedef LinkFormRecord = {
     var position:String;
     var content_id:String;
     var collection_key:String;
+    var language:String;
     var new_tab:Bool;
     var mode:String;
 }
@@ -96,7 +99,16 @@ class ManagementController {
         if (region == null) {
             return SiteController.notFound(request);
         }
-        var links:Array<Dynamic> = MenuLink.query.select(["id", "label", "url", "position", "new_tab", "content_id", "collection_key"])
+        var links:Array<Dynamic> = MenuLink.query.select([
+            "id",
+            "label",
+            "url",
+            "position",
+            "new_tab",
+            "content_id",
+            "collection_key",
+            "language"
+        ])
             .where("location", location)
             .orderBy("position")
             .orderBy("id")
@@ -119,6 +131,10 @@ class ManagementController {
                 "") == "saved" ? "Navigation has been updated." : "",
             "regionQuery" => regionQuery,
             "linkForm" => linkForm,
+            "languageChoices" => Languages.prefixed() ? [
+                for (language in Languages.all())
+                    {code: language.code, name: language.name}
+            ] : [],
             "linkContent" => linkContent,
             "linkCollection" => linkCollection,
             "regionForm" => regionForm(request, region)
@@ -140,6 +156,7 @@ class ManagementController {
                 position: AdminForms.old(request, "position", Std.string(links.length)),
                 content_id: AdminForms.old(request, "content_id", "0"),
                 collection_key: AdminForms.old(request, "collection_key", ""),
+                language: AdminForms.old(request, "language", ""),
                 new_tab: AdminForms.old(request, "new_tab", "0") == "1",
                 mode: ["url", "content", "collection"].contains(target) ? target : "url"
             };
@@ -154,6 +171,7 @@ class ManagementController {
                 position: Std.string(links.length),
                 content_id: "0",
                 collection_key: "",
+                language: "",
                 new_tab: false,
                 mode: "url"
             };
@@ -168,6 +186,7 @@ class ManagementController {
             position: Std.string(edited.position),
             content_id: Std.string(contentId),
             collection_key: collectionKey,
+            language: edited.language ?? "",
             new_tab: edited.new_tab == 1,
             mode: mode
         };
@@ -223,6 +242,7 @@ class ManagementController {
             }
             DBStatic.transaction(() -> {
                 link.delete();
+                SiteTexts.forget(['menu.${link.id}.label']);
                 Activity.record("deleted", "navigation", link.id, link.label);
             });
             ContentCache.changed("navigation");

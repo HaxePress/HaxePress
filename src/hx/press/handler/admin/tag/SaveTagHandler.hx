@@ -1,5 +1,6 @@
 package hx.press.handler.admin.tag;
 
+import hx.press.i18n.SiteTexts;
 import hx.press.Activity;
 import hx.press.AdminController;
 import hx.press.CategoryData;
@@ -86,9 +87,11 @@ class SaveTagHandler extends AbstractHandler implements ValidationResponder {
             values.set("created_at", SiteSettingsStore.timestamp());
             var createdId = Tag.query.insert(values);
             Activity.record("created", "tag", createdId, name);
+            SiteTexts.put('tag.${createdId}.name', "tag", name);
         } else {
             existing.update(values);
             Activity.record("updated", "tag", existing.id, name);
+            SiteTexts.put('tag.${existing.id}.name', "tag", name);
         }
         ContentCache.changed("tags");
         return ResponseBuilder.asRedirect("/admin/tags?notice=saved", 303);

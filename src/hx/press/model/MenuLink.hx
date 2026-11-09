@@ -17,6 +17,7 @@ class MenuLink extends BaseModel<MenuLink> {
     @:visible @:field public var new_tab:Int = 0;
     @:visible @:field public var content_id:Int = 0;
     @:visible @:field public var collection_key:String = "";
+    @:visible @:field public var language:String = "";
     @:visible @:field public var created_at:DatabaseDate = "";
     @:visible @:field public var updated_at:DatabaseDate = "";
 }

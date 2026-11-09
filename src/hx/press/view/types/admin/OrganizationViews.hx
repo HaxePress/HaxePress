@@ -8,7 +8,6 @@ typedef AdminSettingsFormView = {
     var publisher_name:String;
     var description:String;
     var about_site:String;
-    var locale:String;
     var home_mode:String;
     var home_type:String;
     var home_page:String;
@@ -86,6 +85,10 @@ typedef AdminMenuLinkFormView = {
     var position:String;
     var content_id:String;
     var collection_key:String;
+
+    /** The one language the link is shown in, or "" for every language. **/
+    var language:String;
+
     var new_tab:Bool;
     var mode:String;
 }

@@ -1,5 +1,9 @@
 package hx.press;
 
+import hx.press.i18n.PageSeo;
+import hx.press.i18n.LanguageChoices;
+import hx.press.i18n.Languages;
+import hx.press.content.ContentAlternates;
 import hx.press.view.View;
 import hx.press.view.ViewRoots;
 import hx.well.http.AbstractResponse;
@@ -46,7 +50,7 @@ class SiteController {
         var homeType = settings.get("home_type") ?? "entry";
         if (settings.get("home_mode") == "page") {
             var id = Std.parseInt(settings.get("home_page") ?? "0") ?? 0;
-            var page = ContentQueries.publishedById(id);
+            var page = ContentQueries.homePage(id);
             if (page == null) {
                 return notFound(request);
             }
@@ -161,14 +165,25 @@ class SiteController {
         if (type == null || !type.publicVisible) {
             return notFound(request);
         }
-        var item = ContentQueries.publishedItem(slug == "" ? request.route("slug") : slug, kind);
+        var requested = slug == "" ? request.route("slug") : slug;
+        var item = ContentQueries.publishedItem(requested, kind);
         if (item == null) {
+            // Another language's address of content that is translated into this one.
+            var translated = ContentQueries.translatedSlug(requested, kind);
+            if (translated != null) {
+                var target = '${type.publicBase}/${StringTools.urlEncode(translated)}';
+                return ResponseBuilder.asRedirect(Languages.path(Languages.current(), target), 301);
+            }
             return notFound(request);
         }
         var settings = SiteSettingsStore.settings();
-        if (settings.get("home_mode") == "page" && Std.string(item.id) == settings.get("home_page")) {
+        var homeId = Std.parseInt(settings.get("home_page") ?? "0") ?? 0;
+        var home = settings.get("home_mode") == "page" ? ContentQueries.homePage(homeId) : null;
+        if (home != null && home.id == item.id) {
             var previewBase:String = request.getAttribute("hx.press.preview.base", "");
-            return ResponseBuilder.asRedirect(previewBase == "" ? "/" : previewBase, 301);
+            return
+                ResponseBuilder.asRedirect(previewBase == "" ? Languages.path(Languages.current(),
+                    "/") : previewBase, 301);
         }
         return renderDocument(request, item, type);
     }
@@ -178,6 +193,18 @@ class SiteController {
             ?draft:DraftContentDetails):AbstractResponse {
         if (draft == null) {
             ContentViews.shown(request, item.id, type.key);
+            request.setAttribute(LanguageChoices.ALTERNATES,
+                ContentAlternates.of(item, type, home));
+            if (!home) {
+                var own = item.language == "" ? Languages.defaultCode() : item.language;
+                request.setAttribute(PageSeo.CONTENT, {
+                    canonical: Languages.path(own,
+                        '${type.publicBase}/${StringTools.urlEncode(item.slug)}'),
+                    group: item.translation_group,
+                    kind: type.key,
+                    publicBase: type.publicBase
+                });
+            }
         }
         var relatedRecords = type.hasArchive ? ContentQueries.related(item.id, type.key) : [];
         var content = ContentItemData.detail(item, true, type, draft);

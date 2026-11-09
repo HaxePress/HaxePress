@@ -48,6 +48,10 @@ typedef ContentItemView = {
     var slug:String;
     var excerpt:String;
     var category:String;
+
+    /** The category name in the page\'s language; `category` stays the name filters use. **/
+    var categoryLabel:String;
+
     var image:Url;
     var image_alt:String;
     var status:String;

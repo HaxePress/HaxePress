@@ -1,5 +1,6 @@
 package hx.press.provider;
 
+import hx.press.i18n.TranslationSync;
 import hx.well.provider.AbstractProvider;
 import hx.press.database.InitialSchema;
 import hx.press.database.MigrationState;
@@ -23,6 +24,8 @@ import hx.press.database.ThemeDesignSchema;
 import hx.press.database.ThemeAiSchema;
 import hx.press.database.AdminMcpSchema;
 import hx.press.database.AdminPreferenceSchema;
+import hx.press.database.LanguageSchema;
+import hx.press.database.TranslationSchema;
 import hx.press.database.ThemeAssetSchema;
 
 class DatabaseProvider extends AbstractProvider {
@@ -52,12 +55,15 @@ class DatabaseProvider extends AbstractProvider {
         AdminMcpSchema.up();
         ThemeAssetSchema.up();
         AdminPreferenceSchema.up();
+        LanguageSchema.up();
+        TranslationSchema.up();
         NavigationRegions.initialize();
         SiteSettingsStore.initialize();
         ManagedCategories.run();
         ManagedContentImages.run();
         QueryMetadata.run();
         PackageBundles.ensure();
+        TranslationSync.core();
         MediaCatalog.importExisting();
         NavigationData.ensure();
         Connection.free();

@@ -1,5 +1,7 @@
 package hx.press;
 
+import hx.press.i18n.SiteTexts;
+import hx.press.i18n.Languages;
 import hx.press.Pagination.PageCursor;
 import hx.press.data.QueryPage;
 import hx.well.database.query.QueryBuilder;
@@ -105,5 +107,18 @@ class CategoryData {
                 ];
                 return Pagination.slice(rows, PAGE_SIZE, cursor);
             });
+    }
+
+    /** The name of a category in the page's language. **/
+    public static function label(name:String):String {
+        if (name == "" || !Languages.prefixed()) {
+            return name;
+        }
+        var language = Languages.current();
+        var id:Null<Int> = ContentCache.remember("categories", "id-by-name", [name], () -> {
+            var row = Category.query.select(["id"]).where("name", name).first();
+            return row == null ? null : row.id;
+        });
+        return id == null ? name : SiteTexts.text('category.${id}.name', name);
     }
 }

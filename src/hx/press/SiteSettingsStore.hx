@@ -1,9 +1,12 @@
 package hx.press;
 
+import hx.press.i18n.SiteTexts;
 import haxe.Json;
 import hx.press.model.ContentItem;
 import hx.press.model.Admin;
 import hx.press.model.Setting;
+import hx.press.model.Language;
+import hx.press.i18n.Languages;
 import hx.well.facades.Environment;
 import hx.well.facades.Hash;
 import hx.well.facades.DBStatic;
@@ -18,7 +21,6 @@ class SiteSettingsStore {
         var settingsChanged = false;
         var contentChanged = false;
         var defaults = [
-            "locale" => "en",
             "home_mode" => "collection",
             "home_type" => "entry",
             "home_page" => "0",
@@ -35,6 +37,20 @@ class SiteSettingsStore {
                 Setting.query.insert(["key" => key, "value" => value]);
                 settingsChanged = true;
             }
+        if (!Language.query.select(["code"]).exists()) {
+            var code = Languages.configuredDefault();
+            Language.query.insert([
+                "code" => code,
+                "name" => Languages.suggestedName(code),
+                "direction" => Languages.suggestedDirection(code),
+                "position" => 0,
+                "is_default" => 1,
+                "enabled" => 1,
+                "home_page_id" => 0,
+                "updated_epoch" => Date.now().getTime() / 1000
+            ]);
+            ContentCache.changed("languages");
+        }
         if (!Admin.query.select(["id"]).exists()) {
             var email = CategoryData.key(Environment.env("ADMIN_EMAIL", ""));
             var password = Environment.env("ADMIN_PASSWORD", "");
@@ -74,8 +90,13 @@ class SiteSettingsStore {
             contentChanged = true;
         }
         Connection.free();
-        if (settingsChanged)
+        if (settingsChanged) {
             ContentCache.settingsChanged();
+            var name = Setting.query.select(["value"]).where("key", "site_name").first();
+            if (name != null) {
+                SiteTexts.put("setting.site_name", "setting", name.value);
+            }
+        }
         if (contentChanged)
             ContentCache.contentChanged();
     }
@@ -87,7 +108,6 @@ class SiteSettingsStore {
             "publisher_name",
             "description",
             "about_site",
-            "locale",
             "home_mode",
             "home_type",
             "home_page",

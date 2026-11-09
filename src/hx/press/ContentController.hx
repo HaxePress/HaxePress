@@ -1,5 +1,7 @@
 package hx.press;
 
+import hx.press.ContentItemData.DraftContentDetails;
+import hx.press.i18n.Languages;
 import hx.press.AdminController;
 import hx.press.SiteController;
 import hx.press.CategoryData;
@@ -48,9 +50,12 @@ class ContentController {
             request.query("dir", ""));
         var cursor = ContentListColumns.validCursor(Pagination.cursor(request, false,
             ContentListColumns.MAX_SORT_VALUE), sort);
-        var page = ContentData.page(kind, search, status, author, cursor, layout.visible, sort);
-        var count = ContentData.count(kind, search, status, author);
-        var listParameters = ["q" => search, "status" => status];
+        var requestedLanguage = request.query("language", "");
+        var language = Languages.exists(requestedLanguage) ? requestedLanguage : "";
+        var page = ContentData.page(kind, search, status, author, cursor, layout.visible, sort,
+            language);
+        var count = ContentData.count(kind, search, status, author, null, language);
+        var listParameters = ["q" => search, "status" => status, "language" => language];
         if (sort.chosen) {
             listParameters.set("sort", sort.column.key);
             listParameters.set("dir", sort.descending ? "desc" : "asc");
@@ -194,11 +199,57 @@ class ContentController {
         if (!CmsAccess.can(type.capability)) {
             return CmsController.forbidden(request);
         }
+        var sourceId = PositiveInt.parse(request.query("translation_of", ""));
+        var language = request.query("language", "");
+        if (sourceId != null && Languages.exists(language)) {
+            return newTranslation(request, type, sourceId, language);
+        }
         var item = new ContentItem();
         item.content_type = kind;
         item.author_id = CmsAccess.current().id;
         item.category = ContentTypes.supports(type, "categories") ? CategoryData.firstName() : "";
+        item.language = Languages.defaultCode();
         return renderEditor(request, item.toObject(), type);
+    }
+
+    /**
+        A new translation of `sourceId` into `language`: a draft that starts
+        as a copy of the item, with its tags and fields. When the item
+        already has a translation in that language, its editor opens instead.
+    **/
+    static function newTranslation(request:Request, type:ContentTypeDefinition, sourceId:Int,
+            language:String):AbstractResponse {
+        var source = ContentData.detail(sourceId, type.key);
+        if (source == null || source.status == "trash") {
+            return SiteController.notFound(request);
+        }
+        if (source.translation_group != "") {
+            var existing = ContentItem.query.select(["id"])
+                .where("translation_group", source.translation_group)
+                .where("language", language)
+                .where("status", "!=", "trash")
+                .first();
+            if (existing != null) {
+                return ResponseBuilder.asRedirect('${type.adminBase}/${existing.id}/edit', 303);
+            }
+        }
+        if (source.language == language) {
+            return ResponseBuilder.asRedirect('${type.adminBase}/${sourceId}/edit', 303);
+        }
+        var copy:Dynamic = Reflect.copy(source);
+        copy.id = 0;
+        copy.status = "draft";
+        copy.featured = 0;
+        copy.all_languages = 0;
+        copy.language = language;
+        copy.version = 1;
+        copy.author_id = CmsAccess.current().id;
+        copy.scheduled_epoch = 0;
+        var draft:DraftContentDetails = {
+            tags: ContentTypes.supports(type, "tags") ? TagData.forContent(sourceId) : [],
+            fields: ContentFields.values(sourceId, type)
+        };
+        return renderEditor(request, copy, type, "", 200, draft, sourceId);
     }
 
     public static function edit(request:Request, kind:String):AbstractResponse {
@@ -304,7 +355,8 @@ class ContentController {
     }
 
     static function renderEditor(request:Request, item:ContentItemRecord,
-            type:ContentTypeDefinition, error:String = "", status:Int = 200):AbstractResponse {
+            type:ContentTypeDefinition, error:String = "", status:Int = 200,
+            ?draft:DraftContentDetails, translationOf:Int = 0):AbstractResponse {
         var kind = item.content_type;
         if (!CmsAccess.can(type.capability)
             || (item.id > 0 && !CmsAccess.canEdit(item.author_id ?? 0))) {
@@ -333,7 +385,12 @@ class ContentController {
         if (item.category != "" && !options.contains(item.category)) {
             options.push(item.category);
         }
-        var detail = ContentItemData.detail(item);
+        var detail = ContentItemData.detail(item, false, type, draft);
+        var submittedSource = PositiveInt.parse(AdminController.input(request, "translation_of",
+            16));
+        if (translationOf == 0 && submittedSource != null) {
+            translationOf = submittedSource;
+        }
         if (error != "") {
             try {
                 detail.fields = ContentFields.decode(request.input("custom_fields", null),
@@ -351,7 +408,8 @@ class ContentController {
             draftKey: draftKey,
             workingCopy: working,
             canPublish: canPublish,
-            notice: notice
+            notice: notice,
+            translationOf: translationOf
         });
         var props:Map<String, Dynamic> = [
             "item" => detail,

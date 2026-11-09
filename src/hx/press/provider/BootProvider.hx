@@ -4,7 +4,7 @@ import hx.press.AdminController;
 import hx.well.provider.AbstractProvider;
 import hx.well.route.Route;
 import hx.press.SiteController;
-import hx.press.handler.ChangeLocaleHandler;
+import hx.press.i18n.LanguageRouting;
 import hx.press.handler.ValidationErrorHandler;
 import hx.press.validation.CmsValidators;
 import hx.press.CmsController;
@@ -23,7 +23,7 @@ import hx.press.install.InstallationRoutes;
 import hx.press.view.Pages;
 import hx.press.view.View;
 import hx.press.view.WelloutClient;
-import hx.press.view.Translations;
+import hx.press.view.IslandCatalogues;
 #if jvm
 import hx.press.install.InstallationPlugins;
 #end
@@ -41,15 +41,15 @@ class BootProvider extends AbstractProvider {
         Pages.validationRedirector = (request, scope, message,
             url) -> AdminController.validationRedirect(request, scope, message, url);
         InstallationRoutes.register();
+        Route.rewrite = LanguageRouting.rewrite;
         Route.get("/", SiteController.home);
         Route.publicHandler = new SitePublicHandler();
         LegacyContentRoutes.register();
-        Route.post("/locale", new ChangeLocaleHandler());
         Route.get("/tags/{slug}", CmsController.tagArchive);
         Route.get("/categories/options", new CategoryOptionsHandler());
         Route.get("/about", SiteController.about);
         Route.get("/_wellout/{file}", WelloutClient.serve);
-        Route.get("/_translations/{file}", Translations.serve);
+        Route.get("/_translations/{file}", IslandCatalogues.serve);
         Route.get("/theme-design/{file}", DesignViews.serveStylesheet);
         Route.get("/media/{filename}", new MediaImageHandler());
         Route.get("/theme-assets/{id}/{filename}", ThemeAssetController.image);

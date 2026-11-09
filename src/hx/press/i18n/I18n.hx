@@ -1,7 +1,6 @@
 package hx.press.i18n;
 
 import hx.press.ContentCache;
-import hx.press.SiteSettingsStore;
 import hx.press.i18n.TranslationData.TranslationPackageRecord;
 import hx.press.packages.PackageManifest;
 import hx.press.packages.BuiltInTheme;
@@ -57,15 +56,7 @@ class I18n {
         var catalogues:Map<String, Map<String, Dynamic>> = [];
         for (choice in locales) {
             var source = Resource.getString('lang.${choice.code}');
-            var messages = source == null ? new Map() : TranslationCatalogue.parse(source);
-            for (section in ["editor", "packages"]) {
-                var additional = Resource.getString('lang.${section}.${choice.code}');
-                if (additional != null) {
-                    for (key => value in TranslationCatalogue.parse(additional)) {
-                        messages.set(key, value);
-                    }
-                }
-            }
+            var messages = source == null ? new Map() : TranslationCatalogue.parseTrusted(source);
             catalogues.set(choice.code, messages);
         }
         return catalogues;
@@ -112,6 +103,11 @@ class I18n {
     }
     #end
 
+    /** The core catalogues as shipped, by locale; callers must not change them. **/
+    public static function coreCatalogues():Map<String, Map<String, Dynamic>> {
+        return core;
+    }
+
     public static function supported(locale:String):Bool {
         for (choice in locales) {
             if (choice.code == locale) {
@@ -121,29 +117,76 @@ class I18n {
         return false;
     }
 
+    /** The site's default language, which pages use when a request names none. **/
     public static function defaultLocale():String {
-        var configured = SiteSettingsStore.settings().get("locale");
-        return supported(configured) ? configured : FALLBACK;
+        return Languages.defaultCode();
+    }
+
+    /**
+        Whether pages can be shown in a locale: it has a core catalogue or is
+        one of the site's languages, whose missing messages fall back to
+        English.
+    **/
+    public static function known(locale:Null<String>):Bool {
+        return locale != null && (supported(locale) || Languages.exists(locale));
     }
 
     public static function locale():String {
         var request = RequestStatic.request();
         if (request != null) {
             var selected:String = request.getAttribute("hx.press.locale");
-            if (supported(selected)) {
+            if (known(selected)) {
                 return selected;
             }
         }
         return defaultLocale();
     }
 
-    static function merge(fallback:Map<String, Dynamic>,
-            selected:Map<String, Dynamic>):Map<String, Dynamic> {
-        var messages = fallback.copy();
-        for (key => value in selected) {
-            messages.set(key, value);
+    /**
+        Whether members can choose a locale for the administration: one with a
+        core catalogue, or a site language whose missing messages fall back
+        to English.
+    **/
+    public static function adminLocale(locale:Null<String>):Bool {
+        return known(locale);
+    }
+
+    /** The interface languages members can choose. **/
+    public static function adminLocales():Array<LocaleChoice> {
+        var choices = locales.copy();
+        for (language in Languages.all()) {
+            if (!supported(language.code)) {
+                choices.push({
+                    code: language.code,
+                    name: language.name,
+                    direction: language.direction
+                });
+            }
         }
-        return messages;
+        return choices;
+    }
+
+    /** The first core locale an `Accept-Language` header names, or English. **/
+    public static function preferredAdminLocale(header:Null<String>):String {
+        if (header == null || header.length > 500) {
+            return FALLBACK;
+        }
+        for (part in header.split(",")) {
+            var tag = StringTools.trim(part.split(";")[0]);
+            if (supported(tag)) {
+                return tag;
+            }
+            if (tag.length > 0 && supported(base(tag).toLowerCase())) {
+                return base(tag).toLowerCase();
+            }
+        }
+        return FALLBACK;
+    }
+
+    /** The language part of a locale, such as `pt` for `pt-BR`. **/
+    static function base(locale:String):String {
+        var separator = locale.indexOf("-");
+        return separator < 0 ? locale : locale.substr(0, separator);
     }
 
     static function packageCatalogue(record:TranslationPackageRecord,
@@ -170,24 +213,64 @@ class I18n {
     }
 
     /**
-        A package's catalogue for a locale over its fallback, merged once per
-        installed generation and cache revision: a new version installs into a
-        new directory. The map is shared; callers must not change it.
+        A package's messages in a locale, merged once per installed
+        generation and revision of the site's translations: a new version
+        installs into a new directory. The map is shared; callers must not
+        change it.
     **/
     static function packageMessages(record:TranslationPackageRecord,
             selected:String):Map<String, Dynamic> {
         // The extensions revision changes when catalogues are cached anew, such as after clearing the cache.
-        var revision = ContentCache.revision("extensions");
-        var key = '${revision}:${record.id}:${record.directory}:${selected}';
-        mergedLock.acquire();
-        var known = mergedPackages.get(key);
-        mergedLock.release();
+        var revisions = '${ContentCache.revision("extensions")}:${ContentCache.revision("translations")}';
+        var key = '${revisions}:${record.id}:${record.directory}:${selected}';
+        var known = merged(key);
         if (known != null) {
             return known;
         }
-        var fallback = packageCatalogue(record, FALLBACK);
-        var messages = selected == FALLBACK ? fallback : merge(fallback,
-            packageCatalogue(record, selected));
+        var source = BuiltInTheme.isBuiltIn(record.id) ? FALLBACK : PackageManifest.stored(record.manifest)
+            .sourceLanguage;
+        return remember(key,
+            layered(record.id, source, selected, code -> packageCatalogue(record, code)));
+    }
+
+    /**
+        The messages of a namespace in `selected`, each layer over the one
+        before: English, the source catalogue, the site's changes to the
+        source wording, the catalogue of the locale (or its base language)
+        and the site's translations into it.
+    **/
+    static function layered(namespace:String, source:String, selected:String,
+            catalogue:String->Map<String, Dynamic>):Map<String, Dynamic> {
+        var messages:Map<String, Dynamic> = [];
+        var add = (layer:Map<String, Dynamic>) -> {
+            for (key => value in layer) {
+                messages.set(key, value);
+            }
+        };
+        if (source != FALLBACK) {
+            add(catalogue(FALLBACK));
+        }
+        add(catalogue(source));
+        add(TranslationOverrides.forLanguage(namespace, source));
+        if (selected != source) {
+            var own = catalogue(selected);
+            if (Lambda.empty(own) && base(selected) != selected) {
+                own = catalogue(base(selected));
+            }
+            add(own);
+            add(TranslationOverrides.forLanguage(namespace, selected));
+        }
+        return messages;
+    }
+
+    static function merged(key:String):Null<Map<String, Dynamic>> {
+        mergedLock.acquire();
+        var known = mergedPackages.get(key);
+        mergedLock.release();
+        return known;
+    }
+
+    static function remember(key:String, messages:Map<String, Dynamic>):Map<String, Dynamic> {
         mergedLock.acquire();
         if (!mergedPackages.exists(key)) {
             mergedOrder.push(key);
@@ -207,7 +290,7 @@ class I18n {
 
     public static function t(key:String, ?parameters:Map<String, Dynamic>,
             namespace:String = "cms", ?selectedLocale:String):String {
-        var selected = supported(selectedLocale) ? selectedLocale : locale();
+        var selected = known(selectedLocale) ? selectedLocale : locale();
         var message:Dynamic = null;
         if (namespace != "cms") {
             var record = TranslationData.one(namespace);
@@ -216,23 +299,24 @@ class I18n {
             }
         }
         if (message == null) {
-            message = core.get(selected).get(key);
-        }
-        if (message == null) {
-            message = core.get(FALLBACK).get(key);
+            message = coreMessages(selected).get(key);
         }
         return TranslationCatalogue.format(message, key, parameters);
     }
 
-    static final mergedCore:Map<String, Map<String, Dynamic>> = [
-        for (choice in locales)
-            choice.code => merge(core.get(FALLBACK), core.get(choice.code))
-    ];
-
-    /** The CMS catalogue of a locale over the fallback, built once; callers must not change it. **/
+    /**
+        The CMS messages of a locale with the site's translations, merged once
+        per revision of the translations; callers must not change the map.
+    **/
     public static function coreMessages(selected:String):Map<String, Dynamic> {
-        var messages = mergedCore.get(selected);
-        return messages == null ? mergedCore.get(FALLBACK) : messages;
+        var key = 'cms:${ContentCache.revision("translations")}:${selected}';
+        var known = merged(key);
+        if (known != null) {
+            return known;
+        }
+        return remember(key,
+            layered("cms", FALLBACK, selected,
+                code -> core.get(code) ?? new Map<String, Dynamic>()));
     }
 
     /** The catalogue of a theme or plugin over its fallback, or null when it has none. **/
@@ -275,13 +359,13 @@ class I18n {
                 return choice.direction;
             }
         }
-        return "ltr";
+        return Languages.direction(selected);
     }
 
     public static function props(?preview:TranslationPackageRecord):TranslationProps {
         var selected = locale();
         var catalogues:Map<String, Map<String, Dynamic>> = [];
-        catalogues.set("cms", merge(core.get(FALLBACK), core.get(selected)));
+        catalogues.set("cms", coreMessages(selected));
         for (record in TranslationData.active()) {
             catalogues.set(record.id, packageMessages(record, selected));
         }
@@ -292,7 +376,7 @@ class I18n {
             locale: selected,
             direction: direction(selected),
             fallbackLocale: FALLBACK,
-            locales: locales,
+            locales: adminLocales(),
             catalogues: catalogues
         };
     }

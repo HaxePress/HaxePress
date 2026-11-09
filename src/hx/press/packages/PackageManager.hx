@@ -1,5 +1,6 @@
 package hx.press.packages;
 
+import hx.press.i18n.TranslationSync;
 import hx.press.themes.ThemeAssets;
 import hx.press.media.MediaLocks;
 import hx.press.CategoryData;
@@ -267,6 +268,7 @@ class PackageManager {
             });
             committed = true;
             ContentCache.changed("extensions");
+            TranslationSync.afterInstall(id);
             if (previous != null) {
                 PackageStorage.remove(PackageStorage.installed(previousDirectory));
             }
@@ -425,6 +427,7 @@ class PackageManager {
             MediaLocks.run(() -> ThemeAssets.locked(id, () -> {
                 DBStatic.transaction(() -> {
                     PackageHook.query.where("package_id", id).delete();
+                    TranslationSync.forget(id);
                     ThemeDesign.query.where("id", id).delete();
                     ThemeAiConnection.query.where("theme_id", id).delete();
                     if (packageData.plugin_id != null) {

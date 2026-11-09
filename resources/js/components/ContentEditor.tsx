@@ -42,6 +42,9 @@ interface EditorValues {
   seo_description: string;
   scheduled_epoch: string;
   custom_fields: string;
+  language: string;
+  all_languages: boolean;
+  translation_of: string;
 }
 
 /** The saved content item, as `ContentEditorData` prepares it. */
@@ -63,6 +66,24 @@ export interface EditorItem {
   scheduled_epoch: string;
   tags: Tag[];
   fields: CustomFieldValues;
+  language: string;
+  all_languages: boolean;
+}
+
+/** The site's languages and the item's translations; no choices on a single-language site. */
+export interface EditorLanguages {
+  choices: { code: string; name: string; direction: string; enabled: boolean }[];
+  translations: {
+    id: number;
+    language: string;
+    name: string;
+    title: string;
+    status: string;
+    editUrl: string;
+  }[];
+  missing: { code: string; name: string; url: string }[];
+  translationOf: number;
+  sourceTitle: string;
 }
 
 export type EditorContentType = Pick<
@@ -104,6 +125,7 @@ export interface ContentEditorData {
   canPublish: boolean;
   notice: string;
   mediaRules: MediaRules;
+  languages: EditorLanguages;
 }
 
 function localTime(epoch: string) {
@@ -140,6 +162,14 @@ function initialValues(editor: ContentEditorData): EditorValues {
     seo_description: seed.seo_description ?? item.seo_description,
     scheduled_epoch: seed.scheduled_epoch ?? item.scheduled_epoch,
     custom_fields: JSON.stringify(customFields),
+    language: seed.language ?? item.language,
+    all_languages:
+      seed.all_languages === undefined
+        ? item.all_languages
+        : seed.all_languages === '1' || seed.all_languages === 'true',
+    translation_of:
+      seed.translation_of ??
+      (editor.languages.translationOf ? String(editor.languages.translationOf) : ''),
   };
 }
 
@@ -155,7 +185,7 @@ export default function ContentEditor({
   siteUrl: string;
   error: string;
 }) {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const {
     item,
     isNew,
@@ -188,7 +218,7 @@ export default function ContentEditor({
   const preview = mode === 'preview';
   const showPreview = mode !== 'write';
   const previewForm = useRef<HTMLFormElement>(null);
-  const previewUrl = `${base}/preview?lang=${encodeURIComponent(locale)}`;
+  const previewUrl = `${base}/preview`;
   const [slugEdited, setSlugEdited] = useState(Boolean(data.slug));
   const [uploading, setUploading] = useState<UploadTarget | null>(null);
   const [feedback, setFeedback] = useState({ content: '', cover: '' });
@@ -441,6 +471,9 @@ export default function ContentEditor({
         <input type="hidden" name="seo_description" value={data.seo_description} />
         <input type="hidden" name="scheduled_epoch" value={data.scheduled_epoch} />
         <input type="hidden" name="custom_fields" value={data.custom_fields} />
+        <input type="hidden" name="language" value={data.language} />
+        <input type="hidden" name="all_languages" value={data.all_languages ? '1' : '0'} />
+        <input type="hidden" name="translation_of" value={data.translation_of} />
         <div className="admin-page-heading editor-heading">
           <div>
             <a className="back-link" href={base}>
@@ -846,6 +879,40 @@ export default function ContentEditor({
               <p className="field-help">
                 {contentType.publicBase}/{data.slug}
               </p>
+              {editor.languages.choices.length > 0 && (
+                <>
+                  <label htmlFor="content-language">{t('Language')}</label>
+                  <select
+                    id="content-language"
+                    value={data.language}
+                    onChange={(event) => setData('language', event.target.value)}
+                  >
+                    {editor.languages.choices.map((choice) => (
+                      <option key={choice.code} value={choice.code}>
+                        {choice.enabled ? choice.name : `${choice.name} (${t('Disabled')})`}
+                      </option>
+                    ))}
+                  </select>
+                  {editor.languages.sourceTitle && (
+                    <p className="field-help">
+                      {t('A translation of “{title}”.', { title: editor.languages.sourceTitle })}
+                    </p>
+                  )}
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={data.all_languages}
+                      onChange={(event) => setData('all_languages', event.target.checked)}
+                    />
+                    <span>
+                      <strong>{t('Show in every language')}</strong>
+                      <small>
+                        {t('Languages without a published translation list this item as it is.')}
+                      </small>
+                    </span>
+                  </label>
+                </>
+              )}
               {supports('featured') && (
                 <label className="checkbox-label">
                   <input
@@ -860,6 +927,36 @@ export default function ContentEditor({
                 </label>
               )}
             </section>
+            {editor.languages.choices.length > 0 && !isNew && (
+              <section className="admin-card editor-translations">
+                <h2>{t('Translations')}</h2>
+                {editor.languages.translations.length > 0 ? (
+                  <ul>
+                    {editor.languages.translations.map((translation) => (
+                      <li key={translation.id}>
+                        <a href={translation.editUrl}>
+                          <strong>{translation.name}</strong> {translation.title}
+                        </a>
+                        <span className={`status-badge ${translation.status}`}>
+                          {t(translation.status === 'published' ? 'Published' : 'Draft')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="field-help">{t('This content has no translations yet.')}</p>
+                )}
+                {editor.languages.missing.length > 0 && (
+                  <p className="editor-translation-actions">
+                    {editor.languages.missing.map((language) => (
+                      <a key={language.code} className="button button-outline" href={language.url}>
+                        {t('Translate into {language}', { language: language.name })}
+                      </a>
+                    ))}
+                  </p>
+                )}
+              </section>
+            )}
             {supports('seo') && (
               <section className="admin-card">
                 <h2>{t('Search appearance')}</h2>

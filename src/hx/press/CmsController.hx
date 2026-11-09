@@ -1,5 +1,6 @@
 package hx.press;
 
+import hx.press.i18n.SiteTexts;
 import hx.press.AdminController;
 import hx.press.SiteController;
 import hx.press.ContentCache;
@@ -113,6 +114,7 @@ class CmsController {
             DBStatic.transaction(() -> {
                 ContentTag.query.where("tag_id", id).delete();
                 tag.delete();
+                SiteTexts.forget(['tag.${id}.name']);
                 Activity.record("deleted", "tag", tag.id, tag.name);
             });
             ContentCache.changed("tags");

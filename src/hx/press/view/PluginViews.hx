@@ -1,5 +1,7 @@
 package hx.press.view;
 
+import hx.press.i18n.TemplateKeys;
+import hx.press.i18n.TemplateKeys.TemplateKey;
 import haxe.Exception;
 import hx.press.packages.PackageData;
 import hx.press.packages.PackageManifest;
@@ -95,6 +97,19 @@ class PluginViews {
                 }
             }
         }
+    }
+
+    /** The literal message keys of a plugin's pages, for the Translations page. **/
+    public static function translationKeys(disk:StorageDisk, folder:String):Array<TemplateKey> {
+        var views = build(disk, folder, "");
+        var keys:Array<TemplateKey> = [];
+        for (name in ThemeViews.load(disk, folder).keys()) {
+            var result = views.set.library.check(name);
+            if (result != null && result.value != null) {
+                keys = keys.concat(TemplateKeys.collect(result.value));
+            }
+        }
+        return keys;
     }
 
     static function installedSet(id:String, directory:String):Null<PluginViewSet> {

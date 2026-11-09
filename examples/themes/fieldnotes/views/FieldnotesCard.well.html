@@ -12,7 +12,7 @@
     <a
       class="category-pill {{ item.category | lower | replace(' ', '-') }}"
       href="{{ url(item.archiveUrl, category: item.category) }}"
-      >{{ item.category }}</a
+      >{{ item.categoryLabel }}</a
     ><span>{{ t('{count} min read', count: item.readMinutes) }}</span>
   </div>
   <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>

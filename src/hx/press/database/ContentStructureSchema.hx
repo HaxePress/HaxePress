@@ -94,10 +94,15 @@ class ContentStructureSchema {
             }
             // Native SQLite column changes also remove an old inline UNIQUE constraint.
             Schema.table("content_items", table -> table.string("slug", 180).change());
-            if (!Schema.hasIndex("content_items", "content_items_type_slug_unique")) {
-                Schema.table("content_items",
-                    table -> table.unique(["content_type", "slug"],
-                        "content_items_type_slug_unique"));
+            // A slug is unique within a collection and language; translations have their own.
+            if (!Schema.hasIndex("content_items", "content_items_language_slug_unique")) {
+                Schema.table("content_items", table -> {
+                    table.unique(["content_type", "language", "slug"],
+                        "content_items_language_slug_unique");
+                    table.index(["translation_group", "language"], "content_items_translations");
+                    table.index(["content_type", "language", "status", "published_at", "id"],
+                        "content_items_language_listing");
+                });
             }
             Setting.query.insert(["key" => "content_structure_v1", "value" => "1"]);
             ContentCache.contentChanged();

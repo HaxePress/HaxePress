@@ -227,6 +227,8 @@ class CmsSchema {
                 table.integer("new_tab").defaultValue(0);
                 table.bigInteger("content_id").unsigned().defaultValue(0);
                 table.string("collection_key", 32).defaultValue("");
+                // A link shown in one language only; "" shows it in every language.
+                table.string("language", 35).defaultValue("");
                 table.timestamps();
                 table.index(["location", "position", "id"]);
             });

@@ -6,7 +6,7 @@
   <div class="content-summary-meta">
     <time datetime="{{ item.published_at }}">{{ item.publishedLabel }}</time
     ><a :if="item.category" href="{{ url(item.archiveUrl, category: item.category) }}"
-      >{{ item.category }}</a
+      >{{ item.categoryLabel }}</a
     >
   </div>
 </article>

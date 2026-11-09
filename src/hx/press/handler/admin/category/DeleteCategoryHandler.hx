@@ -1,5 +1,6 @@
 package hx.press.handler.admin.category;
 
+import hx.press.i18n.SiteTexts;
 import hx.press.CmsAccess;
 import hx.press.CmsController;
 import hx.press.AdminController;
@@ -28,6 +29,7 @@ class DeleteCategoryHandler extends AbstractHandler {
             return AdminController.categoryList(request,
                 "Move this category's content to another category before deleting it.", 422);
         category.delete();
+        SiteTexts.forget(['category.${category.id}.name']);
         ContentCache.categoriesChanged();
         return ResponseBuilder.asRedirect("/admin/categories?notice=deleted", 303);
     }

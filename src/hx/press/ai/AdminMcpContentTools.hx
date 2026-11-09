@@ -61,8 +61,23 @@ class AdminMcpContentTools {
             optional("scheduledEpoch", McpSchema.number(0)),
             optional("seoTitle", McpSchema.string(180)),
             optional("seoDescription", McpSchema.string(500)),
-            optional("customFields", McpSchema.record())
+            optional("customFields", McpSchema.record()),
+            optional("language", language()),
+            optional("showInAllLanguages",
+                McpSchema.describe(McpSchema.boolean(),
+                    "Also list the item in languages that have no published translation of it.")),
+            optional("translationOf",
+                McpSchema.describe(id(),
+                    "The id of the item this one translates; it joins that item's translations.")),
+            optional("detachTranslation",
+                McpSchema.describe(McpSchema.boolean(),
+                    "Remove the item from its group of translations."))
         ]);
+    }
+
+    static function language():Dynamic {
+        return McpSchema.describe(McpSchema.string(35, 2, "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"),
+            "A site language code from list_languages.");
     }
 
     static function collectionPath(collection:String):String {
@@ -123,7 +138,11 @@ class AdminMcpContentTools {
             tags: [for (tag in tagIds) AdminMcpServer.numberText(tag)].join(","),
             seo_title: pick(changes, "seoTitle", item, "seo_title", ""),
             seo_description: pick(changes, "seoDescription", item, "seo_description", ""),
-            custom_fields: Json.stringify(customFields)
+            custom_fields: Json.stringify(customFields),
+            language: pick(changes, "language", item, "language", ""),
+            all_languages: (changes.showInAllLanguages ?? truthy(item?.all_languages)) == true ? "1" : "0",
+            translation_of: changes.translationOf == null ? "" : AdminMcpServer.numberText(changes.translationOf),
+            detach_translation: changes.detachTranslation == true ? "1" : "0"
         };
     }
 
@@ -163,12 +182,14 @@ class AdminMcpContentTools {
                 field("collection", kind()),
                 optional("query", McpSchema.string(120)),
                 optional("status", McpSchema.choice(["draft", "published", "scheduled", "trash"])),
+                optional("language", language()),
                 optional("cursor", McpSchema.string(1000))
             ], true, arguments -> {
                 var parameters:Array<String> = [];
                 for (entry in [
                     {name: "q", value: arguments.query},
                     {name: "status", value: arguments.status},
+                    {name: "language", value: arguments.language},
                     {name: "cursor", value: arguments.cursor}
                 ]) {
                     var value:Null<String> = entry.value;
@@ -195,6 +216,44 @@ class AdminMcpContentTools {
             currentDocument().concat([field("fields", contentFields())]), false, arguments -> {
                 var props = editor(arguments);
                 return save(arguments, saveFields(arguments.fields, props.item));
+            });
+        add("create_translation",
+            "Create a draft translation of an item in another site language. It starts as a copy of the item, with its tags and fields; fields override what changes, such as title, slug and body.",
+            [
+                field("collection", kind()),
+                field("id", id()),
+                field("language", language()),
+                optional("fields", contentFields())
+            ], false, arguments -> {
+                var collection:String = arguments.collection;
+                var source:Int = arguments.id;
+                var code:String = arguments.language;
+                var path = '${collectionPath(collection)}/new?translation_of=${source}&language=${StringTools.urlEncode(code)}';
+                var reply = bridge.request(path);
+                var page:Dynamic = reply.data;
+                if (reply.redirect != null || page == null || page.props == null) {
+                    throw new Exception("This item already has a translation in that language; edit it with update_content.");
+                }
+                var changes:Dynamic = arguments.fields ?? {};
+                var data = saveFields(changes, page.props.item);
+                data.language = code;
+                data.translation_of = '${source}';
+                return call('${collectionPath(collection)}/save', "POST", data);
+            });
+        add("list_content_translations",
+            "List an item's translations in other site languages with their status, and the languages it has none in.",
+            documentKey(), true, arguments -> {
+                var reply = bridge.request(itemPath(arguments, "/edit"));
+                var page:Dynamic = reply.data;
+                if (page == null || page.props == null) {
+                    throw new Exception("The content editor is unavailable.");
+                }
+                var languages:Dynamic = page.props.editor.languages;
+                return McpServer.json({
+                    language: page.props.item.language,
+                    translations: languages.translations,
+                    missing: languages.missing
+                });
             });
         if (canPublish) {
             add("publish_content", "Publish the saved version of an item.", currentDocument(),

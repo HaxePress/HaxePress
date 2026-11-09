@@ -5,7 +5,6 @@ import wellout.Url;
 /** Site settings; the runtime value is the settings map, read by key. */
 @:well.view
 typedef SiteView = {
-    var locale:String;
     var site_name:String;
     var site_logo:String;
     var publisher_name:String;
@@ -23,6 +22,43 @@ typedef LocaleChoiceView = {
     var code:String;
     var name:String;
     var direction:String;
+}
+
+/** A language visitors can switch to; `href` is the current page in that language. **/
+@:well.view
+typedef LanguageChoiceView = {
+    var code:String;
+    var name:String;
+    var direction:String;
+    var href:String;
+    var current:Bool;
+}
+
+/**
+    The site's public languages. `choices` is empty on a site with one
+    public language, which shows no language switcher.
+**/
+@:well.view
+typedef LanguagesView = {
+    var multilingual:Bool;
+    var current:String;
+    var defaultLanguage:String;
+    var choices:Array<LanguageChoiceView>;
+}
+
+@:well.view
+typedef SeoAlternateView = {
+    var language:String;
+    var href:String;
+}
+
+/** Search engine links of a public page; null in the administration. **/
+@:well.view
+typedef SeoView = {
+    var canonical:String;
+    var alternates:Array<SeoAlternateView>;
+    var ogLocale:String;
+    var ogAlternates:Array<String>;
 }
 
 @:well.view

@@ -52,6 +52,7 @@ class AccessSchema {
             "roles" => "Manage roles and capabilities",
             "settings" => "Manage site settings",
             "subscribers" => "Manage subscribers",
+            "translations" => "Manage translations",
             "account" => "Manage own account"
         ];
         for (key => name in capabilities) {
@@ -67,6 +68,7 @@ class AccessSchema {
             "taxonomy",
             "media",
             "navigation",
+            "translations",
             "activity",
             "account"
         ]);

@@ -1,5 +1,6 @@
 package hx.press.handler.admin.category;
 
+import hx.press.i18n.SiteTexts;
 import hx.press.CmsAccess;
 import hx.press.CmsController;
 import hx.press.AdminController;
@@ -79,18 +80,20 @@ class SaveCategoryHandler extends AbstractHandler implements ValidationResponder
         var renamed = category != null && category.name != name;
         try {
             if (category == null) {
-                Category.query.insert([
+                var createdId = Category.query.insert([
                     "name" => name,
                     "name_key" => key,
                     "created_at" => SiteSettingsStore.timestamp(),
                     "updated_at" => SiteSettingsStore.timestamp()
                 ]);
+                SiteTexts.put('category.${createdId}.name', "category", name);
             } else if (category.name != name) {
                 // Renaming the category and its existing items must succeed together.
                 DBStatic.transaction(() -> {
                     ContentItem.query.where("category", category.name).update(["category" => name]);
                     category.update(["name" => name, "name_key" => key, "updated_at" => SiteSettingsStore.timestamp()]);
                 });
+                SiteTexts.put('category.${category.id}.name', "category", name);
             }
         } catch (error:Exception) {
             #if jvm

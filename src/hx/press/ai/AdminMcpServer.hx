@@ -61,6 +61,9 @@ class AdminMcpServer {
         if (can("extensions")) {
             lines.push(McpSkills.pointer);
         }
+        if (can("translations")) {
+            lines.push(AdminMcpTranslationTools.instruction);
+        }
         return lines.join(" ");
     }
 
@@ -153,6 +156,9 @@ class AdminMcpServer {
         }
         if (can("settings")) {
             registerSettings();
+        }
+        if (can("translations")) {
+            new AdminMcpTranslationTools(server, bridge, can("extensions")).register();
         }
         add("update_account_name", "Change the display name of your current admin account.",
             [field("name", name())], false, arguments -> call("/admin/account", "POST", {
@@ -346,7 +352,10 @@ class AdminMcpServer {
                 field("position", McpSchema.integer(0, 9999)),
                 optional("url", McpSchema.string(1000)),
                 optional("contentId", id()),
-                optional("collectionKey", key())
+                optional("collectionKey", key()),
+                optional("language",
+                    McpSchema.describe(languageCode(),
+                        "Show the link only in this language; leave it out to show it in every language."))
             ], false, arguments -> {
                 var position:Int = arguments.position;
                 var data = {
@@ -356,7 +365,8 @@ class AdminMcpServer {
                     position: '${position}',
                     url: arguments.url ?? "",
                     content_id: optionalId(arguments.contentId),
-                    collection_key: arguments.collectionKey ?? ""
+                    collection_key: arguments.collectionKey ?? "",
+                    language: arguments.language ?? ""
                 };
                 return call("/admin/navigation/save", "POST", data);
             });
@@ -414,6 +424,65 @@ class AdminMcpServer {
             "Save the complete site settings form after reading get_site_settings.",
             [field("settings", McpSchema.record())], false,
             arguments -> call("/admin/settings", "POST", arguments.settings));
+        registerLanguages();
+    }
+
+    static function languageCode():Dynamic {
+        return McpSchema.describe(McpSchema.string(35, 2,
+            "^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-(?:[A-Z]{2}|[0-9]{3}))?$"),
+            "A language code such as en, de, pt-BR or zh-Hant-TW. It is also the address prefix of the language.");
+    }
+
+    /**
+        The site's languages. The default language has no address prefix and
+        every other one is served under its code; a disabled language keeps its
+        content but visitors cannot read it.
+    **/
+    function registerLanguages():Void {
+        add("list_languages",
+            "List the site's languages in order, with the default language, whether each is public, and its optional homepage.",
+            [], true, _ -> call("/admin/languages"));
+        add("save_language",
+            "Add a language, or edit one: its name, writing direction, whether visitors can read it and its optional homepage. Pass originalCode to change the code of an existing language.",
+            [
+                field("code", languageCode()),
+                field("name", McpSchema.string(60, 1)),
+                optional("direction", McpSchema.choice(["ltr", "rtl"])),
+                optional("enabled", McpSchema.boolean()),
+                optional("homePageId",
+                    McpSchema.describe(McpSchema.integer(0, MAX_ID),
+                        "Published content shown as the language's homepage; 0 shows the translation of the site's homepage.")),
+                optional("originalCode", languageCode())
+            ], false, arguments -> {
+                var enabled:Null<Bool> = arguments.enabled;
+                var home:Null<Int> = arguments.homePageId;
+                var data = {
+                    code: arguments.code,
+                    name: trimmed(arguments.name),
+                    direction: arguments.direction ?? "ltr",
+                    enabled: enabled == false ? "0" : "1",
+                    home_page_id: home == null ? "0" : '${home}',
+                    original_code: arguments.originalCode ?? ""
+                };
+                return call("/admin/languages/save", "POST", data);
+            });
+        add("reorder_languages", "Save the display order of every site language.",
+            [field("order", McpSchema.array(languageCode(), 1, 32))], false, arguments -> {
+                var order:Array<String> = arguments.order;
+                return call("/admin/languages/order", "POST", {order: order.join(",")});
+            });
+        add("set_default_language",
+            "Make a language the default. Its addresses lose their prefix and it becomes public.",
+            [field("code", languageCode())], false,
+            arguments -> call("/admin/languages/default", "POST", {
+                code: arguments.code
+            }));
+        add("delete_language",
+            "Delete a language that no content, navigation link or homepage uses. The default language cannot be deleted.",
+            [field("code", languageCode())], false, arguments -> {
+                var code:String = arguments.code;
+                return call('/admin/languages/${StringTools.urlEncode(code)}/delete', "POST");
+            });
     }
 
     /** Tools that plugins declare on their admin routes with `cms.mcp`. **/

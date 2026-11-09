@@ -1,5 +1,9 @@
 package hx.press.view;
 
+import hx.press.i18n.LanguageLinks;
+import hx.press.i18n.Languages;
+import hx.press.i18n.TemplateKeys;
+import hx.press.i18n.TemplateKeys.TemplateKey;
 import haxe.io.Path;
 import haxe.Exception;
 import hx.press.packages.BuiltInTheme;
@@ -53,7 +57,8 @@ class ThemeViews {
             theme = ThemeData.active();
         }
         var namespace = theme == null ? BuiltInTheme.ID : Std.string(theme.id);
-        var mapper = PreviewLinks.mapper(theme, request);
+        var mapper = PreviewLinks.mapper(theme,
+            request) ?? LanguageLinks.mapper(Languages.current());
         var fallback = fallbackName(request);
         if (theme != null
             && theme.studioSession != null
@@ -191,6 +196,23 @@ class ThemeViews {
                 }
             }
         }
+    }
+
+    /** The literal message keys of a theme package's templates, for the Translations page. **/
+    public static function translationKeys(disk:StorageDisk, folder:String):Array<TemplateKey> {
+        var sources = load(disk, folder);
+        var library = new ComponentLibrary(ViewEngine.contract, ViewEngine.library, false);
+        for (name => source in sources) {
+            library.add(name, source);
+        }
+        var keys:Array<TemplateKey> = [];
+        for (name in sources.keys()) {
+            var result = library.check(name);
+            if (result != null && result.value != null) {
+                keys = keys.concat(TemplateKeys.collect(result.value));
+            }
+        }
+        return keys;
     }
 
     static function cachedSet(key:String):Null<TemplateSet> {

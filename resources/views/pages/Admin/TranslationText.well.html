@@ -1,0 +1,79 @@
+<props
+  text="AdminTranslationItemView"
+  entries="List<AdminTranslationEntryView>"
+  returnTo="String"
+/>
+<AdminLayout :title="t('Translations')">
+  <div class="admin-page-heading">
+    <div>
+      <p class="translation-meta">
+        <a href="/admin/translations">{{ t('Translations') }}</a> <span>{{ text.sourceName }}</span>
+      </p>
+      <h1 :if="text.plural" lang="{{ text.sourceLanguage }}">{{ text.sourceOther }}</h1>
+      <h1 :else lang="{{ text.sourceLanguage }}">{{ text.source }}</h1>
+      <p :if="text.key != text.source"><code>{{ text.key }}</code></p>
+    </div>
+  </div>
+  <Alert error :message="error('translations')" />
+  <section class="admin-card">
+    <ol class="translation-list">
+      <li :for="entry in entries" class="translation-row status-{{ entry.translation.status }}">
+        <div class="translation-source">
+          <p class="translation-meta">
+            <strong lang="{{ entry.language }}">{{ entry.name }}</strong>
+            <span :if="not entry.enabled" class="status-badge draft">{{ t('Disabled') }}</span>
+            <span :if="entry.translation.status == 'missing'" class="status-badge draft"
+              >{{ t('Missing') }}</span
+            >
+            <span :if="entry.translation.status == 'source'" class="status-badge"
+              >{{ t('Source language') }}</span
+            >
+          </p>
+          <p :if="entry.translation.shippedText" class="field-help">
+            {{ t('Shipped: {text}', text: entry.translation.shippedText) }}
+          </p>
+        </div>
+        <form
+          class="translation-value"
+          action="/admin/translations/save"
+          method="post"
+          lang="{{ entry.language }}"
+        >
+          <input type="hidden" name="text_id" value="{{ text.id }}" />
+          <input type="hidden" name="language" value="{{ entry.language }}" />
+          <input type="hidden" name="return_to" value="{{ returnTo }}" />
+          <p :if="entry.translation.sourceEditable" class="field-help">
+            {{ t('This is the source wording. Edit it where the text belongs.') }}
+          </p>
+          <template :else-if="text.plural">
+            <label
+              ><span class="sr-only">{{ t('One') }}</span>
+              <textarea name="one" rows="2" maxlength="4000">
+{{ entry.translation.valueOne }}</textarea>
+            </label>
+            <label
+              ><span class="sr-only">{{ t('Other') }}</span>
+              <textarea name="other" rows="2" maxlength="4000">
+{{ entry.translation.valueOther }}</textarea>
+            </label>
+          </template>
+          <label :else
+            ><span class="sr-only">{{ t('Translation') }}</span>
+            <textarea
+              name="value"
+              rows="2"
+              maxlength="4000"
+              placeholder="{{ entry.translation.effective }}"
+            >
+{{ entry.translation.value }}</textarea>
+          </label>
+          <div :if="not entry.translation.sourceEditable" class="translation-actions">
+            <button class="button button-outline" type="submit" data-well-busy="{{ t('Saving…') }}">
+              {{ t('Save') }}
+            </button>
+          </div>
+        </form>
+      </li>
+    </ol>
+  </section>
+</AdminLayout>

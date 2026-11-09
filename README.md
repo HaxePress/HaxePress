@@ -159,6 +159,10 @@ The JVM suite uses temporary databases, actual Crossbyte processes and a test-on
 
 Media deletion enforces live content, plugin and database relationships. See [the dependency contract](docs/MEDIA-DEPENDENCIES.md) for persistent references, watched model columns and lifecycle behavior.
 
+A site publishes in one language until more are added on the Languages page. Other languages are served under their code, such as `/de/`, and can be disabled while they are prepared. Each translation of an item is its own item; an item can also be shown in every language until it is translated, and a page links its other languages for visitors and search engines. See [languages](docs/LANGUAGES.md).
+
+The Translations page lists every text of HaxePress, the themes, the plugins and the site, in each site language: the translations packages ship, the ones made on the site, which win, and the texts still missing. Each member also chooses their own administration language. See [translations](docs/TRANSLATIONS.md).
+
 Site identity accepts PNG, JPEG and GIF logo uploads and supports theme-font text fallback and generic publisher/site descriptions. See [site identity](docs/SITE-IDENTITY.md) for settings, upload validation and legacy-value migration.
 
 Theme cards show live miniature previews. Simple is an application-owned default with bundled styles and catalogues, and cannot be uninstalled or replaced by an uploaded package. See [themes](docs/THEMES.md).

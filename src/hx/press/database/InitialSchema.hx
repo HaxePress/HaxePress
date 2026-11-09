@@ -1,5 +1,6 @@
 package hx.press.database;
 
+import hx.press.i18n.Languages;
 import hx.well.facades.Schema;
 
 class InitialSchema {
@@ -17,6 +18,7 @@ class InitialSchema {
                 table.string("email").unique();
                 table.string("password");
                 table.string("name").defaultValue("Editor");
+                table.string("ui_language", 35).defaultValue("");
                 table.dateTime("created_at");
             });
         if (!Schema.hasTable("content_items"))
@@ -32,6 +34,11 @@ class InitialSchema {
                 table.string("status").defaultValue("draft");
                 table.integer("featured").defaultValue(0);
                 table.integer("reading_minutes").defaultValue(0);
+                // The language of the item, and the group of its translations: "" until it has one.
+                table.string("language", 35).defaultValue(Languages.configuredDefault());
+                table.string("translation_group", 24).defaultValue("");
+                // Shown in languages that have no translation of it.
+                table.integer("all_languages").defaultValue(0);
                 table.dateTime("published_at").nullable();
                 table.timestamps();
                 table.index(["status", "published_at"]);

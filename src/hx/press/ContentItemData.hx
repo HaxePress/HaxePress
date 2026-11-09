@@ -7,6 +7,9 @@ import hx.press.data.ContentSummaryRecord;
 import hx.press.TagData;
 import hx.press.TagData.TagRecord;
 import hx.press.i18n.I18n;
+import hx.press.i18n.Languages;
+import hx.press.view.ViewRoots;
+import hx.well.http.RequestStatic;
 import hx.press.content.ContentTypes;
 import hx.press.content.ContentFields;
 import hx.press.content.ContentTypeDefinition;
@@ -72,6 +75,16 @@ class ContentItemData {
         form.featured = ContentTypes.supports(type, "featured")
             && Flag.input(request, "featured") ? 1 : 0;
         form.published_at = AdminController.input(request, "published_at", 50);
+        var language = AdminController.input(request, "language", 35);
+        var previousLanguage = existing == null ? Languages.defaultCode() : existing.language;
+        form.language = Languages.prefixed()
+            && Languages.exists(language) ? language : previousLanguage;
+        if (!Languages.exists(form.language)) {
+            form.language = Languages.defaultCode();
+        }
+        form.all_languages = Languages.prefixed() ? (Flag.input(request,
+            "all_languages") ? 1 : 0) : existing == null ? 0 : existing.all_languages;
+        form.translation_group = existing == null ? "" : existing.translation_group;
         form.seo_title = AdminController.input(request, "seo_title", 200);
         form.seo_description = AdminController.input(request, "seo_description", 600);
         form.scheduled_epoch = Std.parseFloat(AdminController.input(request, "scheduled_epoch",
@@ -163,14 +176,40 @@ class ContentItemData {
         return data;
     }
 
+    /**
+        The language links of a page lead to: the public page's language,
+        or the item's own language in the administration, except in a
+        preview of another language.
+    **/
+    static function pageLanguage(own:String):String {
+        var request = RequestStatic.request();
+        if (request == null) {
+            return own;
+        }
+        var previewed:Null<String> = request.getAttribute(Languages.ATTRIBUTE, null);
+        if (ViewRoots.isAdmin(request) && previewed == null) {
+            return own;
+        }
+        return Languages.current();
+    }
+
     static function presentation(item:ContentSummaryRecord, ?type:ContentTypeDefinition):Dynamic {
         if (type == null) {
             type = ContentTypes.find(item.content_type, false);
         }
         var data:Dynamic = Reflect.copy(item);
         ContentFields.clearListAliases(data);
-        data.url = type == null || !type.publicVisible
-            || !type.enabled ? "" : '${type.publicBase}/${StringTools.urlEncode(item.slug)}';
+        var path = '${type == null ? "" : type.publicBase}/${StringTools.urlEncode(item.slug)}';
+        var own = item.language == null
+            || item.language == "" ? Languages.defaultCode() : item.language;
+        var reachable = type != null && type.publicVisible && type.enabled;
+        // Lists link items in the page's language, also items shown in every language.
+        data.url = reachable ? Languages.path(pageLanguage(own), path) : "";
+        data.canonicalUrl = reachable ? Languages.path(own, path) : "";
+        data.language = own;
+        data.languageName = Languages.name(own);
+        data.direction = Languages.direction(own);
+        data.all_languages = item.all_languages == 1;
         data.archiveUrl = type != null && type.hasArchive ? type.publicBase : "/";
         data.typeLabel = type == null ? item.content_type : type.singular;
         data.image = MediaReferences.imageUrl(item.image) ? item.image : "";
@@ -180,6 +219,7 @@ class ContentItemData {
         if (!ContentTypes.supports(type, "categories")) {
             data.category = "";
         }
+        data.categoryLabel = CategoryData.label(data.category);
         if (!ContentTypes.supports(type, "excerpt")) {
             data.excerpt = "";
         }

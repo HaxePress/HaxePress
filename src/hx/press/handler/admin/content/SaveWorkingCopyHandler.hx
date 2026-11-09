@@ -60,7 +60,10 @@ class SaveWorkingCopyHandler extends AbstractHandler implements ValidationRespon
             "seo_title" => [String, Max(180)],
             "seo_description" => [String, Max(500)],
             "scheduled_epoch" => [String, Max(30)],
-            "custom_fields" => [String, Max(64000)]
+            "custom_fields" => [String, Max(64000)],
+            "language" => [String, Max(35)],
+            "all_languages" => [String, Max(5)],
+            "translation_of" => [String, Max(16)]
         ]);
     }
 
@@ -110,7 +113,7 @@ class SaveWorkingCopyHandler extends AbstractHandler implements ValidationRespon
 
         var values = request.only("title", "slug", "excerpt", "content", "category", "image",
             "image_alt", "status", "featured", "published_at", "tags", "seo_title",
-            "seo_description", "scheduled_epoch");
+            "seo_description", "scheduled_epoch", "language", "all_languages", "translation_of");
         for (field in values.keys()) {
             values.set(field, request.input(field));
         }

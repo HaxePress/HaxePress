@@ -1,5 +1,6 @@
 package hx.press.content;
 
+import hx.press.i18n.Languages;
 import haxe.Int64;
 import haxe.Json;
 import hx.press.CmsAccess;
@@ -91,6 +92,9 @@ class ContentListColumns {
         columns.push(own("status", I18n.t("Status"), "status", false, "status"));
         if (ContentTypes.supports(type, "categories")) {
             columns.push(own("category", I18n.t("Category"), "value", false, "category"));
+        }
+        if (Languages.prefixed()) {
+            columns.push(own("language", I18n.t("Language"), "value", false, "language"));
         }
         for (field in ContentAdminRows.listFields(type)) {
             columns.push({
@@ -265,6 +269,9 @@ class ContentListColumns {
                         text: category == "" ? "—" : category,
                         translate: false
                     });
+                case Own("language"):
+                    var language:String = summary.language ?? "";
+                    cells.push({kind: "value", text: Languages.name(language), translate: false});
                 case Own(_):
                     cells.push({kind: column.cell, text: "", translate: false});
                 case Field(field):

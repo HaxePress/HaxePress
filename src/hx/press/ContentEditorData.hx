@@ -1,5 +1,8 @@
 package hx.press;
 
+import hx.press.model.ContentItem;
+import hx.press.content.ContentTranslations;
+import hx.press.i18n.Languages;
 import haxe.Int64;
 import haxe.Json;
 import haxe.ds.StringMap;
@@ -12,6 +15,10 @@ import hx.press.view.types.ContentViews.TagView;
 import hx.press.view.types.EditorViews.ContentEditorView;
 import hx.press.view.types.EditorViews.EditorContentTypeView;
 import hx.press.view.types.EditorViews.EditorItemView;
+import hx.press.view.types.EditorViews.EditorLanguageView;
+import hx.press.view.types.EditorViews.EditorLanguagesView;
+import hx.press.view.types.EditorViews.EditorMissingLanguageView;
+import hx.press.view.types.EditorViews.EditorTranslationView;
 import hx.press.view.types.EditorViews.EditorSeedView;
 import hx.press.view.types.EditorViews.EditorWorkingCopyView;
 import hx.well.http.Request;
@@ -27,6 +34,9 @@ typedef ContentEditorState = {
     var workingCopy:Dynamic;
     var canPublish:Bool;
     var notice:String;
+
+    /** The item a new translation translates, or 0. **/
+    var translationOf:Int;
 }
 
 /**
@@ -50,7 +60,10 @@ class ContentEditorData {
         "seo_title",
         "seo_description",
         "scheduled_epoch",
-        "custom_fields"
+        "custom_fields",
+        "language",
+        "all_languages",
+        "translation_of"
     ];
 
     static final labelPatterns = [
@@ -81,7 +94,83 @@ class ContentEditorData {
             seed: seed(request, workingCopy),
             canPublish: state.canPublish,
             notice: state.notice,
-            mediaRules: MediaReferences.rules()
+            mediaRules: MediaReferences.rules(),
+            languages: languages(request, state)
+        };
+    }
+
+    /** The language controls of the editor and the item's other translations. **/
+    static function languages(request:Request, state:ContentEditorState):EditorLanguagesView {
+        var empty:EditorLanguagesView = {
+            choices: [],
+            translations: [],
+            missing: [],
+            translationOf: 0,
+            sourceTitle: ""
+        };
+        if (!Languages.prefixed()) {
+            return empty;
+        }
+        var detail:Dynamic = state.detail;
+        var id:Int = detail.id ?? 0;
+        var group:String = text(detail.translation_group);
+        var own:String = text(detail.language);
+        var choices:Array<EditorLanguageView> = [
+            for (language in Languages.all())
+                {
+                    code: language.code,
+                    name: language.name,
+                    direction: language.direction,
+                    enabled: language.enabled == 1
+                }
+        ];
+        var source = state.translationOf;
+        var entries = ContentTranslations.group(group, state.type.key);
+        if (group == "" && source > 0) {
+            var original = ContentItem.query.select(["translation_group"])
+                .where("id", source)
+                .first();
+            entries = original == null ? [] : ContentTranslations.group(original.translation_group,
+                state.type.key);
+            if (entries.length == 0) {
+                var single = ContentItem.query.select(["id", "language", "title", "slug", "status", "content_type"])
+                    .where("id", source)
+                    .first();
+                entries = single == null ? [] : [cast single.toObject()];
+            }
+        }
+        var taken = [for (entry in entries) entry.language];
+        var translations:Array<EditorTranslationView> = [
+            for (entry in entries)
+                if (entry.id != id) {
+                    id: entry.id,
+                    language: entry.language,
+                    name: Languages.name(entry.language),
+                    title: entry.title,
+                    status: entry.status,
+                    editUrl: '${state.type.adminBase}/${entry.id}/edit'
+                }
+        ];
+        var missing:Array<EditorMissingLanguageView> = id == 0 ? [] : [
+            for (language in Languages.all())
+                if (language.code != own && !taken.contains(language.code)) {
+                    code: language.code,
+                    name: language.name,
+                    url: '${state.type.adminBase}/new?translation_of=${id}&language=${StringTools.urlEncode(language.code)}'
+                }
+        ];
+        var sourceTitle = "";
+        for (entry in entries) {
+            if (entry.id == source) {
+                sourceTitle = entry.title;
+            }
+        }
+        return {
+            choices: choices,
+            translations: translations,
+            missing: missing,
+            translationOf: source,
+            sourceTitle: sourceTitle
         };
     }
 
@@ -128,7 +217,9 @@ class ContentEditorData {
             seo_description: text(detail.seo_description),
             scheduled_epoch: epochText(detail.scheduled_epoch),
             tags: tags(tagRecords),
-            fields: fields
+            fields: fields,
+            language: text(detail.language) == "" ? Languages.defaultCode() : text(detail.language),
+            all_languages: detail.all_languages == true
         };
     }
 

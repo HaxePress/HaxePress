@@ -8,10 +8,24 @@ class TranslationCatalogue {
     public static inline var MAX_BYTES = 128 * 1024;
     public static inline var MAX_MESSAGES = 1500;
 
+    /** Parses an uploaded package's catalogue within the size and message limits. **/
     public static function parse(source:String):Map<String, Dynamic> {
         if (source.length > MAX_BYTES) {
             throw new Exception("A translation catalogue must be smaller than 128 KB.");
         }
+        return read(source, true);
+    }
+
+    /**
+        Parses a catalogue that is part of the application build, such as the
+        core catalogues. Its shape is checked, but not its size: the limits
+        protect the site from uploaded packages.
+    **/
+    public static function parseTrusted(source:String):Map<String, Dynamic> {
+        return read(source, false);
+    }
+
+    static function read(source:String, limited:Bool):Map<String, Dynamic> {
         var input:Dynamic = Json.parse(source);
         if (input == null
             || !Reflect.isObject(input)
@@ -20,7 +34,7 @@ class TranslationCatalogue {
             throw new Exception("Translation catalogues must contain a JSON object.");
         }
         var keys = Reflect.fields(input);
-        if (keys.length > MAX_MESSAGES) {
+        if (limited && keys.length > MAX_MESSAGES) {
             throw new Exception("A translation catalogue can contain at most 1500 messages.");
         }
         var messages:Map<String, Dynamic> = [];

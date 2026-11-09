@@ -1,5 +1,6 @@
 package hx.press.content;
 
+import hx.press.i18n.Languages;
 import hx.well.http.Request;
 
 /**
@@ -50,6 +51,12 @@ class ContentViews {
     }
 
     /** Whether the request comes from a browser where a member is signed in. **/
+    /** The language a public page is shown in: its address's language, or the default one. **/
+    public static function language(request:Request):String {
+        var selected:Null<String> = request.getAttribute(Languages.ATTRIBUTE, null);
+        return selected != null && Languages.exists(selected) ? selected : Languages.defaultCode();
+    }
+
     public static function member(request:Request):Bool {
         return request.cookie(MEMBER_COOKIE) != null;
     }

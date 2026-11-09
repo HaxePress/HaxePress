@@ -191,7 +191,13 @@ def run():
                 props(public, "/")["theme"]["built_in"] is True,
                 "Built-in activation did not reach the site",
             )
-            messages = props(public, "/?lang=tr")["i18n"]["catalogues"][default]
+            turkish = {"code": "tr", "name": "Türkçe", "direction": "ltr", "enabled": "1"}
+            check(
+                admin.request("/admin/languages/save", "POST", turkish)[0] == 303,
+                "Turkish could not be added",
+            )
+            messages = props(public, "/tr")["i18n"]["catalogues"][default]
+            admin.request("/admin/languages/tr/delete", "POST", {})
             check(messages["Simple"] == "Sade", "Built-in public translations need package files")
             check(
                 'aria-label="Uninstall Simple"' not in admin.request("/admin/themes")[2],

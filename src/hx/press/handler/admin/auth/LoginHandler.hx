@@ -1,5 +1,7 @@
 package hx.press.handler.admin.auth;
 
+import hx.press.i18n.I18n;
+import hx.press.handler.admin.account.ChangeAdminLocaleHandler;
 import haxe.crypto.Sha256;
 import haxe.ds.StringMap;
 import hx.well.handler.AbstractHandler;
@@ -71,6 +73,11 @@ class LoginHandler extends AbstractHandler {
         var admin:Admin = adminAuth.user();
         request.session.put("admin_name", admin.name);
         request.session.put("auth_version", admin.password);
+        // The language chosen on the sign-in page becomes the member's own.
+        var chosen = request.cookie(ChangeAdminLocaleHandler.COOKIE, "");
+        if (admin.ui_language == "" && I18n.adminLocale(chosen)) {
+            admin.update(["ui_language" => chosen]);
+        }
         return ResponseBuilder.asRedirect("/admin", 303);
     }
 }

@@ -16,6 +16,10 @@ class Admin extends BaseModel<Admin> implements IAuthenticatable {
     @:visible @:field public var name:String;
     @:visible @:field public var role:String = "owner";
     @:visible @:field public var active:Int = 1;
+
+    /** The member's administration language; empty until they choose one. **/
+    @:visible @:field public var ui_language:String = "";
+
     @:visible @:field public var created_at:DatabaseDate;
 
     public function getId():Dynamic

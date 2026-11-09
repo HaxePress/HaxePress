@@ -1,5 +1,7 @@
 package hx.press.handler.admin.content;
 
+import hx.press.i18n.Languages;
+import hx.press.content.ContentTranslations;
 import hx.press.media.MediaReferences;
 import hx.press.media.MediaLocks;
 import hx.press.content.ContentLocks;
@@ -81,7 +83,11 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
             "seo_title" => [String, Max(180)],
             "seo_description" => [String, Max(500)],
             "tags" => [String, Max(1000)],
-            "version" => [String, Max(16)]
+            "version" => [String, Max(16)],
+            "language" => [String, Max(35)],
+            "all_languages" => [String, Max(5)],
+            "translation_of" => [String, Max(16)],
+            "detach_translation" => [String, Max(5)]
         ]);
     }
 
@@ -204,8 +210,37 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
                 "This content changed in another editor. Reload the saved version before saving.",
                 409);
         }
+        // A translation joins the group of the item it translates; detaching leaves the group.
+        var source:Null<ContentItem> = null;
+        var sourceId = PositiveInt.parse(AdminController.input(request, "translation_of", 16));
+        if (sourceId != null && sourceId != id) {
+            source = ContentItem.query.select(["id", "language", "translation_group"])
+                .where("id", sourceId)
+                .where("content_type", kind)
+                .where("status", "!=", "trash")
+                .first();
+            if (source == null) {
+                error = "The content this translates no longer exists.";
+            } else {
+                form.translation_group = source.translation_group == "" ? ContentTranslations.newGroup() : source.translation_group;
+            }
+        }
+        if (Flag.input(request, "detach_translation")) {
+            form.translation_group = "";
+        }
+        if (error == ""
+            && form.translation_group != ""
+            && ContentItem.query.where("translation_group", form.translation_group)
+                .where("language", form.language)
+                .where("id", "!=", id)
+                .where("status", "!=", "trash")
+                .exists()) {
+            error = I18n.t("This content already has a translation in {language}.",
+                ["language" => Languages.name(form.language)]);
+        }
         if (error == ""
             && ContentItem.query.where("content_type", kind)
+                .where("language", form.language)
                 .where("slug", form.slug)
                 .where("id", "!=", id)
                 .exists()) {
@@ -262,6 +297,9 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
         data.set("version", existing == null ? 1 : existing.version + 1);
         data.set("status", form.status);
         data.set("featured", form.featured);
+        data.set("language", form.language);
+        data.set("translation_group", form.translation_group);
+        data.set("all_languages", form.all_languages);
         data.set("reading_minutes", form.reading_minutes);
         var scheduledEpoch:Float = 0.0;
         if (form.status == "scheduled") {
@@ -282,9 +320,21 @@ class SaveContentHandler extends AbstractHandler implements ValidationResponder 
                         ContentHistory.remember(existing, previousTags, admin.id);
                     }
                     if (form.featured == 1 && form.status == "published") {
+                        // A collection features one item in each language.
                         ContentItem.query.where("content_type", kind)
+                            .where("language", form.language)
                             .where("featured", 1)
                             .update(["featured" => 0]);
+                    }
+                    if (source != null && source.translation_group == "") {
+                        source.update(["translation_group" => form.translation_group]);
+                    }
+                    if (form.all_languages == 1 && form.translation_group != "") {
+                        // One item of a group stands in for the languages it lacks.
+                        ContentItem.query.where("translation_group", form.translation_group)
+                            .where("id", "!=", id)
+                            .where("all_languages", 1)
+                            .update(["all_languages" => 0]);
                     }
                     if (existing == null) {
                         data.set("created_at", SiteSettingsStore.timestamp());

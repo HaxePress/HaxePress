@@ -67,7 +67,10 @@ class SiteBackupDatabase {
         "activity_logs",
         "roles",
         "role_grants",
-        "capabilities"
+        "capabilities",
+        "languages",
+        "translation_texts",
+        "translations"
     ];
 
     /**
@@ -612,6 +615,8 @@ class SiteBackupDatabase {
                 home.update(["value" => "0"]);
                 query("settings").where("key", "home_mode").update(["value" => "collection"]);
             }
+            // A language's homepage that was not restored falls back to the site's homepage.
+            query("languages").whereIn("home_page_id", cast batch).update(["home_page_id" => 0]);
             offset += batch.length;
         }
         return skipped;

@@ -47,6 +47,8 @@ class AdminMcpPolicy {
         {prefix: "/admin/navigation", capabilities: ["navigation"]},
         {prefix: "/admin/activity", capabilities: ["activity"]},
         {prefix: "/admin/settings", capabilities: ["settings"]},
+        {prefix: "/admin/languages", capabilities: ["settings"]},
+        {prefix: "/admin/translations", capabilities: ["translations"]},
         {prefix: "/admin/team", capabilities: ["team"]},
         {prefix: "/admin/roles", capabilities: ["roles"]},
         {prefix: "/admin/themes", capabilities: ["extensions"]},

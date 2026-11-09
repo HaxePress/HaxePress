@@ -69,6 +69,15 @@ typedef ManifestData = {
     var mediaFile:String;
     var mediaPrefix:String;
     var translations:Map<String, String>;
+
+    /**
+        The language the package's own texts are written in (`sourceLanguage`,
+        English by default). Its catalogue for that language holds the source
+        texts the Translations page lists; the other catalogues are its
+        translations.
+    **/
+    var sourceLanguage:String;
+
     var templates:Array<{name:String, label:String, scope:String}>;
     var navigation:Array<{key:String, name:String, maxLinks:Int}>;
 }
@@ -283,6 +292,14 @@ class PackageManifest {
             throw new Exception("A visual theme media list must reference a JSON file in its package.");
         }
         var translations = translationFiles(input.translations);
+        var sourceLanguage = text(input, "sourceLanguage", 35);
+        if (sourceLanguage == "") {
+            sourceLanguage = "en";
+        }
+        var languagePattern = ~/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*(?![\s\S])/;
+        if (!languagePattern.match(sourceLanguage)) {
+            throw new Exception("A package's sourceLanguage must be a language code such as en or pt-BR.");
+        }
         if (Lambda.count(translations) > 0 && !hooks.contains("i18n.catalogues")) {
             hooks.push("i18n.catalogues");
         }
@@ -321,6 +338,7 @@ class PackageManifest {
             mediaFile: mediaFile,
             mediaPrefix: mediaPrefix,
             translations: translations,
+            sourceLanguage: sourceLanguage,
             templates: templateDefinitions(input.templates),
             navigation: navigationDefinitions(input.navigation)
         };

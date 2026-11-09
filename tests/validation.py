@@ -152,8 +152,6 @@ def verify(owner, public, fixtures):
             )
 
         for path, values in [
-            ("/locale", {"locale": []}),
-            ("/locale", {"locale": "en", "return_to": []}),
             ("/subscribe", {"email": []}),
             ("/subscribe", {"email": "invalid-email"}),
         ]:

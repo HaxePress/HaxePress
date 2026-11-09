@@ -1,5 +1,6 @@
 package hx.press.themes;
 
+import hx.press.i18n.TranslationSync;
 import haxe.Exception;
 import haxe.Json;
 import haxe.crypto.Sha256;
@@ -492,6 +493,7 @@ class ThemeDesignPackage {
         }
         ContentCache.changed("extensions");
         ThemeAssets.changed(id);
+        TranslationSync.afterInstall(id);
         PackageStorage.remove('${PackageStorage.STAGING}/${upload.key}');
         return id;
     }

@@ -11,6 +11,8 @@ import hx.press.ManagementController;
 import hx.press.content.ContentTypeController;
 import hx.press.access.RoleController;
 import hx.press.content.ContentOptions;
+import hx.press.i18n.LanguageController;
+import hx.press.i18n.TranslationController;
 import hx.press.packages.PackageController;
 import hx.press.themes.ThemeStudioController;
 import hx.press.themes.ThemeAssetController;
@@ -39,6 +41,7 @@ import hx.press.handler.admin.category.ListCategoriesHandler;
 import hx.press.handler.admin.category.SaveCategoryHandler;
 import hx.press.handler.admin.category.DeleteCategoryHandler;
 import hx.press.handler.admin.account.SaveAccountHandler;
+import hx.press.handler.admin.account.ChangeAdminLocaleHandler;
 import hx.press.handler.admin.media.SaveMediaHandler;
 import hx.press.handler.admin.navigation.SaveNavigationHandler;
 import hx.press.handler.admin.packages.SavePackageSettingsHandler;
@@ -70,6 +73,8 @@ class AdminRoutes extends RouteGroup {
         Route.middleware(sessionMiddleware).group(() -> {
             Route.get("/login", AdminController.loginPage);
             Route.post("/login", new LoginHandler());
+            Route.post("/locale", new ChangeAdminLocaleHandler())
+                .attribute(AdminMcpPolicy.PEOPLE_ONLY, true);
         });
 
         var protectedMiddleware = sessionMiddleware.copy();
@@ -228,6 +233,39 @@ class AdminRoutes extends RouteGroup {
                 position: 20,
                 exact: true
             });
+            Route.get("/languages", LanguageController.index).attribute("cms.navigation", {
+                group: "Administration",
+                groupPosition: 30,
+                label: "Languages",
+                icon: "globe",
+                capability: "settings",
+                position: 25,
+                exact: false
+            });
+            Route.post("/languages/save", LanguageController.save);
+            Route.post("/languages/order", LanguageController.order);
+            Route.post("/languages/default", LanguageController.makeDefault);
+            Route.post("/languages/{code}/delete", LanguageController.remove);
+            Route.get("/translations", TranslationController.index).attribute("cms.navigation", {
+                group: "Organization",
+                groupPosition: 10,
+                label: "Translations",
+                icon: "globe",
+                capability: "translations",
+                position: 30,
+                exact: false
+            });
+            Route.get("/translations/sources", TranslationController.sources);
+            Route.get("/translations/progress", TranslationController.progress);
+            Route.get("/translations/export", TranslationController.export);
+            Route.get("/translations/download", TranslationController.download)
+                .attribute(AdminMcpPolicy.PEOPLE_ONLY, true);
+            Route.post("/translations/save", TranslationController.save);
+            Route.post("/translations/save-batch", TranslationController.saveBatch);
+            Route.post("/translations/remove", TranslationController.remove);
+            Route.post("/translations/import", TranslationController.importCatalogue);
+            Route.post("/translations/rescan", TranslationController.rescan);
+            Route.get("/translations/{id}", TranslationController.show).whereNumber("id");
             Route.get("/navigation", request -> ManagementController.navigation(request))
                 .attribute("cms.navigation", {
                     group: "Organization",

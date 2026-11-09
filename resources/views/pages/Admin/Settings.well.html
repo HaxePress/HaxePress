@@ -5,6 +5,8 @@
   homeTypeKnown="Bool"
   homePage="AdminContentChoiceView?"
   logoRules="SettingsMediaRulesView"
+  languageCount="Int"
+  defaultLanguage="String"
 />
 <AdminLayout :title="t('Settings')">
   <div class="admin-page-heading">
@@ -90,18 +92,13 @@
           <label for="about-site">{{ t('About this site') }}</label>
           <textarea id="about-site" name="about_site" rows="4" maxlength="1500">
 {{ settingsForm.about_site }}</textarea>
-          <label for="site-language">{{ t('Default language') }}</label>
-          <select id="site-language" name="locale">
-            <option
-              :for="choice in i18n.locales"
-              value="{{ choice.code }}"
-              :selected="choice.code == settingsForm.locale"
-            >
-              {{ choice.name }}
-            </option>
-          </select>
-          <!-- prettier-ignore -->
-          <p class="field-help">{{ t('Visitors can choose their own language. Content keeps the language it was written in.') }}</p>
+          <h2 class="settings-subheading">{{ t('Languages') }}</h2>
+          <p class="field-help">
+            {{ languageCount == 1 ? t('This site publishes in {language}.', language:
+            defaultLanguage) : t('This site publishes in {count} languages; {language} is the
+            default.', count: languageCount, language: defaultLanguage) }}
+            <a href="/admin/languages">{{ t('Manage languages') }}</a>
+          </p>
           <h2 class="settings-subheading">{{ t('Homepage') }}</h2>
           <label for="home-mode">{{ t('Homepage display') }}</label>
           <select id="home-mode" name="home_mode">

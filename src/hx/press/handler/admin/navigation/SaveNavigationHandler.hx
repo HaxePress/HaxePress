@@ -1,5 +1,7 @@
 package hx.press.handler.admin.navigation;
 
+import hx.press.i18n.SiteTexts;
+import hx.press.i18n.Languages;
 import hx.press.content.ContentLocks;
 import hx.press.Activity;
 import hx.press.AdminController;
@@ -27,6 +29,7 @@ import hx.well.validator.ValidatorRule;
 import java.net.URI;
 #end
 
+/** Saves a navigation link, which can show in every language or in one. **/
 class SaveNavigationHandler extends AbstractHandler implements ValidationResponder {
     public override function validate():Bool {
         var current = request();
@@ -111,6 +114,7 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
             "position" => position,
             "content_id" => contentId,
             "collection_key" => collectionKey,
+            "language" => linkLanguage(request),
             "new_tab" => Flag.input(request, "new_tab") ? 1 : 0,
             "updated_at" => SiteSettingsStore.timestamp()
         ];
@@ -124,6 +128,7 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
                     existing.update(values);
                 }
                 Activity.record("saved", "navigation", savedId, label);
+                SiteTexts.put('menu.${savedId}.label', "menu", label);
             });
             return true;
         });
@@ -150,5 +155,11 @@ class SaveNavigationHandler extends AbstractHandler implements ValidationRespond
         var absoluteUrl = ~/^https?:\/\/(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.?|\[[0-9A-Fa-f:.]+\])(?::[0-9]*)?(?:[\/?#][^\x00-\x20"<>\\^`{|}]*)?$/;
         return absoluteUrl.match(value);
         #end
+    }
+
+    /** The one language a link is shown in, or "" for every language. **/
+    static function linkLanguage(request:Request):String {
+        var language = AdminController.input(request, "language", 35);
+        return Languages.exists(language) && Languages.prefixed() ? language : "";
     }
 }

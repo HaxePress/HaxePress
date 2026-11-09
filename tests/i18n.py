@@ -33,13 +33,26 @@ def run():
         == 303,
         "translation owner login",
     )
+    turkish = {"code": "tr", "name": "Türkçe", "direction": "ltr", "enabled": "1"}
+    check(
+        owner.request("/admin/languages/save", "POST", turkish)[0] == 303,
+        "Turkish could not be added as a site language",
+    )
+    try:
+        verify(public, owner)
+    finally:
+        owner.request("/admin/languages/default", "POST", {"code": "en"})
+        owner.request("/admin/languages/tr/delete", "POST", {})
+
+
+def verify(public, owner):
     with FixtureStore.from_environment() as fixtures:
         original_content = list(
             fixtures.scan("items", ["id", "title", "content", "slug", "status"])
         )
         initial = props(public, "/")
         check(initial["i18n"]["locale"] == "en", "default language changed")
-        status, headers, html = public.request("/?lang=tr")
+        status, headers, html = public.request("/tr")
         check(
             status == 200 and '<html lang="tr" dir="ltr">' in html,
             "server-rendered document language",
@@ -49,7 +62,7 @@ def run():
             headers.get("content-language") == "tr" and "set-cookie" not in headers,
             "stateless language request",
         )
-        translated = props(public, "/?lang=tr")["i18n"]
+        translated = props(public, "/tr")["i18n"]
         check(
             translated["catalogues"]["plugin-newsletter"]["Subscribe"] == "Abone ol",
             "newsletter catalogue",
@@ -65,9 +78,14 @@ def run():
                 for index in range(31)
             ],
         )
+        # The administration follows the member's own language.
+        check(
+            owner.request("/admin/locale", "POST", {"locale": "tr"})[0] == 303,
+            "admin language preference",
+        )
         try:
             clear_content(Path(os.environ["TEST_CACHE_PATH"]))
-            status, _, subscriber_page = owner.request("/admin/subscribers?lang=tr")
+            status, _, subscriber_page = owner.request("/admin/subscribers?lang=en")
             check(
                 status == 200
                 and "Aboneler" in subscriber_page
@@ -78,12 +96,17 @@ def run():
             fixtures.delete("subscribers", [("id", "in", subscribers)])
             clear_content(Path(os.environ["TEST_CACHE_PATH"]))
         check(
-            props(public, "/?lang=unsupported")["i18n"]["locale"] == "en", "unknown locale fallback"
+            props(public, "/?lang=tr")["i18n"]["locale"] == "en", "a query chose the page language"
+        )
+        status, headers, _ = public.request("/en/content?page=2")
+        check(
+            status == 301 and headers["location"] == "/content?page=2",
+            "the default language's prefix did not move to the address without it",
         )
 
         def render(locale):
             """What went wrong with a concurrent request for `locale`, or None."""
-            status, headers, html = Client().request(f"/?lang={locale}")
+            status, headers, html = Client().request("/tr" if locale == "tr" else "/")
             if status != 200:
                 return f"{locale}: status {str(status)}"
             expected = "Son içerikler" if locale == "tr" else "The latest content"
@@ -110,27 +133,11 @@ def run():
         )
         thread_summary = "; ".join(thread_failures)
         check(not thread_failures, f"threads shared regular expressions: {thread_summary}")
-        check(
-            public.request("/locale", "POST", {"locale": "tr", "return_to": "/content"})[0] == 303,
-            "language preference",
-        )
-        check(set(public.cookies) == {"cms_locale"}, "language selection created a session")
-        check(props(public, "/")["i18n"]["locale"] == "tr", "language cookie was ignored")
-        status, _, body = public.request("/subscribe", "POST", {"email": "invalid"})
+        check("set-cookie" not in public.request("/tr")[1], "a language page created a session")
+        status, _, body = public.request("/tr/subscribe", "POST", {"email": "invalid"})
         check(
             status == 422 and json.loads(body)["error"] == "Geçerli bir e-posta adresi girin.",
-            "native plugin translation",
-        )
-        check(
-            public.request("/locale", "POST", {"locale": "../tr"})[0] == 422,
-            "invalid language accepted",
-        )
-        redirected = public.request(
-            "/locale", "POST", {"locale": "en", "return_to": "//outside.example"}
-        )
-        check(
-            redirected[0] == 303 and redirected[1]["location"] == "/",
-            "language endpoint redirects outside the site",
+            "native plugin translation under a language prefix",
         )
         preview_page = props(owner, "/admin/themes/theme-notebook/preview?lang=tr")
         preview_html = owner.request("/admin/themes/theme-notebook/preview?lang=tr")[2]
@@ -148,6 +155,15 @@ def run():
         check(
             props(Client(), "/")["theme"]["slug"] == "simple",
             "theme preview changed the active theme",
+        )
+        english_frame = props(owner, "/admin/themes/theme-notebook/preview")["preview"]["url"]
+        check(
+            '<html lang="en"' in owner.request(english_frame)[2],
+            "a theme preview did not default to the site's language",
+        )
+        check(
+            owner.request("/admin/locale", "POST", {"locale": "en"})[0] == 303,
+            "admin language reset",
         )
 
         sample = ROOT / "Export/packages/reading-companion-2.16.0.zip"
@@ -204,7 +220,7 @@ def run():
                     owner.request(f"/admin/plugins/plugin-{slug}/enable", "POST", {})[0] == 303,
                     "activate translation package",
                 )
-            catalogues = props(Client(), "/?lang=tr")["i18n"]["catalogues"]
+            catalogues = props(Client(), "/tr")["i18n"]["catalogues"]
             check(catalogues[first_id]["Save content"] == "Birinci eklenti", "first namespace")
             check(catalogues[second_id]["Save content"] == "İkinci eklenti", "second namespace")
             check(
@@ -251,13 +267,13 @@ def run():
                 replace=True,
             )
             check(
-                props(Client(), "/?lang=tr")["i18n"]["catalogues"][first_id]["Save content"]
+                props(Client(), "/tr")["i18n"]["catalogues"][first_id]["Save content"]
                 == "Güncel çeviri",
                 "replacement kept a stale catalogue",
             )
             owner.request(f"/admin/plugins/{first_id}/disable", "POST", {})
             check(
-                first_id not in props(Client(), "/?lang=tr")["i18n"]["catalogues"],
+                first_id not in props(Client(), "/tr")["i18n"]["catalogues"],
                 "disabled translations remain public",
             )
             owner.request(f"/admin/plugins/{first_id}/enable", "POST", {})
@@ -286,23 +302,22 @@ def run():
             for identifier in [first_id, second_id]:
                 owner.request(f"/admin/plugins/{identifier}/uninstall", "POST", {})
 
-        original_settings = props(owner, "/admin/settings")["site"]
+        # The site's default language applies to new visitors.
         try:
             check(
-                owner.request("/admin/settings", "POST", {**original_settings, "locale": "tr"})[0]
-                == 303,
-                "default locale setting",
+                owner.request("/admin/languages/default", "POST", {"code": "tr"})[0] == 303,
+                "default language setting",
             )
             check(
                 props(Client(), "/")["i18n"]["locale"] == "tr",
                 "default locale did not apply to a new visitor",
             )
             check(
-                props(Client(), "/?lang=en")["i18n"]["locale"] == "en",
-                "explicit language did not override the default",
+                props(Client(), "/en")["i18n"]["locale"] == "en",
+                "a language prefix did not choose the page language",
             )
         finally:
-            owner.request("/admin/settings", "POST", original_settings)
+            owner.request("/admin/languages/default", "POST", {"code": "en"})
         check(
             list(fixtures.scan("items", ["id", "title", "content", "slug", "status"]))
             == original_content,

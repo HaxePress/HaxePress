@@ -1,5 +1,7 @@
 package hx.press.view;
 
+import hx.press.i18n.PageSeo;
+import hx.press.i18n.SiteTexts;
 import hx.press.CmsAccess;
 import hx.press.NavigationData;
 import hx.press.SiteSettingsStore;
@@ -8,6 +10,7 @@ import hx.press.access.Roles;
 import hx.press.content.ContentTypes;
 import hx.press.content.ContentViews;
 import hx.press.i18n.I18n;
+import hx.press.i18n.LanguageChoices;
 import hx.press.media.MediaReferences;
 import hx.press.packages.ThemeData;
 import hx.press.plugins.PluginHealth;
@@ -28,6 +31,8 @@ class ViewRoots {
     public static final names = [
         "site",
         "i18n",
+        "languages",
+        "seo",
         "auth",
         "request",
         "theme",
@@ -53,9 +58,13 @@ class ViewRoots {
         }
         return switch name {
             case "site":
-                SiteSettingsStore.settings();
+                SiteTexts.settings(SiteSettingsStore.settings());
             case "i18n":
-                i18n();
+                i18n(request);
+            case "languages":
+                LanguageChoices.forRequest(request);
+            case "seo":
+                PageSeo.forRequest(request);
             case "auth":
                 auth();
             case "request":
@@ -95,7 +104,7 @@ class ViewRoots {
             case "adminLocation":
                 AdminChrome.location(host.root("adminNavigation"), request, host);
             case "translations":
-                Translations.url();
+                IslandCatalogues.url();
             default:
                 null;
         }
@@ -110,12 +119,12 @@ class ViewRoots {
     }
 
     /** Templates read the locale and its direction; the catalogues stay out of page rendering. **/
-    static function i18n():Dynamic {
+    static function i18n(request:Null<Request>):Dynamic {
         var selected = I18n.locale();
         return {
             locale: selected,
             direction: I18n.direction(selected),
-            locales: I18n.locales
+            locales: isAdmin(request) ? I18n.adminLocales() : I18n.locales
         };
     }
 

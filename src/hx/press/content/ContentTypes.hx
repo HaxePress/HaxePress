@@ -1,5 +1,6 @@
 package hx.press.content;
 
+import hx.press.i18n.Languages;
 import haxe.Exception;
 import haxe.Json;
 import hx.press.CategoryData;
@@ -72,6 +73,7 @@ class ContentTypes {
         "categories",
         "tags",
         "locale",
+        "mcp",
         "media",
         "storage",
         "extension-assets",
@@ -85,6 +87,17 @@ class ContentTypes {
         "p",
         "tag"
     ];
+
+    /**
+        Whether a first path segment already belongs to the site: a path the
+        CMS reserves, a collection's public path, or a path kept as a
+        redirect. Site languages cannot use these segments.
+    **/
+    public static function pathTaken(path:String):Bool {
+        return reservedPaths.contains(path)
+            || ContentType.query.where("public_path", path).exists()
+            || ContentTypePath.query.where("path", path).exists();
+    }
 
     public static function validKey(key:String):Bool {
         return key != null && ~/^[a-z][a-z0-9_]{0,31}(?![\s\S])/.match(key);
@@ -491,6 +504,9 @@ class ContentTypes {
             || reservedPaths.contains(path)
             || !~/^[a-z][a-z0-9-]*(?![\s\S])/.match(icon)) {
             throw new Exception("Enter collection labels and a public path that is not reserved by the CMS.");
+        }
+        if (Languages.bySegment(path) != null) {
+            throw new Exception("This public path is the address of a site language.");
         }
         if (ContentType.query.where("public_path", path).where("key", "!=", key).exists()) {
             throw new Exception("Another content type already uses this public path.");

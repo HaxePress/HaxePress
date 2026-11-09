@@ -98,7 +98,7 @@ class ContentWorkflow {
         var count = 0;
         for (item in rows) {
             var published = ContentLocks.run('document-${item.id}', () -> {
-                var document = ContentItem.query.select(["id", "content_type", "title", "version", "featured"])
+                var document = ContentItem.query.select(["id", "content_type", "title", "version", "featured", "language"])
                     .where("id", item.id)
                     .where("status", "scheduled")
                     .where("scheduled_epoch", "<=", Date.now().getTime())
@@ -110,6 +110,7 @@ class ContentWorkflow {
                 DBStatic.transaction(() -> {
                     if (document.featured == 1) {
                         ContentItem.query.where("content_type", document.content_type)
+                            .where("language", document.language)
                             .where("featured", 1)
                             .update(["featured" => 0]);
                     }

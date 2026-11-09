@@ -1,5 +1,6 @@
 package extensions.viewcount;
 
+import hx.press.i18n.Languages;
 import hx.press.Pagination;
 import hx.press.Pagination.PageCursor;
 import hx.press.content.ContentTypes;
@@ -158,7 +159,7 @@ class ViewCounts {
         var ids:Array<Dynamic> = [for (record in records) record.content_id];
         var items:Map<Int, ContentItem> = [];
         if (ids.length > 0) {
-            for (item in ContentItem.query.select(["id", "title", "slug", "status", "content_type"])
+            for (item in ContentItem.query.select(["id", "title", "slug", "status", "content_type", "language"])
                 .whereIn("id", ids)
                 .get()) {
                 items.set(item.id, item);
@@ -182,7 +183,7 @@ class ViewCounts {
                 title: title,
                 type: kind,
                 collection: type == null ? kind : type.name,
-                url: published ? '${base}/${slug}' : "",
+                url: published ? Languages.path(item.language, '${base}/${slug}') : "",
                 views: record.views
             });
         }

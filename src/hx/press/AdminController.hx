@@ -1,5 +1,6 @@
 package hx.press;
 
+import hx.press.i18n.Languages;
 import hx.press.ai.AdminMcpAccess;
 import hx.press.validation.PositiveInt;
 import hx.press.view.View;
@@ -176,7 +177,6 @@ class AdminController {
             publisher_name: value("publisher_name"),
             description: value("description"),
             about_site: value("about_site"),
-            locale: value("locale"),
             home_mode: value("home_mode"),
             home_type: value("home_type"),
             home_page: value("home_page"),
@@ -194,7 +194,9 @@ class AdminController {
             "homeCollections" => homeCollections,
             "homeTypeKnown" => homeTypeKnown,
             "homePage" => homePage,
-            "logoRules" => MediaReferences.rules()
+            "logoRules" => MediaReferences.rules(),
+            "languageCount" => Languages.all().length,
+            "defaultLanguage" => Languages.name(Languages.defaultCode())
         ];
 
         if (error != "") {

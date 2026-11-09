@@ -1,0 +1,12 @@
+<template :if="seo">
+  <link rel="canonical" href="{{ seo.canonical }}" />
+  <link
+    :for="alternate in seo.alternates"
+    rel="alternate"
+    hreflang="{{ alternate.language }}"
+    href="{{ alternate.href }}"
+  />
+  <meta property="og:url" content="{{ seo.canonical }}" />
+  <meta property="og:locale" content="{{ seo.ogLocale }}" />
+  <meta :for="locale in seo.ogAlternates" property="og:locale:alternate" content="{{ locale }}" />
+</template>

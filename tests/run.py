@@ -63,6 +63,8 @@ parser.add_argument(
         "media_dependencies",
         "site_identity",
         "i18n",
+        "languages",
+        "translations",
     ],
 )
 parser.add_argument("--skip-build", action="store_true")
@@ -261,6 +263,8 @@ with tempfile.TemporaryDirectory(prefix="haxepress-test-") as name:
                     "media_dependencies",
                     "site_identity",
                     "i18n",
+                    "languages",
+                    "translations",
                 ]
             )
             for suite in suites:

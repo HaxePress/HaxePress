@@ -14,6 +14,8 @@ class ViewContract {
         var contract = ViewSchema.registerPackage(new HostContract(), "hx.press.view.types");
         contract.addRoot("site", TView("SiteView"));
         contract.addRoot("i18n", TView("I18nView"));
+        contract.addRoot("languages", TView("LanguagesView"));
+        contract.addRoot("seo", TNullable(TView("SeoView")));
         contract.addRoot("auth", TNullable(TView("AuthView")));
         contract.addRoot("request", TView("RequestView"));
         contract.addRoot("theme", TNullable(TView("ThemeView")));

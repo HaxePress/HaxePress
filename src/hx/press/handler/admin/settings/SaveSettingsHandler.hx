@@ -1,5 +1,6 @@
 package hx.press.handler.admin.settings;
 
+import hx.press.i18n.SiteTexts;
 import hx.press.media.MediaLocks;
 import hx.press.media.MediaReferences;
 import hx.press.model.MediaAsset;
@@ -7,7 +8,6 @@ import hx.press.CmsAccess;
 import hx.press.CmsController;
 import hx.press.AdminController;
 import hx.press.ContentCache;
-import hx.press.i18n.I18n;
 import hx.well.facades.DBStatic;
 import hx.well.handler.AbstractHandler;
 import hx.well.http.AbstractResponse;
@@ -35,7 +35,6 @@ class SaveSettingsHandler extends AbstractHandler implements ValidationResponder
             "site_logo" => [String, Max(500)],
             "description" => [String, Max(500)],
             "about_site" => [String, Max(1500)],
-            "locale" => [String, Max(20)],
             "home_mode" => [String, Max(20)],
             "home_type" => [String, Max(32)],
             "home_page" => [String, Max(16)],
@@ -54,17 +53,12 @@ class SaveSettingsHandler extends AbstractHandler implements ValidationResponder
             return CmsController.forbidden(request);
         }
         var values = request.only("site_name", "publisher_name", "description", "about_site",
-            "site_logo", "locale");
-        var locale = request.input("locale", I18n.defaultLocale());
-        if (!I18n.supported(locale)) {
-            return AdminController.settingsForm(request, "Choose a supported language.", "", 422);
-        }
+            "site_logo");
 
         for (key in values.keys()) {
             var value:String = request.input(key, "");
             values.set(key, value.trim());
         }
-        values.set("locale", locale);
         var previous = SiteSettingsStore.settings();
         for (key in ["home_mode", "home_type", "home_page", "home_size", "home_template"]) {
             values.set(key, request.input(key, previous.get(key)));
@@ -127,6 +121,10 @@ class SaveSettingsHandler extends AbstractHandler implements ValidationResponder
             });
 
             ContentCache.settingsChanged();
+            for (field in ["site_name", "description", "about_site", "publisher_name"]) {
+                var text:String = values.get(field) ?? "";
+                SiteTexts.put('setting.${field}', "setting", text);
+            }
             return ResponseBuilder.asRedirect("/admin/settings?notice=settings", 303);
         });
     }

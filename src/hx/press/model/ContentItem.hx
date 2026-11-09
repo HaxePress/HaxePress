@@ -26,6 +26,9 @@ class ContentItem extends BaseModel<ContentItem> {
     @:visible @:field public var scheduled_epoch:Float = 0;
     @:visible @:field public var previous_status:String = "draft";
     @:visible @:field public var featured:Int = 0;
+    @:visible @:field public var language:String = "";
+    @:visible @:field public var translation_group:String = "";
+    @:visible @:field public var all_languages:Int = 0;
 
     @:visible @:field public var reading_minutes:Int = 1;
     @:visible @:field public var published_at:Null<DatabaseDate> = null;

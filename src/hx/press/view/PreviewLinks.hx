@@ -1,6 +1,7 @@
 package hx.press.view;
 
 import hx.press.i18n.I18n;
+import hx.press.i18n.Languages;
 import hx.well.http.Request;
 
 /**
@@ -49,6 +50,12 @@ class PreviewLinks {
         if (hashIndex >= 0) {
             hash = href.substr(hashIndex);
             withoutHash = href.substr(0, hashIndex);
+        }
+        // A link into a language previews that language.
+        var named = Languages.prefixOf(withoutHash);
+        if (named != null) {
+            locale = named.code;
+            withoutHash = Languages.neutral(withoutHash);
         }
         var queryIndex = withoutHash.indexOf("?");
         var path = queryIndex < 0 ? withoutHash : withoutHash.substr(0, queryIndex);

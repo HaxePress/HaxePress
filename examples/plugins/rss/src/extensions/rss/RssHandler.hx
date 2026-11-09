@@ -1,5 +1,8 @@
 package extensions.rss;
 
+import hx.press.content.ContentTranslations;
+import hx.press.i18n.SiteTexts;
+import hx.press.i18n.Languages;
 import hx.press.ContentCache;
 import hx.press.SiteSettingsStore;
 import hx.press.content.ContentTypes;
@@ -20,12 +23,15 @@ class RssHandler extends AbstractHandler {
         if (type == null || !type.publicVisible) {
             return ResponseBuilder.asString("Feed collection not found.", 404);
         }
+        // Each site language has its own feed under its prefix, such as /de/rss.xml.
+        var language = Languages.current();
         var items:Array<FeedItem> = ContentCache.remember("items", "rss",
-            [kind, 50, ContentTypes.revision()], () -> {
-                return ContentItem.query.select(["title", "slug", "excerpt"])
+            [kind, 50, ContentTypes.revision(), language], () -> {
+                var query = ContentItem.query.select(["title", "slug", "excerpt"])
                     .where("content_type", kind)
-                    .where("status", "published")
-                    .orderBy("published_at", "DESC")
+                    .where("status", "published");
+                ContentTranslations.visibleIn(query, kind, language);
+                return query.orderBy("published_at", "DESC")
                     .orderBy("id", "DESC")
                     .limit(50)
                     .get()
@@ -39,12 +45,15 @@ class RssHandler extends AbstractHandler {
         document.addChild(rss);
         var channel = Xml.createElement("channel");
         rss.addChild(channel);
-        add(channel, "title", settings.get("site_name"));
-        add(channel, "link", baseUrl);
-        add(channel, "description", settings.get("description"));
+        var site = SiteTexts.settings(settings);
+        add(channel, "title", site.get("site_name"));
+        add(channel, "link", '${baseUrl}${Languages.path(language, "/")}');
+        add(channel, "description", site.get("description"));
+        add(channel, "language", language);
         for (item in items) {
             var feedItem = Xml.createElement("item");
-            var url = '${baseUrl}${type.publicBase}/${StringTools.urlEncode(item.slug)}';
+            var path = '${type.publicBase}/${StringTools.urlEncode(item.slug)}';
+            var url = '${baseUrl}${Languages.path(language, path)}';
             add(feedItem, "title", item.title);
             add(feedItem, "link", url);
             add(feedItem, "guid", url);

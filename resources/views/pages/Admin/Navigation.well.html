@@ -7,6 +7,7 @@
   notice="String"
   regionQuery="String"
   linkForm="AdminMenuLinkFormView"
+  languageChoices="List<AdminLanguageSuggestionView>"
   linkContent="AdminContentChoiceView?"
   linkCollection="AdminCollectionChoiceView?"
   regionForm="AdminNavigationRegionFormView"
@@ -198,6 +199,21 @@
             max="9999"
             value="{{ linkForm.position }}"
           />
+          <template :if="languageChoices">
+            <label for="link-language">{{ t('Shown in') }}</label>
+            <select id="link-language" name="language">
+              <option value="" :selected="linkForm.language == ''">
+                {{ t('Every language') }}
+              </option>
+              <option
+                :for="choice in languageChoices"
+                value="{{ choice.code }}"
+                :selected="choice.code == linkForm.language"
+              >
+                {{ choice.name }}
+              </option>
+            </select>
+          </template>
           <label class="checkbox-label"
             ><input type="checkbox" name="new_tab" value="1" :checked="linkForm.new_tab" /><span
               >{{ t('Open in a new tab') }}</span

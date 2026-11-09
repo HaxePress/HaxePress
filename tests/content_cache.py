@@ -133,7 +133,7 @@ def verify(port, fixtures, cache_folder):
         ), "A new query filtered an old whole-content cache"
         expire(
             find_entry(
-                cache_folder, "items", "published-by-slug", ["entry", "welcome-to-haxepress"]
+                cache_folder, "items", "published-by-slug", ["entry", "welcome-to-haxepress", "en"]
             )
         )
         assert json.loads(request(port, content)[2])["props"]["item"]["title"] == changed

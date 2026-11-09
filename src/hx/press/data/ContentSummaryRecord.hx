@@ -13,6 +13,9 @@ typedef ContentSummaryRecord = {
     var image_alt:String;
     var status:String;
     var featured:Int;
+    var language:String;
+    var translation_group:String;
+    var all_languages:Int;
     var reading_minutes:Int;
     var published_at:Null<DatabaseDate>;
     var updated_at:DatabaseDate;

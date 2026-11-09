@@ -456,11 +456,13 @@ Templates are checked when the package is installed, against the same view contr
 
 ## Shared translations
 
-Core and packages use English fallback with Turkish included. Declare up to ten JSON catalogues under `translations`. Files are flat key/message objects; plural values contain `one` / `other`. Catalogue limits are 128 KB, 1500 messages, 500 characters per key and 4000 per translation. Named placeholders are substituted once. Messages are plain text.
+Packages declare up to ten JSON catalogues under `translations`. Files are flat key/message objects; plural values contain `one` / `other`. Catalogue limits are 128 KB, 1500 messages, 500 characters per key and 4000 per translation. Named placeholders are substituted once. Messages are plain text. `sourceLanguage` names the language of the package's own texts (`en` by default); its catalogue for that language holds the source texts, and the others are translations.
 
-Namespaces are `plugin-{slug}` and `theme-{slug}`; packages cannot replace another namespace. Theme templates translate with `t(key)`, which checks the theme's catalogue before the core one; native code imports `hx.press.i18n.I18n`, and frontend `activate` receives a package-bound `t`. `I18n.t(key, parameters, namespace, locale)` supports explicit background locale. Public rendering checks the active theme before core messages; administration uses the core namespace. Preference changes use a separate cookie without a public session, and owners configure the default language.
+Namespaces are `plugin-{slug}` and `theme-{slug}`; packages cannot replace another namespace. Theme templates translate with `t(key)`, which checks the theme's catalogue before the core one; native code imports `hx.press.i18n.I18n`, and frontend `activate` receives a package-bound `t`. `I18n.t(key, parameters, namespace, locale)` supports an explicit locale. Public pages are in the language of their address; the administration is in each member's own language.
 
-Catalogue caches include package identity, installed generation and locale. Replacement/activation/removal invalidate them. Only active catalogues are public; inactive theme previews can use that theme's translations. Stored authored content is not automatically translated.
+Every text of a package, its catalogue keys, manifest labels and the literal `t` keys of its templates, is listed on the Translations page, where the site can override the shipped translations and add languages the package does not ship (see [TRANSLATIONS.md](TRANSLATIONS.md)). Updates change only what the package ships. Catalogue caches include package identity, installed generation, locale and the revision of the site's translations. Only active catalogues are public; inactive theme previews can use that theme's translations.
+
+Site languages and content translations are described in [LANGUAGES.md](LANGUAGES.md). Plugins read the page's language with `ContentViews.language(request)`, limit content queries to what a language shows with `ContentTranslations.visibleIn`, and read the site settings in the page's language with `SiteTexts.settings`.
 
 ## Build and verify
 

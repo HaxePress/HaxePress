@@ -35,5 +35,8 @@
 --macro haxe.macro.Context.getType("hx.press.Pagination")
 --macro haxe.macro.Context.getType("hx.press.CmsVersion")
 --macro haxe.macro.Context.getType("hx.press.i18n.I18n")
+--macro haxe.macro.Context.getType("hx.press.i18n.Languages")
+--macro haxe.macro.Context.getType("hx.press.i18n.SiteTexts")
+--macro haxe.macro.Context.getType("hx.press.content.ContentTranslations")
 --macro haxe.macro.Context.getType("hx.press.validation.ValidationResponder")
 --macro haxe.macro.Context.getType("hx.press.validation.PositiveInt")
